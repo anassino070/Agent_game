@@ -47,7 +47,7 @@ func top_club() -> Dictionary:
 	return best
 
 
-func _get(cid: String) -> Dictionary:
+func find_club(cid: String) -> Dictionary:
 	for c in clubs:
 		if str(c.id) == cid:
 			return c
@@ -56,7 +56,7 @@ func _get(cid: String) -> Dictionary:
 
 func play_bluf(target_id: String, rng: RandomNumberGenerator) -> void:
 	rounds_left -= 1
-	var c := _get(target_id)
+	var c := find_club(target_id)
 	if rng.randf() < 0.6:
 		var raise := int(float(c.bid) * rng.randf_range(0.15, 0.25))
 		c["bid"] = mini(int(c.bid) + raise, int(c.budget))

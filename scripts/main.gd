@@ -577,7 +577,7 @@ func show_bidding() -> void:
 	sep()
 	if bidding.finished:
 		if bidding.deal:
-			lbl("Winnaar: %s met %s." % [str(bidding._get(bidding.winner_id).name), eur(bidding.final_bid)], 26)
+			lbl("Winnaar: %s met %s." % [str(bidding.find_club(bidding.winner_id).name), eur(bidding.final_bid)], 26)
 		else:
 			lbl("Geen deal. De bui trekt over zonder handtekening.", 26)
 		btn("Verder →", _finish_bidding)
