@@ -25,6 +25,7 @@ var sponsor: SponsorPitch = null
 var tax: TaxSettlement = null
 
 var home_btn: Button
+var inf_btn: Button                # ∞-upgrade, klein vierkant rechtsboven op het perkscherm
 var confirm_reset := false         # tweestaps-bevestiging voor de perk-reset
 
 # ---- Developer-only puntenreset: verborgen achter een tik-sequentie + wachtwoord.
@@ -83,6 +84,19 @@ func _ready() -> void:
 	home_btn.pressed.connect(_go_home)
 	add_child(home_btn)
 
+	# ∞-upgrade: klein vierkantje rechtsboven, alleen zichtbaar op het
+	# perkscherm. Vaste prijs, oneindig te kopen, +0,01% punten per niveau.
+	inf_btn = Button.new()
+	inf_btn.add_theme_font_size_override("font_size", 18)
+	inf_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+	inf_btn.offset_left = -160
+	inf_btn.offset_top = 24
+	inf_btn.offset_right = -24
+	inf_btn.offset_bottom = 160
+	inf_btn.pressed.connect(_buy_inf)
+	inf_btn.visible = false
+	add_child(inf_btn)
+
 	show_start()
 
 
@@ -99,6 +113,8 @@ func clear() -> void:
 		c.queue_free()
 	if home_btn:
 		home_btn.visible = true
+	if inf_btn:
+		inf_btn.visible = false
 
 
 func lbl(text: String, size := 28) -> Label:
@@ -239,6 +255,8 @@ func _do_dev_wipe() -> void:
 
 func show_perks() -> void:
 	clear()
+	_refresh_inf_btn()
+	inf_btn.visible = true
 	header.text = "PERKBOOM — %s legacy points" % _pts(Meta.state.legacy_points)
 	lbl("Boom voltooid: %s%%  (%s van %s punten)" % [
 		("%.1f" % (Meta.tree_progress() * 100.0)).replace(".", ","),
@@ -312,6 +330,20 @@ func _perk_node(id: String) -> void:
 func _buy_perk(id: String) -> void:
 	Meta.buy_perk(id)
 	show_perks()
+
+
+func _refresh_inf_btn() -> void:
+	inf_btn.text = "∞ ×%s\n+0,01%%\nkoop: %d pt" % [
+		("%.4f" % Meta.inf_multiplier()).replace(".", ","), Meta.INF_COST,
+	]
+	inf_btn.disabled = int(Meta.state.legacy_points) < Meta.INF_COST
+
+
+func _buy_inf() -> void:
+	if Meta.buy_inf():
+		# Alleen de knop en de header verversen; de boom hoeft niet opnieuw.
+		header.text = "PERKBOOM — %s legacy points" % _pts(Meta.state.legacy_points)
+	_refresh_inf_btn()
 
 
 # Kent legacy points toe voor de afgelopen run, maar hoogstens één keer per
@@ -500,31 +532,83 @@ func show_event(ev: Dictionary) -> void:
 			suffix = "  (geen gunst beschikbaar)"
 		var label := str(opt.label)
 		if opt.has("chance"):
-			label += "  [%d%% kans]" % int(round(float(opt.chance) * 100))
+			# Geluksvogel-perk telt mee in de getoonde én de echte kans.
+			var shown := clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98)
+			label += "  [%d%% kans]" % int(round(shown * 100))
 		btn(label + suffix, func(): _resolve(ev, opt), enabled)
 
 
 func _resolve(ev: Dictionary, opt: Dictionary) -> void:
 	var txt := ""
 	var notes: Array = []
+	var used: Dictionary = {}
 	if opt.has("chance"):
-		if Game.rng.randf() < float(opt.chance):
-			notes = Game.apply_effects(opt.get("success", {}), str(ev.client_id))
+		if Game.rng.randf() < clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98):
+			used = opt.get("success", {})
+			notes = Game.apply_effects(used, str(ev.client_id))
 			txt = str(opt.get("success_txt", "Het pakt goed uit."))
 		else:
-			notes = Game.apply_effects(opt.get("fail", {}), str(ev.client_id))
+			used = opt.get("fail", {})
+			notes = Game.apply_effects(used, str(ev.client_id))
 			txt = str(opt.get("fail_txt", "Het mislukt."))
 	else:
-		notes = Game.apply_effects(opt.get("effects", {}), str(ev.client_id))
+		used = opt.get("effects", {})
+		notes = Game.apply_effects(used, str(ev.client_id))
 		txt = str(opt.get("txt", "Gedaan."))
 	refresh_header()
 	clear()
 	lbl("UITKOMST", 32)
 	lbl(txt, 26)
+	var cname := ""
+	if str(ev.client_id) != "" and Game.state.players.has(ev.client_id):
+		cname = str(Game.state.players[ev.client_id].name)
+	_show_effect_lines(used, cname)
 	for n in notes:
 		lbl(">> " + str(n), 24)
 	sep()
 	btn("Verder →", _next_event)
+
+
+# ---------------------------------------------------------------- effect-samenvatting
+# Vertaalt een effects-Dictionary (money/rep/scandal/favors/trust/all_trust/
+# scout_points) naar leesbare regels, zodat je na élk event/minigame precies
+# ziet wat er veranderd is — los van het verhaaltje.
+
+func _fmt_delta(v: int) -> String:
+	return ("+%d" % v) if v > 0 else str(v)
+
+
+func _money_delta(v: int) -> String:
+	return ("+" + eur(v)) if v > 0 else eur(v)
+
+
+func _effect_lines(effects: Dictionary, client_name: String = "") -> Array:
+	var lines: Array = []
+	if effects.has("money") and int(effects.money) != 0:
+		lines.append("Geld: %s" % _money_delta(int(effects.money)))
+	if effects.has("rep") and int(effects.rep) != 0:
+		lines.append("Reputatie: %s" % _fmt_delta(int(effects.rep)))
+	if effects.has("scandal") and int(effects.scandal) != 0:
+		lines.append("Schandaal: %s" % _fmt_delta(int(effects.scandal)))
+	if effects.has("favors") and int(effects.favors) != 0:
+		lines.append("Gunsten: %s" % _fmt_delta(int(effects.favors)))
+	if effects.has("scout_points") and int(effects.scout_points) != 0:
+		lines.append("Scoutpunten: %s" % _fmt_delta(int(effects.scout_points)))
+	if effects.has("trust") and int(effects.trust) != 0:
+		var who := client_name if client_name != "" else "cliënt"
+		lines.append("Vertrouwen (%s): %s" % [who, _fmt_delta(int(effects.trust))])
+	if effects.has("all_trust") and int(effects.all_trust) != 0:
+		lines.append("Vertrouwen (hele stal): %s" % _fmt_delta(int(effects.all_trust)))
+	return lines
+
+
+func _show_effect_lines(effects: Dictionary, client_name: String = "") -> void:
+	var lines := _effect_lines(effects, client_name)
+	if lines.is_empty():
+		return
+	sep()
+	for line in lines:
+		lbl(line, 22)
 
 
 # ---------------------------------------------------------------- event-minigames
@@ -578,8 +662,13 @@ func show_bidding() -> void:
 	if bidding.finished:
 		if bidding.deal:
 			lbl("Winnaar: %s met %s." % [str(bidding.find_club(bidding.winner_id).name), eur(bidding.final_bid)], 26)
+			var income := int(float(bidding.final_bid) * Game.fee_cut())
+			if Meta.perk_level("superprovisie") > 0:
+				income *= 2
+			_show_effect_lines({"money": income})
 		else:
 			lbl("Geen deal. De bui trekt over zonder handtekening.", 26)
+			_show_effect_lines({"rep": BIDDING_FAIL_REP})
 		btn("Verder →", _finish_bidding)
 	else:
 		for c in bidding.active_clubs():
@@ -601,12 +690,14 @@ func _play_bidding(action: String, target_id: String) -> void:
 	show_bidding()
 
 
+const BIDDING_FAIL_REP := -3
+
 func _finish_bidding() -> void:
 	if bidding.deal:
 		var income := Game.complete_transfer(bidding.client_id, bidding.winner_id, bidding.final_bid, Game.fee_cut())
 		flash = "Transfer uit de biedingsoorlog! Jij incasseert %s." % eur(income)
 	else:
-		Game.apply_effects({"rep": -3}, "")
+		Game.apply_effects({"rep": BIDDING_FAIL_REP}, "")
 	bidding = null
 	_next_event()
 
@@ -629,6 +720,7 @@ func show_press() -> void:
 	if press.finished:
 		var o := press.outcome()
 		lbl(str(o.txt), 26)
+		_show_effect_lines(o.effects, str(Game.state.players[cid].name))
 		btn("Verder →", func(): _finish_press(o))
 	else:
 		btn("Ontwijken", func(): _play_press("ontwijken"))
@@ -664,6 +756,7 @@ func show_sponsor() -> void:
 	if sponsor.finished:
 		var o := sponsor.outcome()
 		lbl(str(o.txt), 26)
+		_show_effect_lines(o.effects, str(Game.state.players[cid].name))
 		btn("Verder →", func(): _finish_sponsor(o))
 	else:
 		btn("Cijfers tonen  [70%%, -15]", func(): _play_sponsor("cijfers"))
@@ -705,9 +798,8 @@ func show_tax() -> void:
 	else:
 		for r in tax.results:
 			lbl("· " + str(r.txt), 22)
+		_show_effect_lines({"money": tax.total_money, "scandal": tax.total_scandal})
 		sep()
-		var sc := int(tax.total_scandal)
-		lbl("Totaal: %s   |   schandaal %s%d" % [eur(tax.total_money), "+" if sc > 0 else "", sc], 26)
 		btn("Verder →", _finish_tax)
 
 
@@ -792,6 +884,7 @@ func _start_nego(cid: String, club_id: String) -> void:
 	nego.walk_mod = 1.0 - float(Meta.perk_bonus("stalen_zenuwen")) / 100.0
 	nego.clausule_cost = 0.02 - float(Meta.perk_bonus("clausulemeester")) / 1000.0
 	nego.aftast_cost = 2 - Meta.perk_level("dossierkennis")
+	nego.bluf_bonus = float(Meta.perk_bonus("koelbloedig")) / 100.0
 	var v := Game.value(Game.state.players[cid])
 	nego.setup(v, Game.start_resistance(club_id), Game.td_personality(club_id), Game.td_known(club_id))
 	if Meta.perk_level("helderziend") > 0:

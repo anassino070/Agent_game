@@ -65,6 +65,7 @@ var flow_mult := 1.5         # effect-multiplier bij flow
 var walk_mod := 1.0          # demping op wegloopkansen (Stalen zenuwen)
 var clausule_cost := 0.02    # fee-kost per clausule (Clausulemeester)
 var aftast_cost := 2         # rondes die aftasten kost (Dossierkennis)
+var bluf_bonus := 0.0        # extra slagingskans op bluffen (Koelbloedig)
 
 
 func setup(value: int, start_resistance: float, personality: String, known: bool) -> void:
@@ -136,7 +137,7 @@ func tactics(rep: int) -> Array:
 	})
 
 	# Payoff: bluffen — heeft een goede stemming nodig (25/50/75%).
-	var b_chance: float = [0.25, 0.50, 0.75][mood] + bonus
+	var b_chance: float = [0.25, 0.50, 0.75][mood] + bonus + bluf_bonus
 	if pers == "rekenmeester":
 		b_chance -= 0.15
 	out.append({

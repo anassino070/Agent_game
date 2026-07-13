@@ -28,8 +28,8 @@ func new_run() -> void:
 	var world: Dictionary = WorldGen.generate(rng)
 	state = {
 		"season": 1,
-		"money": START_MONEY + Meta.perk_bonus("startkapitaal"),
-		"rep": clampi(50 + Meta.perk_bonus("netwerk"), 0, 100),
+		"money": START_MONEY + Meta.perk_bonus("startkapitaal") + Meta.perk_bonus("onderpand"),
+		"rep": clampi(50 + Meta.perk_bonus("netwerk") + Meta.perk_bonus("iconenstatus"), 0, 100),
 		"scandal": 0,
 		"favors": 1 + Meta.perk_bonus("gunsten"),
 		"scout_points": scout_points_per_season(),
@@ -64,7 +64,9 @@ func _make_client(pid: String, trust: int) -> void:
 func value(p: Dictionary) -> int:
 	# Marktwaarde: kwadratisch in rating, zodat toppers écht lonen.
 	var r: float = float(p.rating)
-	return int(pow(maxf(r - 40.0, 5.0), 2.0) * 650.0)
+	var v := pow(maxf(r - 40.0, 5.0), 2.0) * 650.0
+	v *= 1.0 + float(Meta.perk_bonus("waardestijging")) / 100.0
+	return int(v)
 
 
 func scout_points_per_season() -> int:
@@ -350,7 +352,13 @@ func start_resistance(club_id: String) -> float:
 	var base := rng.randf_range(45.0, 70.0)
 	if int(state.season) % 5 == 0:
 		base -= 8.0
+	base -= float(Meta.perk_bonus("voorwerk"))
 	return base
+
+
+func luck_bonus() -> float:
+	# Geluksvogel-perk: +1%-punt per bonuspunt op kans-opties bij events.
+	return float(Meta.perk_bonus("geluksvogel")) * 0.01
 
 
 func complete_transfer(client_id: String, club_id: String, fee: int, cut: float) -> int:
@@ -393,6 +401,7 @@ func end_of_season() -> Array:
 	var discount := Meta.perk_bonus("kantoorkorting")
 	if discount > 0:
 		costs = int(costs * (1.0 - float(discount) / 100.0))
+	costs = maxi(costs - Meta.perk_bonus("schuldpapier"), 0)
 	state.money = int(state.money) - costs
 	lines.append("Kantoorkosten: -€%d" % costs)
 
@@ -408,7 +417,7 @@ func end_of_season() -> Array:
 				p["rating"] = mini(oud + growth, int(p.pot))
 				lines.append("%s ontwikkelt zich: rating %d → %d." % [p.name, oud, int(p.rating)])
 		# Vertrouwen drift op basis van het seizoen (licht negatief zonder aandacht).
-		var drift := rng.randi_range(-5, 5)
+		var drift := rng.randi_range(-5, 5) + Meta.perk_bonus("spelersfluisteraar")
 		if perf >= 8:
 			drift += 3
 			lines.append("%s had een topseizoen." % p.name)
@@ -424,7 +433,7 @@ func end_of_season() -> Array:
 			state.money = int(state.money) + tg
 			state.total_fees = int(state.total_fees) + tg
 			lines.append("%s verlengt bij zijn club; tekengeld €%d voor jou." % [p.name, tg])
-		if Meta.perk_level("ijzeren_stal") == 0 and int(p.trust) < LEAVE_TRUST and rng.randf() < LEAVE_CHANCE:
+		if Meta.perk_level("ijzeren_stal") == 0 and int(p.trust) < LEAVE_TRUST - Meta.perk_bonus("empathie") and rng.randf() < LEAVE_CHANCE:
 			leavers.append(cid)
 			lines.append("!! %s VERTREKT naar een andere makelaar. Het vertrouwen was op." % p.name)
 		elif rng.randf() < poach_chance(p):

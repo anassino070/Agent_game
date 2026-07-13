@@ -10,18 +10,23 @@ const SAVE_PATH := "user://meta.json"
 # Hoeveel niveaus je in een rij moet kopen om de volgende rij te ontgrendelen.
 const TIER_REQ := 5
 
-# Beloningscurve: een gewonnen run levert exact 2,5% van de volledige boom op;
+# Beloningscurve: een gewonnen run levert exact 1% van de volledige boom op;
 # elk seizoen mínder overleefd deelt de beloning door REWARD_BASE.
 const RUN_SEASONS := 15
 const REWARD_BASE := 1.45
-const WIN_REWARD_PCT := 2.5
+const WIN_REWARD_PCT := 1.0
+
+# De ∞-upgrade: vaste (nooit stijgende) prijs, oneindig te kopen, elk niveau
+# geeft +0,01% op alle verdiende legacy points.
+const INF_COST := 200
+const INF_STEP := 0.0001
 
 # De OVERPOWERED extra's: peperduur (30–50% van de boomkosten), tellen NIET
 # mee voor de 100%-voortgang.
 const OP_PERKS := ["superprovisie", "ijzeren_stal", "helderziend", "vaste_kern"]
 
-# De perkboom: 3 takken × 3 rijen × 3 opties = 27 perks. Volledig kopen kost
-# ~800.000 punten — een lange grind waarin elke run iets achterlaat.
+# De perkboom: 3 takken × 4 rijen × 3 opties = 36 perks. Volledig kopen kost
+# ~1,4 miljoen punten — een lange grind waarin elke run iets achterlaat.
 # "fmt" bepaalt hoe de waarde in de UI verschijnt: int (default), money, pct10
 # (waarde in tienden van procenten, bijv. 2 → "0,2%").
 const PERKS := {
@@ -64,6 +69,19 @@ const PERKS := {
 		"name": "Laatste redmiddel", "desc": "%s× per run dekt een oude vriend je tekort (saldo naar €0)",
 		"value": 1, "max_level": 1, "base_cost": 35000,
 	},
+	# ---- TAK KAPITAAL, rij 4 ----
+	"waardestijging": {
+		"name": "Waardestijging", "desc": "+%s%% marktwaarde voor al je cliënten",
+		"value": 2, "max_level": 5, "base_cost": 6000,
+	},
+	"onderpand": {
+		"name": "Onderpand", "desc": "+%s extra startkapitaal",
+		"value": 5000, "fmt": "money", "max_level": 4, "base_cost": 4000,
+	},
+	"schuldpapier": {
+		"name": "Schuldpapier", "desc": "%s vaste korting op de kantoorkosten",
+		"value": 500, "fmt": "money", "max_level": 5, "base_cost": 3000,
+	},
 	# ---- TAK RELATIES, rij 1 ----
 	"netwerk": {
 		"name": "Netwerk", "desc": "+%s startreputatie",
@@ -102,6 +120,19 @@ const PERKS := {
 	"gunstenfabriek": {
 		"name": "Gunstenfabriek", "desc": "+%s gunst(en) elk 3e seizoen",
 		"value": 1, "max_level": 2, "base_cost": 15000,
+	},
+	# ---- TAK RELATIES, rij 4 ----
+	"iconenstatus": {
+		"name": "Iconenstatus", "desc": "+%s extra startreputatie",
+		"value": 3, "max_level": 5, "base_cost": 5000,
+	},
+	"spelersfluisteraar": {
+		"name": "Spelersfluisteraar", "desc": "+%s vertrouwen voor ál je cliënten, elk seizoen",
+		"value": 1, "max_level": 3, "base_cost": 7000,
+	},
+	"empathie": {
+		"name": "Empathie", "desc": "cliënten overwegen pas vertrek onder vertrouwen %s lager",
+		"value": 2, "max_level": 5, "base_cost": 4000,
 	},
 	# ---- TAK VAKWERK, rij 1 ----
 	"onderhandelen": {
@@ -142,6 +173,19 @@ const PERKS := {
 		"name": "Crisismanagement", "desc": "schandaal-stijgingen %s lager (minimaal 1)",
 		"value": 1, "max_level": 3, "base_cost": 5000,
 	},
+	# ---- TAK VAKWERK, rij 4 ----
+	"koelbloedig": {
+		"name": "Koelbloedig", "desc": "+%s%% slagingskans op bluffen",
+		"value": 2, "max_level": 5, "base_cost": 5000,
+	},
+	"voorwerk": {
+		"name": "Voorwerk", "desc": "TD's starten met %s minder weerstand",
+		"value": 1, "max_level": 5, "base_cost": 5000,
+	},
+	"geluksvogel": {
+		"name": "Geluksvogel", "desc": "+%s%% slagingskans op alle kans-opties bij events",
+		"value": 2, "max_level": 5, "base_cost": 5000,
+	},
 	# ---- OVERPOWERED extra's (buiten de boom; tellen niet mee voor 100%) ----
 	"superprovisie": {
 		"name": "★ Superprovisie", "desc": "alle transfer-inkomsten tellen dubbel",
@@ -168,16 +212,19 @@ const TREE := [
 		["startkapitaal", "kantoorkorting", "oud_geld"],
 		["commissie", "tekengeld", "gunsten"],
 		["kantoor", "reserves", "laatste_redmiddel"],
+		["waardestijging", "onderpand", "schuldpapier"],
 	]},
 	{"name": "RELATIES", "tiers": [
 		["netwerk", "babbel", "vertrouwenspersoon"],
 		["binding", "mediatraining", "pr_machine"],
 		["talentmagneet", "grote_naam", "gunstenfabriek"],
+		["iconenstatus", "spelersfluisteraar", "empathie"],
 	]},
 	{"name": "VAKWERK", "tiers": [
 		["onderhandelen", "talentenoog", "flow_meester"],
 		["stalen_zenuwen", "clausulemeester", "scouting"],
 		["dossierkennis", "extra_kandidaat", "crisismanagement"],
+		["koelbloedig", "voorwerk", "geluksvogel"],
 	]},
 ]
 
@@ -326,10 +373,30 @@ func tree_progress() -> float:
 
 func reset_perks() -> void:
 	# Zet alle perks terug naar 0 en geef de bestede punten volledig terug.
+	# De ∞-upgrade blijft staan; die is statisch en los van de boom.
 	state.legacy_points = int(state.legacy_points) + spent_points()
 	for id in PERKS:
 		state.perks[id] = 0
 	save_meta()
+
+
+# ---- De ∞-upgrade (statisch, oneindig, vaste prijs) ----
+
+func inf_level() -> int:
+	return int(state.get("inf_level", 0))
+
+
+func inf_multiplier() -> float:
+	return 1.0 + float(inf_level()) * INF_STEP
+
+
+func buy_inf() -> bool:
+	if int(state.legacy_points) < INF_COST:
+		return false
+	state.legacy_points = int(state.legacy_points) - INF_COST
+	state["inf_level"] = inf_level() + 1
+	save_meta()
+	return true
 
 
 func dev_wipe_points() -> void:
@@ -350,6 +417,8 @@ func award_run(total_fees: int, seasons_survived: int, won: bool) -> int:
 		points = int(round(full))
 	else:
 		points = maxi(int(round(full * pow(REWARD_BASE, float(seasons_survived - RUN_SEASONS)))), 10)
+	# De ∞-upgrade vermenigvuldigt alles wat binnenkomt.
+	points = int(round(float(points) * inf_multiplier()))
 	state.legacy_points = int(state.legacy_points) + points
 	state.runs_completed = int(state.runs_completed) + 1
 	state.total_career_fees = int(state.total_career_fees) + total_fees
