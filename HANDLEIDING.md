@@ -1,6 +1,6 @@
 # Handleiding — Voetbalmakelaar Roguelike (Godot MVP)
 
-Dit is de speelbare MVP van het game design document: één archetype, 15 seizoenen per run, 24 events, 10 clubs, 80 procedureel gegenereerde spelers, een onderhandelings-minigame met stemming, verborgen TD-persoonlijkheden en flow, drie fail states, autosave én meta-progressie (legacy points en permanente perks die runs overleven). Alles is opgezet volgens het GDD-principe: **staat en logica strikt gescheiden van presentatie**, zodat je later moeiteloos archetypes en daily seeds kunt toevoegen.
+Dit is de speelbare MVP van het game design document: één archetype, 15 seizoenen per run, 64 events, 10 clubs, 80 procedureel gegenereerde spelers, een onderhandelings-minigame met stemming, verborgen TD-persoonlijkheden en flow, drie fail states, autosave én meta-progressie (legacy points en permanente perks die runs overleven). Alles is opgezet volgens het GDD-principe: **staat en logica strikt gescheiden van presentatie**, zodat je later moeiteloos archetypes en daily seeds kunt toevoegen.
 
 ---
 
@@ -51,7 +51,7 @@ voetbalmakelaar/
     ├── game.gd            # AUTOLOAD "Game": alle staat + spellogica van één run
     ├── meta.gd            # AUTOLOAD "Meta": meta-progressie (legacy points, perks), overleeft runs
     ├── world_gen.gd       # procedurele generatie (spelers, clubs, namen)
-    ├── events_db.gd       # alle 24 events als pure data
+    ├── events_db.gd       # alle 64 events als pure data
     ├── negotiation.gd     # het onderhandelings-minigame
     └── main.gd            # de UI: bouwt elk scherm programmatisch
 ```
