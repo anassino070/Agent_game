@@ -736,4 +736,36 @@ static func get_events() -> Array:
 					"txt": "Geen fee meer op dit contract, wel een cliënt die je nooit vergeet."},
 			],
 		},
+
+		# ---------------------------------------------------------------- batch 3 (6 nieuwe minigame-events)
+		{
+			"id": "rivaal_poker", "title": "Pokeravond om een talent", "needs_slot": true,
+			"minigame": "pokerbluf",
+			"text": "Een rivaliserende makelaar zit aan tafel met hetzelfde toptalent op het oog. Jullie leggen de knikkers op tafel — wie het meest overtuigend speelt, krijgt het talent.",
+		},
+		{
+			"id": "bookmaker_dobbelen", "title": "De achterkamer van de bookmaker",
+			"minigame": "dobbelen",
+			"text": "Een bevriende bookmaker biedt je een gokje op zijn dobbelstenen. Vijf worpen, twee herkansingen, en een uitbetaling die met de uitkomst meeschaalt.",
+		},
+		{
+			"id": "boekhoud_puzzel", "title": "De boekhoudpuzzel",
+			"minigame": "boekhoudpuzzel",
+			"text": "Je boekhouder legt een rooster voor je neer: vul het correct in en je bespaart legaal een aardig bedrag. Geen risico, wel denkwerk.",
+		},
+		{
+			"id": "anagram_jacht", "title": "Het gelekte document",
+			"minigame": "anagramjacht",
+			"text": "Een gelekt clubdocument ligt gehusseld in je inbox — letterlijk. Ontcijfer de sleutelwoorden voordat een rivaal-makelaar hetzelfde document doorheeft.",
+		},
+		{
+			"id": "scoutingbeurs_speeddate", "title": "Speed-daten op de scoutingbeurs",
+			"minigame": "scoutspeeddate",
+			"text": "Op de jaarlijkse scoutingbeurs zoek je binnen een paar minuten uit welke scout bij welk talent past. Klik goed, en je netwerk groeit.",
+		},
+		{
+			"id": "mediatraining_simon", "title": "Mediatraining: Simon Says", "needs_client": true,
+			"minigame": "simonmedia",
+			"text": "{client} moet leren zijn mond te houden onder druk. Jullie oefenen een groeiende reeks veilige reacties — één foutje en de sessie is voorbij.",
+		},
 	]

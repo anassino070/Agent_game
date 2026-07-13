@@ -29,13 +29,15 @@ func all_chosen() -> bool:
 	return true
 
 
-func resolve(rng: RandomNumberGenerator) -> void:
+func resolve(rng: RandomNumberGenerator, money_scale: float = 1.0) -> void:
+	# money_scale komt van Game.event_money_scale(): elke postbedrag schaalt
+	# vóór de percentages worden berekend, zodat tekst en totaal altijd kloppen.
 	resolved = true
 	total_money = 0
 	total_scandal = 0
 	for i in range(POSTS.size()):
 		var post: Dictionary = POSTS[i]
-		var amount: int = int(post.amount)
+		var amount: int = int(round(float(post.amount) * money_scale))
 		var name: String = str(post.name)
 		var r: Dictionary
 		match int(choices[i]):

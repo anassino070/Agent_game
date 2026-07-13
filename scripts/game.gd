@@ -59,6 +59,17 @@ func _make_client(pid: String, trust: int) -> void:
 	state.clients.append(pid)
 
 
+func ensure_test_client() -> void:
+	# Developer-only: garandeert minstens één cliënt, zodat needs_client-events
+	# ook in de eventtest kunnen worden getoond.
+	if not state.clients.is_empty():
+		return
+	var pool: Array = state.players.keys()
+	if pool.is_empty():
+		return
+	_make_client(pool[0], 70)
+
+
 # ---------------------------------------------------------------- helpers
 
 func value(p: Dictionary) -> int:
@@ -117,6 +128,26 @@ func club_name(club_id: String) -> String:
 	if club_id == "" or not state.clubs.has(club_id):
 		return "clubloos"
 	return str(state.clubs[club_id]["name"])
+
+
+const EVENT_MONEY_GROWTH := 0.20   # event-geldbedragen groeien 20%/seizoen mee met de economie
+
+
+func event_money_scale() -> float:
+	# Vaste event-bedragen (€8.000 hier, €5.000 daar) worden anders snel
+	# betekenisloos naast de exponentieel stijgende kantoorkosten.
+	return pow(1.0 + EVENT_MONEY_GROWTH, float(state.season) - 1.0)
+
+
+func scale_money_effects(effects: Dictionary) -> Dictionary:
+	# Geeft een kopie terug met de "money"-key opgeschaald naar dit seizoen;
+	# andere keys blijven ongewijzigd. Gebruik dit VOORDAT je zowel toont
+	# als toepast, zodat preview en werkelijkheid altijd gelijk zijn.
+	if not effects.has("money"):
+		return effects
+	var out := effects.duplicate()
+	out["money"] = int(round(float(out.money) * event_money_scale()))
+	return out
 
 
 func apply_effects(effects: Dictionary, client_id: String = "") -> Array:
@@ -273,7 +304,7 @@ func attempt_sign(pid: String) -> bool:
 func gen_events() -> Array:
 	var evs: Array = EventsDB.get_events()
 	var out: Array = []
-	var n := rng.randi_range(2, 3)
+	var n := rng.randi_range(4, 6)
 	var tries := 0
 	while out.size() < n and tries < 300:
 		tries += 1

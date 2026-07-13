@@ -47,15 +47,17 @@ func play(action: String, rng: RandomNumberGenerator) -> void:
 		success = reluctance < 90.0
 
 
-func outcome() -> Dictionary:
+func outcome(money_scale: float = 1.0) -> Dictionary:
+	# money_scale komt van Game.event_money_scale(): tekst en effect gebruiken
+	# hetzelfde al-geschaalde bedrag, zodat preview en werkelijkheid kloppen.
 	if success and reluctance <= 0.0:
-		var value := BASE_VALUE + rounds_left * 3000
+		var value := int(round(float(BASE_VALUE + rounds_left * 3000) * money_scale))
 		var effects := {"money": value, "trust": 5 - trust_penalty}
 		return {"effects": effects,
 			"txt": "Topdeal binnen: %s. %s" % [_eur(value),
 				"Wel iets minder blij met de kleine lettertjes." if trust_penalty > 0 else "Hij is dolblij."]}
 	if success:
-		var value := maxi(int(BASE_VALUE * (1.0 - reluctance / 100.0)), 3000)
+		var value := int(round(float(maxi(int(BASE_VALUE * (1.0 - reluctance / 100.0)), 3000)) * money_scale))
 		return {"effects": {"money": value, "trust": 2 - trust_penalty},
 			"txt": "Ze tekenen, maar met een lager bod dan gehoopt: %s." % _eur(value)}
 	return {"effects": {"trust": -5},

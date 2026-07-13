@@ -23,6 +23,14 @@ var bidding: BiddingWar = null
 var press: PressConference = null
 var sponsor: SponsorPitch = null
 var tax: TaxSettlement = null
+var poker: PokerBluff = null
+var poker_notes: Array = []
+var poker_applied := false
+var dice: DiceBookmaker = null
+var accounting: AccountingPuzzle = null
+var anagram: AnagramHunt = null
+var scoutdate: ScoutSpeedDate = null
+var simon: SimonMedia = null
 
 var home_btn: Button
 var inf_btn: Button                # ∞-upgrade, klein vierkant rechtsboven op het perkscherm
@@ -36,6 +44,13 @@ const DEV_TAPS_NEEDED := 7
 var dev_taps := 0
 var dev_unlocked := false
 var dev_confirm := false
+
+# ---- Developer-only eventtest: doorloopt ALLE events achter elkaar, met
+# onbeperkt geld en zonder fail-checks, zodat je elke tekst/minigame kunt zien.
+const DEV_TEST_MONEY := 999999999
+var dev_test_mode := false
+var dev_test_index := 0
+var dev_test_total := 0
 
 
 # ---------------------------------------------------------------- opbouw
@@ -242,12 +257,48 @@ func show_dev_panel() -> void:
 	else:
 		btn("Wis alle punten (naar 0)", func(): dev_confirm = true; show_dev_panel())
 	sep()
+	lbl("Testmodus: doorloopt ALLE %d events op volgorde, met onbeperkt geld en zonder fail-checks. Start een verse testrun in het geheugen — je opgeslagen run blijft veilig op schijf." % EventsDB.get_events().size(), 20)
+	btn("Test: doorloop alle events →", _start_event_test)
+	sep()
 	btn("← Terug naar start", func(): dev_unlocked = false; dev_confirm = false; show_start())
 
 
 func _do_dev_wipe() -> void:
 	Meta.dev_wipe_points()
 	dev_confirm = false
+	show_dev_panel()
+
+
+# ---- Developer-only eventtest ----
+
+func _dev_test_banner() -> void:
+	if not dev_test_mode:
+		return
+	var l := lbl("[DEV TEST] Event %d/%d — id: %s" % [dev_test_index, dev_test_total, str(mg_ev.get("id", "?"))], 18)
+	l.add_theme_color_override("font_color", Color(1.0, 0.6, 0.2))
+
+
+func _start_event_test() -> void:
+	Game.new_run()
+	Game.ensure_test_client()
+	Game.state.money = DEV_TEST_MONEY
+	dev_test_mode = true
+	event_queue = []
+	for ev in EventsDB.get_events():
+		var e: Dictionary = ev.duplicate(true)
+		if bool(e.get("needs_client", false)):
+			e["client_id"] = Game.state.clients[0] if not Game.state.clients.is_empty() else ""
+		else:
+			e["client_id"] = ""
+		event_queue.append(e)
+	dev_test_total = event_queue.size()
+	dev_test_index = 0
+	_next_event()
+
+
+func _finish_event_test() -> void:
+	dev_test_mode = false
+	flash = "Testrun klaar: alle %d events doorlopen." % dev_test_total
 	show_dev_panel()
 
 
@@ -491,27 +542,36 @@ func _goto_events() -> void:
 
 
 func _next_event() -> void:
-	# Tussentijdse fail-check (events kunnen je nu al de das omdoen).
-	if int(Game.state.scandal) >= 100:
-		Game.state.game_over = "licentie"
-		Game.save_game()
-		show_gameover()
-		return
-	if int(Game.state.money) < 0:
-		Game.state.game_over = "failliet"
-		Game.save_game()
-		show_gameover()
-		return
+	if not dev_test_mode:
+		# Tussentijdse fail-check (events kunnen je nu al de das omdoen).
+		if int(Game.state.scandal) >= 100:
+			Game.state.game_over = "licentie"
+			Game.save_game()
+			show_gameover()
+			return
+		if int(Game.state.money) < 0:
+			Game.state.game_over = "failliet"
+			Game.save_game()
+			show_gameover()
+			return
 	if event_queue.is_empty():
-		_goto_window()
+		if dev_test_mode:
+			_finish_event_test()
+		else:
+			_goto_window()
 		return
+	if dev_test_mode:
+		Game.state.money = maxi(int(Game.state.money), DEV_TEST_MONEY)
+		dev_test_index += 1
 	var ev: Dictionary = event_queue.pop_front()
 	show_event(ev)
 
 
 func show_event(ev: Dictionary) -> void:
+	mg_ev = ev
 	refresh_header()
 	clear()
+	_dev_test_banner()
 	var cname := ""
 	if str(ev.client_id) != "":
 		cname = str(Game.state.players[ev.client_id].name)
@@ -524,7 +584,7 @@ func show_event(ev: Dictionary) -> void:
 	for opt in ev.options:
 		var enabled := true
 		var suffix := ""
-		if opt.has("req_money") and int(Game.state.money) < int(opt.req_money):
+		if opt.has("req_money") and int(Game.state.money) < int(round(float(opt.req_money) * Game.event_money_scale())):
 			enabled = false
 			suffix = "  (te weinig geld)"
 		if opt.has("req_favors") and int(Game.state.favors) < int(opt.req_favors):
@@ -544,15 +604,15 @@ func _resolve(ev: Dictionary, opt: Dictionary) -> void:
 	var used: Dictionary = {}
 	if opt.has("chance"):
 		if Game.rng.randf() < clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98):
-			used = opt.get("success", {})
+			used = Game.scale_money_effects(opt.get("success", {}))
 			notes = Game.apply_effects(used, str(ev.client_id))
 			txt = str(opt.get("success_txt", "Het pakt goed uit."))
 		else:
-			used = opt.get("fail", {})
+			used = Game.scale_money_effects(opt.get("fail", {}))
 			notes = Game.apply_effects(used, str(ev.client_id))
 			txt = str(opt.get("fail_txt", "Het mislukt."))
 	else:
-		used = opt.get("effects", {})
+		used = Game.scale_money_effects(opt.get("effects", {}))
 		notes = Game.apply_effects(used, str(ev.client_id))
 		txt = str(opt.get("txt", "Gedaan."))
 	refresh_header()
@@ -641,6 +701,30 @@ func _start_minigame(ev: Dictionary) -> void:
 		"fiscale_schikking":
 			tax = TaxSettlement.new()
 			show_tax()
+		"pokerbluf":
+			poker = PokerBluff.new()
+			poker.setup(Game.rng, Game.event_money_scale())
+			show_poker()
+		"dobbelen":
+			dice = DiceBookmaker.new()
+			dice.setup(Game.rng, Game.event_money_scale())
+			show_dice()
+		"boekhoudpuzzel":
+			accounting = AccountingPuzzle.new()
+			accounting.setup(Game.rng)
+			show_accounting()
+		"anagramjacht":
+			anagram = AnagramHunt.new()
+			anagram.setup(Game.rng)
+			show_anagram()
+		"scoutspeeddate":
+			scoutdate = ScoutSpeedDate.new()
+			scoutdate.setup(Game.rng)
+			show_scoutdate()
+		"simonmedia":
+			simon = SimonMedia.new()
+			simon.setup(Game.rng)
+			show_simon()
 
 
 # -- Biedingsoorlog --
@@ -648,6 +732,7 @@ func _start_minigame(ev: Dictionary) -> void:
 func show_bidding() -> void:
 	refresh_header()
 	clear()
+	_dev_test_banner()
 	lbl("BIEDINGSOORLOG", 32)
 	lbl("Cliënt: %s   |   Rondes over: %d" % [str(Game.state.players[bidding.client_id].name), bidding.rounds_left], 24)
 	sep()
@@ -707,6 +792,7 @@ func _finish_bidding() -> void:
 func show_press() -> void:
 	refresh_header()
 	clear()
+	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
 	lbl("PERSCONFERENTIE", 32)
 	lbl("%s   |   Spanning: %d/100   |   Vragen over: %d" % [
@@ -744,6 +830,7 @@ func _finish_press(o: Dictionary) -> void:
 func show_sponsor() -> void:
 	refresh_header()
 	clear()
+	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
 	lbl("SPONSORPITCH", 32)
 	lbl("Cliënt: %s" % str(Game.state.players[cid].name), 24)
@@ -754,7 +841,7 @@ func show_sponsor() -> void:
 			lbl("· " + str(line), 20)
 	sep()
 	if sponsor.finished:
-		var o := sponsor.outcome()
+		var o := sponsor.outcome(Game.event_money_scale())
 		lbl(str(o.txt), 26)
 		_show_effect_lines(o.effects, str(Game.state.players[cid].name))
 		btn("Verder →", func(): _finish_sponsor(o))
@@ -780,6 +867,7 @@ func _finish_sponsor(o: Dictionary) -> void:
 func show_tax() -> void:
 	refresh_header()
 	clear()
+	_dev_test_banner()
 	lbl("FISCALE SCHIKKING", 32)
 	if not tax.resolved:
 		lbl("Kies per post hoe je ermee omgaat. Pas als alle drie gekozen zijn, kun je regelen.", 22)
@@ -788,7 +876,8 @@ func show_tax() -> void:
 			var post: Dictionary = TaxSettlement.POSTS[i]
 			var chosen := int(tax.choices[i])
 			var labels := ["Open aangeven", "Deels verhullen", "Volledig verhullen"]
-			lbl("%s (€%d)  —  %s" % [str(post.name), int(post.amount),
+			var scaled_amount := int(round(float(post.amount) * Game.event_money_scale()))
+			lbl("%s (%s)  —  %s" % [str(post.name), eur(scaled_amount),
 				labels[chosen] if chosen >= 0 else "nog niet gekozen"], 24)
 			for opt_i in range(3):
 				if opt_i != chosen:
@@ -809,13 +898,295 @@ func _choose_tax(post_idx: int, option: int) -> void:
 
 
 func _resolve_tax() -> void:
-	tax.resolve(Game.rng)
+	tax.resolve(Game.rng, Game.event_money_scale())
 	show_tax()
 
 
 func _finish_tax() -> void:
 	Game.apply_effects({"money": tax.total_money, "scandal": tax.total_scandal}, "")
 	tax = null
+	_next_event()
+
+
+# -- Pokerbluf tegen een rivaal --
+
+func show_poker() -> void:
+	refresh_header()
+	clear()
+	_dev_test_banner()
+	lbl("POKERBLUF TEGEN EEN RIVAAL", 32)
+	lbl("Jouw hand: %d/100   |   Pot: %s   |   Rondes over: %d" % [poker.my_strength, eur(poker.pot), poker.rounds_left], 24)
+	if not poker.log.is_empty():
+		sep()
+		for line in poker.log:
+			lbl("· " + str(line), 20)
+	sep()
+	if poker.finished:
+		var o := poker.outcome()
+		lbl(str(o.txt), 26)
+		_show_effect_lines(o.effects)
+		for n in poker_notes:
+			lbl(">> " + str(n), 24)
+		btn("Verder →", _finish_poker)
+	else:
+		btn("Meegaan", func(): _play_poker("meegaan"))
+		btn("Verhogen", func(): _play_poker("verhogen"))
+		btn("Bluffen", func(): _play_poker("bluffen"))
+		btn("Passen (veilig wegwezen)", func(): _play_poker("passen"))
+
+
+func _play_poker(action: String) -> void:
+	poker.play(action, Game.rng)
+	# Effecten (incl. eventuele nieuwe cliënt) direct toepassen zodra het
+	# spel eindigt, zodat de melding op het uitkomstscherm klopt met de
+	# werkelijk toegepaste staat — en niet dubbel wordt toegepast op "Verder".
+	if poker.finished and not poker_applied:
+		poker_applied = true
+		poker_notes = Game.apply_effects(poker.outcome().effects, "")
+	show_poker()
+
+
+func _finish_poker() -> void:
+	poker = null
+	poker_notes = []
+	poker_applied = false
+	_next_event()
+
+
+# -- Dobbelen bij de bookmaker --
+
+func show_dice() -> void:
+	refresh_header()
+	clear()
+	_dev_test_banner()
+	lbl("DOBBELEN BIJ DE BOOKMAKER", 32)
+	lbl("Inzet: %s   |   Herkansingen over: %d" % [eur(dice.stake), dice.rolls_left], 24)
+	sep()
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 12)
+	content.add_child(row)
+	for i in range(5):
+		var b := Button.new()
+		b.text = "%d%s" % [int(dice.dice[i]), "\n🔒" if dice.held[i] else ""]
+		b.custom_minimum_size = Vector2(72, 72)
+		b.disabled = dice.finished
+		var idx := i
+		b.pressed.connect(func(): _toggle_die(idx))
+		row.add_child(b)
+	if not dice.log.is_empty():
+		sep()
+		for line in dice.log:
+			lbl("· " + str(line), 20)
+	sep()
+	if dice.finished:
+		var o := dice.outcome()
+		lbl(str(o.txt), 26)
+		_show_effect_lines(o.effects)
+		btn("Verder →", func(): _finish_dice(o))
+	else:
+		lbl("Tik dobbelstenen aan om ze vast te houden, gooi dan de rest opnieuw.", 20)
+		btn("Opnieuw gooien (%d over)" % dice.rolls_left, _reroll_dice, dice.rolls_left > 0)
+		btn("Nu stoppen, uitbetalen", _stop_dice)
+
+
+func _toggle_die(i: int) -> void:
+	dice.toggle_hold(i)
+	show_dice()
+
+
+func _reroll_dice() -> void:
+	dice.reroll(Game.rng)
+	show_dice()
+
+
+func _stop_dice() -> void:
+	dice.stop_early()
+	show_dice()
+
+
+func _finish_dice(o: Dictionary) -> void:
+	Game.apply_effects(o.effects, "")
+	dice = null
+	_next_event()
+
+
+# -- Cijferpuzzel voor de boekhouding --
+
+func show_accounting() -> void:
+	refresh_header()
+	clear()
+	_dev_test_banner()
+	lbl("DE BOEKHOUDPUZZEL", 32)
+	lbl("Vul elke rij, kolom en 2×2-vak met de cijfers 1-4, elk precies één keer. Pogingen over: %d" % accounting.attempts_left, 22)
+	sep()
+	var grid := GridContainer.new()
+	grid.columns = 4
+	grid.add_theme_constant_override("h_separation", 8)
+	grid.add_theme_constant_override("v_separation", 8)
+	content.add_child(grid)
+	for i in range(16):
+		var b := Button.new()
+		var v := int(accounting.grid[i])
+		b.text = str(v) if v > 0 else "·"
+		b.custom_minimum_size = Vector2(64, 64)
+		b.disabled = bool(accounting.fixed[i]) or accounting.finished
+		if bool(accounting.fixed[i]):
+			b.modulate = Color(1, 1, 1, 0.5)
+		var idx := i
+		b.pressed.connect(func(): _cycle_accounting(idx))
+		grid.add_child(b)
+	if not accounting.log.is_empty():
+		sep()
+		for line in accounting.log:
+			lbl("· " + str(line), 20)
+	sep()
+	if accounting.finished:
+		var o := accounting.outcome(Game.event_money_scale())
+		lbl(str(o.txt), 26)
+		_show_effect_lines(o.effects)
+		btn("Verder →", func(): _finish_accounting(o))
+	else:
+		btn("Controleren", _check_accounting)
+
+
+func _cycle_accounting(i: int) -> void:
+	accounting.cycle_cell(i)
+	show_accounting()
+
+
+func _check_accounting() -> void:
+	accounting.check()
+	show_accounting()
+
+
+func _finish_accounting(o: Dictionary) -> void:
+	Game.apply_effects(o.effects, "")
+	accounting = null
+	_next_event()
+
+
+# -- Anagramjacht --
+
+func show_anagram() -> void:
+	refresh_header()
+	clear()
+	_dev_test_banner()
+	lbl("HET GELEKTE DOCUMENT", 32)
+	if not anagram.finished:
+		var r: Dictionary = anagram.current()
+		lbl("Woord %d/3: %s" % [anagram.round_idx + 1, str(r.scrambled)], 28)
+		sep()
+		for opt in r.options:
+			btn(str(opt), func(): _guess_anagram(str(opt)))
+	if not anagram.log.is_empty():
+		sep()
+		for line in anagram.log:
+			lbl("· " + str(line), 20)
+	if anagram.finished:
+		sep()
+		var o := anagram.outcome(Game.event_money_scale())
+		lbl(str(o.txt), 26)
+		_show_effect_lines(o.effects)
+		btn("Verder →", func(): _finish_anagram(o))
+
+
+func _guess_anagram(word: String) -> void:
+	anagram.guess(word)
+	show_anagram()
+
+
+func _finish_anagram(o: Dictionary) -> void:
+	Game.apply_effects(o.effects, "")
+	anagram = null
+	_next_event()
+
+
+# -- Speed-dating met scouts --
+
+func show_scoutdate() -> void:
+	refresh_header()
+	clear()
+	_dev_test_banner()
+	lbl("SPEED-DATEN OP DE SCOUTINGBEURS", 32)
+	lbl("Vastgezet: %d/4   |   Pogingen over: %d" % [scoutdate.locked_count(), scoutdate.attempts_left], 24)
+	if not scoutdate.log.is_empty():
+		sep()
+		for line in scoutdate.log:
+			lbl("· " + str(line), 20)
+	sep()
+	if scoutdate.finished:
+		var o := scoutdate.outcome()
+		lbl(str(o.txt), 26)
+		_show_effect_lines(o.effects)
+		btn("Verder →", func(): _finish_scoutdate(o))
+	else:
+		for si in range(ScoutSpeedDate.SCOUTS.size()):
+			if bool(scoutdate.locked[si]):
+				lbl("✔ %s — vastgezet" % str(ScoutSpeedDate.SCOUTS[si]), 22)
+				continue
+			lbl(str(ScoutSpeedDate.SCOUTS[si]), 22)
+			var row := HBoxContainer.new()
+			row.add_theme_constant_override("separation", 10)
+			content.add_child(row)
+			for ti in range(ScoutSpeedDate.TALENTS.size()):
+				var b := Button.new()
+				b.text = str(ScoutSpeedDate.TALENTS[ti])
+				var s := si
+				var t := ti
+				b.pressed.connect(func(): _guess_scoutdate(s, t))
+				row.add_child(b)
+
+
+func _guess_scoutdate(scout_idx: int, talent_idx: int) -> void:
+	scoutdate.guess(scout_idx, talent_idx)
+	show_scoutdate()
+
+
+func _finish_scoutdate(o: Dictionary) -> void:
+	Game.apply_effects(o.effects, "")
+	scoutdate = null
+	_next_event()
+
+
+# -- Simon Says voor mediatraining --
+
+func show_simon() -> void:
+	refresh_header()
+	clear()
+	_dev_test_banner()
+	var cid := str(mg_ev.client_id)
+	lbl("MEDIATRAINING: SIMON SAYS", 32)
+	lbl("%s   |   Reeks %d/%d" % [str(Game.state.players[cid].name), simon.round_num, SimonMedia.TARGET_ROUNDS], 24)
+	sep()
+	if simon.finished:
+		var o := simon.outcome()
+		lbl(str(o.txt), 26)
+		_show_effect_lines(o.effects, str(Game.state.players[cid].name))
+		btn("Verder →", func(): _finish_simon(o))
+	elif simon.phase == "show":
+		lbl("Onthoud deze reeks:", 22)
+		lbl(simon.sequence_text(), 28)
+		btn("Ik heb het onthouden →", _start_simon_input)
+	else:
+		lbl("Herhaal de reeks (stap %d/%d):" % [simon.player_progress + 1, simon.sequence.size()], 22)
+		for i in range(SimonMedia.MOVES.size()):
+			var mv := i
+			btn(str(SimonMedia.MOVES[i]), func(): _play_simon(mv))
+
+
+func _start_simon_input() -> void:
+	simon.start_input()
+	show_simon()
+
+
+func _play_simon(move_idx: int) -> void:
+	simon.input_move(move_idx, Game.rng)
+	show_simon()
+
+
+func _finish_simon(o: Dictionary) -> void:
+	Game.apply_effects(o.effects, str(mg_ev.client_id))
+	simon = null
 	_next_event()
 
 
