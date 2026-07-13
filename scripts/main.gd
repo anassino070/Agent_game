@@ -39,7 +39,7 @@ var confirm_reset := false         # tweestaps-bevestiging voor de perk-reset
 # ---- Developer-only puntenreset: verborgen achter een tik-sequentie + wachtwoord.
 # Geen echte beveiliging (GDScript-bronnen zijn leesbaar), maar voorkomt dat
 # spelers of testers er per ongeluk tegenaan lopen.
-const DEV_PASSWORD := "makelaar1987"
+const DEV_PASSWORD := "wachtwoord"
 const DEV_TAPS_NEEDED := 7
 var dev_taps := 0
 var dev_unlocked := false
