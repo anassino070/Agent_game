@@ -16,9 +16,9 @@ const TIER_REQ := 5
 const RUN_SEASONS := 15
 const REWARD_BASE := 1.45
 
-# De drie OVERPOWERED extra's: elk ~50% van de boomkosten, tellen NIET mee
-# voor de 100%-voortgang.
-const OP_PERKS := ["superprovisie", "ijzeren_stal", "helderziend"]
+# De OVERPOWERED extra's: peperduur (30–50% van de boomkosten), tellen NIET
+# mee voor de 100%-voortgang.
+const OP_PERKS := ["superprovisie", "ijzeren_stal", "helderziend", "vaste_kern"]
 
 # De perkboom: 3 takken × 3 rijen × 3 opties = 27 perks. Volledig kopen kost
 # ~800.000 punten — een lange grind waarin elke run iets achterlaat.
@@ -154,6 +154,10 @@ const PERKS := {
 	"helderziend": {
 		"name": "★ Helderziend", "desc": "alle TD-persoonlijkheden zijn direct bekend en elk gesprek start Ontvankelijk",
 		"value": 1, "max_level": 1, "base_cost": 417000,
+	},
+	"vaste_kern": {
+		"name": "★ Vaste kern", "desc": "je bent de uitzondering op de regel: nooit meer verplicht een cliënt wegsturen",
+		"value": 1, "max_level": 1, "base_cost": 250000,
 	},
 }
 

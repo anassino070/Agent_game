@@ -276,12 +276,16 @@ func show_prep() -> void:
 			Game.club_name(str(p.club)), int(p.contract), eur(Game.value(p)),
 		], 23)
 	sep()
-	btn("Naar stalbeheer →", _goto_release)
+	btn("Naar scouting →" if Meta.perk_level("vaste_kern") > 0 else "Naar stalbeheer →", _goto_release)
 
 
 # ---------------------------------------------------------------- fase 1b: stalbeheer
 
 func _goto_release() -> void:
+	# ★ Vaste kern-perk: jij bent de uitzondering op de ontslagregel.
+	if Meta.perk_level("vaste_kern") > 0:
+		_goto_scouting()
+		return
 	# Met 0 of 1 cliënten is ontslaan direct game over ("leeg") — dan slaan
 	# we de verplichting over.
 	if Game.state.clients.size() <= 1:
@@ -556,13 +560,27 @@ func show_nego() -> void:
 		lbl("COMBO'S (opeenvolgende successen; ×1 per gesprek):", 20)
 		for combo in Negotiation.COMBOS:
 			var done: bool = str(combo.id) in nego.combos_done
+			var progress := nego.combo_progress(combo)
 			var req := ""
 			if combo.has("req_pers"):
 				req = "  [vereist bekende %s]" % str(combo.req_pers)
-			lbl("%s %s: %s  (+%d)%s" % [
-				"✔" if done else "·", str(combo.name),
-				" → ".join(combo.pattern), int(combo.bonus), req,
+			var mark := "·"
+			var suffix := ""
+			var color := Color(0.75, 0.75, 0.75)  # neutraal grijs
+			if done:
+				mark = "✔"
+				color = Color(0.35, 0.9, 0.4)       # groen: voltooid
+			elif progress > 0:
+				mark = "▸"
+				suffix = "  — OP KOERS (%d/%d)!" % [progress, combo.pattern.size()]
+				color = Color(1.0, 0.78, 0.15)      # goud: op koers
+			var l := lbl("%s %s: %s  (+%d)%s%s" % [
+				mark, str(combo.name), nego.combo_pattern_text(combo),
+				int(combo.bonus), req, suffix,
 			], 19)
+			l.add_theme_color_override("font_color", color)
+			if progress > 0 and not done:
+				l.add_theme_font_size_override("font_size", 21)
 
 
 func _play_tactic(t: Dictionary) -> void:
@@ -570,6 +588,57 @@ func _play_tactic(t: Dictionary) -> void:
 	if nego.pers_known:
 		Game.reveal_td(nego_club)
 	show_nego()
+	if nego.last_combo != "":
+		_confetti_burst(nego.last_combo)
+
+
+# ---------------------------------------------------------------- confetti
+
+const CONFETTI_EMOJI := ["🎉", "✨", "🎊", "⭐", "💰"]
+
+func _confetti_burst(combo_name: String) -> void:
+	var vp := get_viewport_rect().size
+	var center := vp / 2.0
+
+	var banner := Label.new()
+	banner.text = "★ COMBO — %s! ★" % combo_name
+	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	banner.add_theme_font_size_override("font_size", 36)
+	banner.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	banner.position = Vector2(0, vp.y * 0.30)
+	banner.size = Vector2(vp.x, 60)
+	banner.z_index = 100
+	banner.modulate.a = 0.0
+	banner.scale = Vector2(0.7, 0.7)
+	banner.pivot_offset = banner.size / 2.0
+	add_child(banner)
+	var btw := create_tween()
+	btw.tween_property(banner, "modulate:a", 1.0, 0.12)
+	btw.parallel().tween_property(banner, "scale", Vector2(1.1, 1.1), 0.12)
+	btw.tween_property(banner, "scale", Vector2(1.0, 1.0), 0.1)
+	btw.tween_interval(1.0)
+	btw.tween_property(banner, "modulate:a", 0.0, 0.5)
+	btw.tween_callback(banner.queue_free)
+
+	var burst_rng := RandomNumberGenerator.new()
+	burst_rng.randomize()
+	for i in range(26):
+		var p := Label.new()
+		p.text = CONFETTI_EMOJI[burst_rng.randi_range(0, CONFETTI_EMOJI.size() - 1)]
+		p.add_theme_font_size_override("font_size", burst_rng.randi_range(20, 34))
+		p.z_index = 99
+		p.position = center
+		p.pivot_offset = Vector2(12, 12)
+		add_child(p)
+		var angle := burst_rng.randf_range(0, TAU)
+		var dist := burst_rng.randf_range(140, 340)
+		var target := center + Vector2(cos(angle), sin(angle)) * dist
+		var dur := burst_rng.randf_range(0.55, 0.95)
+		var tw := create_tween()
+		tw.tween_property(p, "position", target, dur).set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+		tw.parallel().tween_property(p, "rotation", burst_rng.randf_range(-4.0, 4.0), dur)
+		tw.parallel().tween_property(p, "modulate:a", 0.0, dur * 0.7).set_delay(dur * 0.3)
+		tw.tween_callback(p.queue_free)
 
 
 func _close_nego(deal: bool) -> void:

@@ -17,7 +17,7 @@ const PERS_INFO := {
 	"ijdel": "IJdel — charme slaagt altijd (en iets sterker)",
 	"koppig": "Koppig — wat extra weerstand, maar zakt nooit onder Zakelijk",
 	"nerveus": "Nerveus — druk slaagt veel vaker, maar hij loopt sneller weg",
-	"rekenmeester": "Rekenmeester — feiten slagen vaker en tellen 1,25×; charme doet niets",
+	"rekenmeester": "Rekenmeester — taaie weerstand, feiten slagen iets vaker en tellen 1,15×; charme doet niets en hij is ongevoelig voor bluf en druk",
 }
 
 # Combo's: speel dit patroon van OPEENVOLGENDE SUCCESSEN en de laatste zet
@@ -38,6 +38,11 @@ const COMBOS := [
 		"pattern": ["clausule", "charme", "feiten", "bluf"], "bonus": 12},
 ]
 
+const MOVE_LABELS := {
+	"charme": "Charmeren", "feiten": "Feiten & cijfers", "bluf": "Bluffen",
+	"druk": "Deadline-druk", "clausule": "Clausule", "aftasten": "Aftasten",
+}
+
 var resistance: float = 45.0
 var deal_value: int = 0
 var cut: float = 0.10       # jouw fee-percentage van de transfersom
@@ -53,6 +58,7 @@ var pers_known := false
 var streak := 0              # opeenvolgende successen; 2+ = flow
 var success_run: Array = []  # ids van opeenvolgende successen (voor combo's)
 var combos_done: Array = []  # elke combo maximaal één keer per gesprek
+var last_combo := ""         # naam van de combo die de LAATSTE zet afrondde ("" = geen)
 
 # Perk-instelbaar (gezet door main.gd bij de start van een gesprek).
 var flow_mult := 1.5         # effect-multiplier bij flow
@@ -68,6 +74,8 @@ func setup(value: int, start_resistance: float, personality: String, known: bool
 	pers_known = known
 	if pers == "koppig":
 		resistance += 5.0
+	elif pers == "rekenmeester":
+		resistance += 8.0
 
 
 func mood_name() -> String:
@@ -117,8 +125,8 @@ func tactics(rep: int) -> Array:
 	if mood == 1:
 		f_drop = 18
 	if pers == "rekenmeester":
-		f_drop = int(f_drop * 1.25)
-		f_chance += 0.15
+		f_drop = int(f_drop * 1.15)
+		f_chance += 0.08
 	out.append({
 		"id": "feiten", "label": "Feiten & cijfers", "drop": f_drop,
 		"chance": clampf(f_chance, 0.05, 0.95),
@@ -128,9 +136,12 @@ func tactics(rep: int) -> Array:
 	})
 
 	# Payoff: bluffen — heeft een goede stemming nodig (25/50/75%).
+	var b_chance: float = [0.25, 0.50, 0.75][mood] + bonus
+	if pers == "rekenmeester":
+		b_chance -= 0.15
 	out.append({
 		"id": "bluf", "label": "Bluffen ('Er is nog een club...')", "drop": 22,
-		"chance": clampf([0.25, 0.50, 0.75][mood] + bonus, 0.05, 0.95),
+		"chance": clampf(b_chance, 0.05, 0.95),
 		"mood_ok": 0, "mood_fail": -1, "fail_res": 8,
 		"ok_txt": "De TD slikt het. De prijs beweegt.",
 		"fail_txt": "Je bluf wordt doorzien. De TD verhardt.",
@@ -141,6 +152,8 @@ func tactics(rep: int) -> Array:
 	var d_chance: float = [0.40, 0.55, 0.70][mood] + bonus
 	if pers == "nerveus":
 		d_chance += 0.20
+	elif pers == "rekenmeester":
+		d_chance -= 0.10
 	var d_walk := 0.0
 	if mood == 0:
 		d_walk = 0.8 if pers == "nerveus" else 0.5
@@ -174,6 +187,7 @@ func tactics(rep: int) -> Array:
 
 
 func play(t: Dictionary, rng: RandomNumberGenerator) -> void:
+	last_combo = ""
 	if str(t.id) == "aftasten":
 		rounds_left -= aftast_cost
 		pers_known = true
@@ -225,7 +239,30 @@ func _check_combos() -> void:
 		if success_run.slice(success_run.size() - pat.size()) == pat:
 			combos_done.append(str(combo.id))
 			resistance -= float(combo.bonus)
+			last_combo = str(combo.name)
 			log.append("COMBO — %s! Extra weerstand -%d." % [str(combo.name), int(combo.bonus)])
+
+
+# Hoeveel stappen van dit patroon je al hebt gezet, met de LOPENDE reeks als
+# staart. 0 = niet op koers, pattern.size() = al voltooid. Gebruikt door de
+# UI om combo's te markeren die "op koers" zijn.
+func combo_progress(combo: Dictionary) -> int:
+	var pat: Array = combo.pattern
+	if str(combo.id) in combos_done:
+		return pat.size()
+	if combo.has("req_pers") and (pers != str(combo.req_pers) or not pers_known):
+		return 0
+	for k in range(mini(success_run.size(), pat.size() - 1), 0, -1):
+		if success_run.slice(success_run.size() - k) == pat.slice(0, k):
+			return k
+	return 0
+
+
+func combo_pattern_text(combo: Dictionary) -> String:
+	var labels: Array = []
+	for id in combo.pattern:
+		labels.append(str(MOVE_LABELS.get(id, id)))
+	return " → ".join(labels)
 
 
 func _check_end() -> void:
