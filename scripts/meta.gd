@@ -332,6 +332,12 @@ func reset_perks() -> void:
 	save_meta()
 
 
+func dev_wipe_points() -> void:
+	# Developer-only: wist alleen het puntensaldo (niet de gekochte perks).
+	state.legacy_points = 0
+	save_meta()
+
+
 # Beloning na afloop van een run (game over of gewonnen). Exponentiële
 # curve: elk seizoen verder vermenigvuldigt de beloning met REWARD_BASE,
 # met als plafond precies 1% van de volledige boom voor een gewonnen run.

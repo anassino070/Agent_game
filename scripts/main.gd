@@ -20,6 +20,15 @@ var nego_club := ""
 var home_btn: Button
 var confirm_reset := false         # tweestaps-bevestiging voor de perk-reset
 
+# ---- Developer-only puntenreset: verborgen achter een tik-sequentie + wachtwoord.
+# Geen echte beveiliging (GDScript-bronnen zijn leesbaar), maar voorkomt dat
+# spelers of testers er per ongeluk tegenaan lopen.
+const DEV_PASSWORD := "makelaar1987"
+const DEV_TAPS_NEEDED := 7
+var dev_taps := 0
+var dev_unlocked := false
+var dev_confirm := false
+
 
 # ---------------------------------------------------------------- opbouw
 
@@ -153,6 +162,70 @@ func show_start() -> void:
 	btn("NIEUWE RUN", _on_new_run)
 	if Game.has_save():
 		btn("Doorgaan met vorige run", _on_continue)
+	sep()
+	var dev_tap := btn("v1.0", _on_dev_tap)
+	dev_tap.add_theme_font_size_override("font_size", 14)
+	dev_tap.modulate = Color(1, 1, 1, 0.25)
+	dev_tap.custom_minimum_size = Vector2(0, 36)
+
+
+# ---------------------------------------------------------------- developer-only
+
+func _on_dev_tap() -> void:
+	dev_taps += 1
+	if dev_taps >= DEV_TAPS_NEEDED:
+		dev_taps = 0
+		_show_dev_login()
+
+
+func _show_dev_login(error := "") -> void:
+	clear()
+	header.text = "DEVELOPER"
+	if error != "":
+		var e := lbl(error, 20)
+		e.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
+	lbl("Voer het developer-wachtwoord in.", 22)
+	var input := LineEdit.new()
+	input.placeholder_text = "wachtwoord"
+	input.secret = true
+	input.custom_minimum_size = Vector2(0, 56)
+	content.add_child(input)
+	btn("Bevestigen", func(): _check_dev_password(input.text))
+	btn("← Terug", show_start)
+
+
+func _check_dev_password(pw: String) -> void:
+	if pw == DEV_PASSWORD:
+		dev_unlocked = true
+		dev_confirm = false
+		show_dev_panel()
+	else:
+		_show_dev_login("Onjuist wachtwoord. Probeer opnieuw.")
+
+
+func show_dev_panel() -> void:
+	if not dev_unlocked:
+		show_start()
+		return
+	clear()
+	header.text = "DEVELOPER — puntenbeheer"
+	lbl("Huidig puntensaldo: %s legacy points." % _pts(Meta.state.legacy_points), 26)
+	lbl("Dit wist alleen het saldo, niet de gekochte perk-niveaus (gebruik daarvoor 'Reset alle perks' op het perkscherm).", 20)
+	sep()
+	if dev_confirm:
+		lbl("Weet je het zeker? Het puntensaldo gaat naar 0 en dit kan niet ongedaan worden.", 22)
+		btn("JA — wis puntensaldo", _do_dev_wipe)
+		btn("Annuleer", func(): dev_confirm = false; show_dev_panel())
+	else:
+		btn("Wis alle punten (naar 0)", func(): dev_confirm = true; show_dev_panel())
+	sep()
+	btn("← Terug naar start", func(): dev_unlocked = false; dev_confirm = false; show_start())
+
+
+func _do_dev_wipe() -> void:
+	Meta.dev_wipe_points()
+	dev_confirm = false
+	show_dev_panel()
 
 
 # ---------------------------------------------------------------- meta: perks
