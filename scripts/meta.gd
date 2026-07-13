@@ -10,11 +10,11 @@ const SAVE_PATH := "user://meta.json"
 # Hoeveel niveaus je in een rij moet kopen om de volgende rij te ontgrendelen.
 const TIER_REQ := 5
 
-# Beloningscurve: een gewonnen run levert exact 1% van de volledige boom op;
-# elk seizoen mínder overleefd deelt de beloning door REWARD_BASE. 100% van
-# de boom = ~100 gewonnen runs ≈ 240 uur goed spel.
+# Beloningscurve: een gewonnen run levert exact 2,5% van de volledige boom op;
+# elk seizoen mínder overleefd deelt de beloning door REWARD_BASE.
 const RUN_SEASONS := 15
 const REWARD_BASE := 1.45
+const WIN_REWARD_PCT := 2.5
 
 # De OVERPOWERED extra's: peperduur (30–50% van de boomkosten), tellen NIET
 # mee voor de 100%-voortgang.
@@ -340,10 +340,11 @@ func dev_wipe_points() -> void:
 
 # Beloning na afloop van een run (game over of gewonnen). Exponentiële
 # curve: elk seizoen verder vermenigvuldigt de beloning met REWARD_BASE,
-# met als plafond precies 1% van de volledige boom voor een gewonnen run.
-# Werkt de career-stats bij en geeft het aantal verdiende punten terug.
+# met als plafond precies WIN_REWARD_PCT% van de volledige boom voor een
+# gewonnen run. Werkt de career-stats bij en geeft het aantal verdiende
+# punten terug.
 func award_run(total_fees: int, seasons_survived: int, won: bool) -> int:
-	var full := float(tree_total_cost()) / 100.0
+	var full := float(tree_total_cost()) * (WIN_REWARD_PCT / 100.0)
 	var points: int
 	if won:
 		points = int(round(full))
