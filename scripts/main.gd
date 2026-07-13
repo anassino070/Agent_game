@@ -160,7 +160,11 @@ func show_start() -> void:
 func show_perks() -> void:
 	clear()
 	header.text = "PERKBOOM — %s legacy points" % _pts(Meta.state.legacy_points)
-	lbl("Permanente upgrades voor elke volgende run. Je verdient legacy points door te spelen — ook bij een game over. Elke rij biedt 3 opties; koop %d niveaus in een rij om de rij eronder te ontgrendelen." % Meta.TIER_REQ, 22)
+	lbl("Boom voltooid: %s%%  (%s van %s punten)" % [
+		("%.1f" % (Meta.tree_progress() * 100.0)).replace(".", ","),
+		_pts(Meta.tree_spent()), _pts(Meta.tree_total_cost()),
+	], 26)
+	lbl("Permanente upgrades voor elke volgende run. Je verdient legacy points door te spelen — hoe verder je komt, hoe exponentieel meer (een gewonnen run = 1%% van de boom). Elke rij biedt 3 opties; koop %d niveaus in een rij om de rij eronder te ontgrendelen." % Meta.TIER_REQ, 22)
 	for branch in Meta.TREE:
 		sep()
 		lbl("◆ TAK: %s" % str(branch.name), 30)
@@ -179,10 +183,14 @@ func show_perks() -> void:
 					Meta.tier_levels(branch, tier_idx - 1),
 				], 20)
 	sep()
+	lbl("★ OVERPOWERED — extra's buiten de boom (tellen niet mee voor de 100%)", 26)
+	for id in Meta.OP_PERKS:
+		_perk_node(str(id))
+	sep()
 	var spent := Meta.spent_points()
 	if spent > 0:
 		if confirm_reset:
-			lbl("Weet je het zeker? Alle 27 perks gaan naar 0; je krijgt %s punten terug." % _pts(spent), 22)
+			lbl("Weet je het zeker? Alle perks (ook de ★-extra's) gaan naar 0; je krijgt %s punten terug." % _pts(spent), 22)
 			btn("JA — reset alles", _do_reset)
 			btn("Annuleer", func(): _set_confirm(false))
 		else:
@@ -499,6 +507,8 @@ func _start_nego(cid: String, club_id: String) -> void:
 	nego.aftast_cost = 2 - Meta.perk_level("dossierkennis")
 	var v := Game.value(Game.state.players[cid])
 	nego.setup(v, Game.start_resistance(club_id), Game.td_personality(club_id), Game.td_known(club_id))
+	if Meta.perk_level("helderziend") > 0:
+		nego.mood = 2   # elk gesprek start Ontvankelijk
 	nego_client = cid
 	nego_club = club_id
 	show_nego()

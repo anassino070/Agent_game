@@ -83,6 +83,8 @@ func fee_cut() -> float:
 func poach_chance(p: Dictionary) -> float:
 	# Rivalen kapen ook cliënten met redelijk vertrouwen weg: hoe hoger de
 	# rating, hoe aantrekkelijker; hoog vertrouwen beschermt.
+	if Meta.perk_level("ijzeren_stal") > 0:
+		return 0.0
 	var c := 0.03 + (float(p.rating) - 50.0) * 0.005 - (float(p.trust) - 50.0) * 0.004
 	c -= float(Meta.perk_bonus("binding")) * 0.01
 	return clampf(c, 0.0, 0.35)
@@ -333,6 +335,8 @@ func td_personality(club_id: String) -> String:
 
 
 func td_known(club_id: String) -> bool:
+	if Meta.perk_level("helderziend") > 0:
+		return true
 	return bool(state.clubs[club_id].get("td_known", false))
 
 
@@ -351,6 +355,8 @@ func start_resistance(club_id: String) -> float:
 
 func complete_transfer(client_id: String, club_id: String, fee: int, cut: float) -> int:
 	var income := int(fee * cut)
+	if Meta.perk_level("superprovisie") > 0:
+		income *= 2
 	state.money = int(state.money) + income
 	state.total_fees = int(state.total_fees) + income
 	var p: Dictionary = state.players[client_id]
@@ -418,7 +424,7 @@ func end_of_season() -> Array:
 			state.money = int(state.money) + tg
 			state.total_fees = int(state.total_fees) + tg
 			lines.append("%s verlengt bij zijn club; tekengeld €%d voor jou." % [p.name, tg])
-		if int(p.trust) < LEAVE_TRUST and rng.randf() < LEAVE_CHANCE:
+		if Meta.perk_level("ijzeren_stal") == 0 and int(p.trust) < LEAVE_TRUST and rng.randf() < LEAVE_CHANCE:
 			leavers.append(cid)
 			lines.append("!! %s VERTREKT naar een andere makelaar. Het vertrouwen was op." % p.name)
 		elif rng.randf() < poach_chance(p):

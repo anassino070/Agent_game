@@ -10,6 +10,16 @@ const SAVE_PATH := "user://meta.json"
 # Hoeveel niveaus je in een rij moet kopen om de volgende rij te ontgrendelen.
 const TIER_REQ := 5
 
+# Beloningscurve: een gewonnen run levert exact 1% van de volledige boom op;
+# elk seizoen mínder overleefd deelt de beloning door REWARD_BASE. 100% van
+# de boom = ~100 gewonnen runs ≈ 240 uur goed spel.
+const RUN_SEASONS := 15
+const REWARD_BASE := 1.45
+
+# De drie OVERPOWERED extra's: elk ~50% van de boomkosten, tellen NIET mee
+# voor de 100%-voortgang.
+const OP_PERKS := ["superprovisie", "ijzeren_stal", "helderziend"]
+
 # De perkboom: 3 takken × 3 rijen × 3 opties = 27 perks. Volledig kopen kost
 # ~800.000 punten — een lange grind waarin elke run iets achterlaat.
 # "fmt" bepaalt hoe de waarde in de UI verschijnt: int (default), money, pct10
@@ -18,7 +28,7 @@ const PERKS := {
 	# ---- TAK KAPITAAL, rij 1 ----
 	"startkapitaal": {
 		"name": "Startkapitaal", "desc": "+%s bij de start van elke run",
-		"value": 1000, "fmt": "money", "max_level": 10, "base_cost": 40000,
+		"value": 1000, "fmt": "money", "max_level": 10, "base_cost": 400,
 	},
 	"kantoorkorting": {
 		"name": "Kantoorkorting", "desc": "-%s%% kantoorkosten",
@@ -132,6 +142,19 @@ const PERKS := {
 		"name": "Crisismanagement", "desc": "schandaal-stijgingen %s lager (minimaal 1)",
 		"value": 1, "max_level": 3, "base_cost": 5000,
 	},
+	# ---- OVERPOWERED extra's (buiten de boom; tellen niet mee voor 100%) ----
+	"superprovisie": {
+		"name": "★ Superprovisie", "desc": "alle transfer-inkomsten tellen dubbel",
+		"value": 1, "max_level": 1, "base_cost": 417000,
+	},
+	"ijzeren_stal": {
+		"name": "★ IJzeren contracten", "desc": "cliënten vertrekken nooit meer en kunnen niet worden weggekaapt",
+		"value": 1, "max_level": 1, "base_cost": 417000,
+	},
+	"helderziend": {
+		"name": "★ Helderziend", "desc": "alle TD-persoonlijkheden zijn direct bekend en elk gesprek start Ontvankelijk",
+		"value": 1, "max_level": 1, "base_cost": 417000,
+	},
 }
 
 # De boom: 3 takken, elk 3 rijen met 3 opties. Rij 2/3 ontgrendelen zodra je
@@ -207,6 +230,8 @@ func perk_cost(id: String) -> int:
 func perk_desc(id: String, levels: int) -> String:
 	# Beschrijving voor `levels` niveaus, met de juiste eenheid.
 	var p: Dictionary = PERKS[id]
+	if str(p.desc).find("%s") == -1:
+		return str(p.desc)   # vaste tekst (de OP-perks)
 	var amount: int = int(p.value) * levels
 	var txt := str(amount)
 	match str(p.get("fmt", "int")):
@@ -266,6 +291,35 @@ func spent_points() -> int:
 	return total
 
 
+func full_perk_cost(id: String) -> int:
+	var m := int(PERKS[id].max_level)
+	return int(PERKS[id].base_cost) * m * (m + 1) / 2
+
+
+func tree_total_cost() -> int:
+	# Totale kosten van de reguliere boom (zonder de OP-extra's) = de 100%.
+	var total := 0
+	for id in PERKS:
+		if id in OP_PERKS:
+			continue
+		total += full_perk_cost(id)
+	return total
+
+
+func tree_spent() -> int:
+	var total := 0
+	for id in PERKS:
+		if id in OP_PERKS:
+			continue
+		var lvl := perk_level(id)
+		total += int(PERKS[id].base_cost) * lvl * (lvl + 1) / 2
+	return total
+
+
+func tree_progress() -> float:
+	return float(tree_spent()) / float(tree_total_cost())
+
+
 func reset_perks() -> void:
 	# Zet alle perks terug naar 0 en geef de bestede punten volledig terug.
 	state.legacy_points = int(state.legacy_points) + spent_points()
@@ -274,12 +328,17 @@ func reset_perks() -> void:
 	save_meta()
 
 
-# Beloning na afloop van een run (game over of gewonnen). Werkt de
-# career-stats bij en geeft het aantal verdiende legacy points terug.
+# Beloning na afloop van een run (game over of gewonnen). Exponentiële
+# curve: elk seizoen verder vermenigvuldigt de beloning met REWARD_BASE,
+# met als plafond precies 1% van de volledige boom voor een gewonnen run.
+# Werkt de career-stats bij en geeft het aantal verdiende punten terug.
 func award_run(total_fees: int, seasons_survived: int, won: bool) -> int:
-	var points := int(floor(float(total_fees) / 2.5)) + seasons_survived * 2500
+	var full := float(tree_total_cost()) / 100.0
+	var points: int
 	if won:
-		points += 75000
+		points = int(round(full))
+	else:
+		points = maxi(int(round(full * pow(REWARD_BASE, float(seasons_survived - RUN_SEASONS)))), 10)
 	state.legacy_points = int(state.legacy_points) + points
 	state.runs_completed = int(state.runs_completed) + 1
 	state.total_career_fees = int(state.total_career_fees) + total_fees
