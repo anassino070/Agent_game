@@ -539,13 +539,8 @@ static func get_events() -> Array:
 		},
 		{
 			"id": "overboden", "title": "Verkeerd begrepen bod", "needs_client": true,
-			"text": "Door een miscommunicatie denkt een club dat er een concurrerend bod ligt op {client} — en overbiedt zichzelf fors. Correct je hen?",
-			"options": [
-				{"label": "Laten zoals het is", "effects": {"money": 9000, "rep": -4},
-					"txt": "Extra fee in je zak. In de wandelgangen fluistert men wel wat."},
-				{"label": "Eerlijk rechtzetten", "effects": {"rep": 6},
-					"txt": "De club is je dankbaar voor de integriteit. Minder geld, meer krediet."},
-			],
+			"minigame": "biedingsoorlog",
+			"text": "Door een miscommunicatie denken meteen drie clubs dat er een concurrerend bod ligt op {client}. Niemand wil de eerste zijn die afhaakt — en jij kunt die chaos naar je hand zetten.",
 		},
 		{
 			"id": "podcastuitnodiging", "title": "De podcast",
@@ -641,41 +636,18 @@ static func get_events() -> Array:
 		},
 		{
 			"id": "persconferentie_druk", "title": "Persconferentie onder druk", "needs_client": true,
-			"text": "Na een dramatische nederlaag moet {client} de pers te woord staan. De vragen worden steeds scherper.",
-			"options": [
-				{"label": "Vooraf goed voorbereiden", "req_money": 3000,
-					"effects": {"money": -3000, "trust": 5, "rep": 3},
-					"txt": "Hij blijft kalm, geeft nette antwoorden. Storm overgewaaid."},
-				{"label": "Hem zijn eigen ding laten doen", "chance": 0.45,
-					"success": {"rep": 4}, "success_txt": "Hij verrast met ontwapenende eerlijkheid. Werkt.",
-					"fail": {"scandal": 10, "trust": -5},
-					"fail_txt": "Hij verliest zijn geduld voor de camera's. Kop van de dag."},
-			],
+			"minigame": "persconferentie",
+			"text": "Na een dramatische nederlaag moet {client} de pers te woord staan. Jij zit naast hem en fluistert antwoorden — de vragen worden ronde na ronde scherper.",
 		},
 		{
 			"id": "sponsorpitch", "title": "De sponsorpitch", "needs_client": true,
+			"minigame": "sponsorpitch",
 			"text": "Een groot merk wil {client} als gezicht van een campagne, maar de eerste pitch-vergadering wordt een pokerspel over voorwaarden.",
-			"options": [
-				{"label": "Hard onderhandelen", "chance": 0.55,
-					"success": {"money": 16000, "trust": 5},
-					"success_txt": "Ze gaan akkoord met jouw voorwaarden. Topdeal.",
-					"fail": {"money": 4000}, "fail_txt": "Ze zakken naar een matig bod om het gesprek niet te laten klappen."},
-				{"label": "Snel akkoord voor zekerheid", "effects": {"money": 6000, "trust": 2},
-					"txt": "Minder geld, wel binnen. Zekerheid heeft ook waarde."},
-			],
 		},
 		{
 			"id": "fiscale_schikking", "title": "Schikkingsvoorstel",
-			"text": "Na de laatste controle biedt de fiscus een schikking aan: nu een fors bedrag betalen, of het risico lopen op een veel duurdere procedure later.",
-			"options": [
-				{"label": "Schikken", "req_money": 9000,
-					"effects": {"money": -9000},
-					"txt": "Klaar, gesloten dossier. Duur, maar voorbij."},
-				{"label": "Het laten voorkomen", "chance": 0.45,
-					"success": {}, "success_txt": "De zaak wordt om onduidelijke redenen ingetrokken. Geluk.",
-					"fail": {"money": -22000, "scandal": 10},
-					"fail_txt": "De rechter is niet mild. Fikse naheffing plus boete."},
-			],
+			"minigame": "fiscale_schikking",
+			"text": "De fiscus controleert drie posten in je boeken. Per post kies je: open aangeven, deels verhullen, of volledig verhullen — hoe meer je verhult, hoe groter de besparing én het risico.",
 		},
 		{
 			"id": "dubbele_pet", "title": "Twee petten, één positie", "needs_client": true,

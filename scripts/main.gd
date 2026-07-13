@@ -17,6 +17,13 @@ var nego: Negotiation = null
 var nego_client := ""
 var nego_club := ""
 
+# Event-minigames: precies één van deze is actief tijdens een minigame-event.
+var mg_ev: Dictionary = {}          # het originerende event (voor client_id, terugkeer)
+var bidding: BiddingWar = null
+var press: PressConference = null
+var sponsor: SponsorPitch = null
+var tax: TaxSettlement = null
+
 var home_btn: Button
 var confirm_reset := false         # tweestaps-bevestiging voor de perk-reset
 
@@ -479,6 +486,9 @@ func show_event(ev: Dictionary) -> void:
 	lbl("EVENT: %s" % str(ev.title), 32)
 	lbl(str(ev.text).replace("{client}", cname), 26)
 	sep()
+	if ev.has("minigame"):
+		btn("Beginnen →", func(): _start_minigame(ev))
+		return
 	for opt in ev.options:
 		var enabled := true
 		var suffix := ""
@@ -515,6 +525,206 @@ func _resolve(ev: Dictionary, opt: Dictionary) -> void:
 		lbl(">> " + str(n), 24)
 	sep()
 	btn("Verder →", _next_event)
+
+
+# ---------------------------------------------------------------- event-minigames
+
+func _start_minigame(ev: Dictionary) -> void:
+	mg_ev = ev
+	match str(ev.minigame):
+		"biedingsoorlog":
+			var cid := str(ev.client_id)
+			var value := Game.value(Game.state.players[cid])
+			var pool: Array = []
+			for club_id in Game.state.clubs:
+				var c: Dictionary = Game.state.clubs[club_id]
+				if club_id != str(Game.state.players[cid].club) and int(c.budget) >= int(float(value) * 0.5):
+					pool.append(club_id)
+			var picked: Array = []
+			while picked.size() < 3 and not pool.is_empty():
+				var i := Game.rng.randi_range(0, pool.size() - 1)
+				picked.append(pool[i])
+				pool.remove_at(i)
+			bidding = BiddingWar.new()
+			bidding.setup(cid, picked, value, Game.state.clubs, Game.rng)
+			show_bidding()
+		"persconferentie":
+			press = PressConference.new()
+			show_press()
+		"sponsorpitch":
+			sponsor = SponsorPitch.new()
+			show_sponsor()
+		"fiscale_schikking":
+			tax = TaxSettlement.new()
+			show_tax()
+
+
+# -- Biedingsoorlog --
+
+func show_bidding() -> void:
+	refresh_header()
+	clear()
+	lbl("BIEDINGSOORLOG", 32)
+	lbl("Cliënt: %s   |   Rondes over: %d" % [str(Game.state.players[bidding.client_id].name), bidding.rounds_left], 24)
+	sep()
+	for c in bidding.clubs:
+		var status := "actief" if c.active else "afgehaakt"
+		lbl("%s — bod %s (%s)" % [str(c.name), eur(int(c.bid)), status], 24)
+	if not bidding.log.is_empty():
+		sep()
+		for line in bidding.log:
+			lbl("· " + str(line), 20)
+	sep()
+	if bidding.finished:
+		if bidding.deal:
+			lbl("Winnaar: %s met %s." % [str(bidding._get(bidding.winner_id).name), eur(bidding.final_bid)], 26)
+		else:
+			lbl("Geen deal. De bui trekt over zonder handtekening.", 26)
+		btn("Verder →", _finish_bidding)
+	else:
+		for c in bidding.active_clubs():
+			btn("Bluffen richting %s" % str(c.name), func(): _play_bidding("bluf", str(c.id)))
+		if not bidding.top_club().is_empty():
+			btn("Deadline-druk op de leider (%s)" % str(bidding.top_club().name), func(): _play_bidding("druk", ""))
+		if bidding.active_clubs().size() >= 2:
+			btn("Vergelijken (alle clubs)", func(): _play_bidding("vergelijk", ""))
+		if not bidding.top_club().is_empty():
+			btn("Bod aannemen nu", func(): _play_bidding("aannemen", ""))
+
+
+func _play_bidding(action: String, target_id: String) -> void:
+	match action:
+		"bluf": bidding.play_bluf(target_id, Game.rng)
+		"druk": bidding.play_pressure(Game.rng)
+		"vergelijk": bidding.play_compare(Game.rng)
+		"aannemen": bidding.accept_now()
+	show_bidding()
+
+
+func _finish_bidding() -> void:
+	if bidding.deal:
+		var income := Game.complete_transfer(bidding.client_id, bidding.winner_id, bidding.final_bid, Game.fee_cut())
+		flash = "Transfer uit de biedingsoorlog! Jij incasseert %s." % eur(income)
+	else:
+		Game.apply_effects({"rep": -3}, "")
+	bidding = null
+	_next_event()
+
+
+# -- Persconferentie --
+
+func show_press() -> void:
+	refresh_header()
+	clear()
+	var cid := str(mg_ev.client_id)
+	lbl("PERSCONFERENTIE", 32)
+	lbl("%s   |   Spanning: %d/100   |   Vragen over: %d" % [
+		str(Game.state.players[cid].name), int(press.tension), press.questions_left,
+	], 24)
+	if not press.log.is_empty():
+		sep()
+		for line in press.log:
+			lbl("· " + str(line), 20)
+	sep()
+	if press.finished:
+		var o := press.outcome()
+		lbl(str(o.txt), 26)
+		btn("Verder →", func(): _finish_press(o))
+	else:
+		btn("Ontwijken", func(): _play_press("ontwijken"))
+		btn("Toegeven (eerlijk antwoord)", func(): _play_press("toegeven"))
+		btn("Aanvallen (weerwoord geven)", func(): _play_press("aanvallen"))
+
+
+func _play_press(action: String) -> void:
+	press.play(action, Game.rng)
+	show_press()
+
+
+func _finish_press(o: Dictionary) -> void:
+	Game.apply_effects(o.effects, str(mg_ev.client_id))
+	press = null
+	_next_event()
+
+
+# -- Sponsorpitch --
+
+func show_sponsor() -> void:
+	refresh_header()
+	clear()
+	var cid := str(mg_ev.client_id)
+	lbl("SPONSORPITCH", 32)
+	lbl("Cliënt: %s" % str(Game.state.players[cid].name), 24)
+	lbl("Terughoudendheid merk: %d   |   Rondes over: %d" % [int(sponsor.reluctance), sponsor.rounds_left], 26)
+	if not sponsor.log.is_empty():
+		sep()
+		for line in sponsor.log:
+			lbl("· " + str(line), 20)
+	sep()
+	if sponsor.finished:
+		var o := sponsor.outcome()
+		lbl(str(o.txt), 26)
+		btn("Verder →", func(): _finish_sponsor(o))
+	else:
+		btn("Cijfers tonen  [70%%, -15]", func(): _play_sponsor("cijfers"))
+		btn("Exclusiviteit beloven  [55%%, -22, kost vertrouwen]", func(): _play_sponsor("exclusiviteit"))
+		btn("Prestatiebonus voorstellen  [85%%, -10]", func(): _play_sponsor("prestatiebonus"))
+
+
+func _play_sponsor(action: String) -> void:
+	sponsor.play(action, Game.rng)
+	show_sponsor()
+
+
+func _finish_sponsor(o: Dictionary) -> void:
+	Game.apply_effects(o.effects, str(mg_ev.client_id))
+	sponsor = null
+	_next_event()
+
+
+# -- Fiscale schikking --
+
+func show_tax() -> void:
+	refresh_header()
+	clear()
+	lbl("FISCALE SCHIKKING", 32)
+	if not tax.resolved:
+		lbl("Kies per post hoe je ermee omgaat. Pas als alle drie gekozen zijn, kun je regelen.", 22)
+		for i in range(TaxSettlement.POSTS.size()):
+			sep()
+			var post: Dictionary = TaxSettlement.POSTS[i]
+			var chosen := int(tax.choices[i])
+			var labels := ["Open aangeven", "Deels verhullen", "Volledig verhullen"]
+			lbl("%s (€%d)  —  %s" % [str(post.name), int(post.amount),
+				labels[chosen] if chosen >= 0 else "nog niet gekozen"], 24)
+			for opt_i in range(3):
+				if opt_i != chosen:
+					btn(labels[opt_i], func(): _choose_tax(i, opt_i))
+		sep()
+		btn("Regelen →", _resolve_tax, tax.all_chosen())
+	else:
+		for r in tax.results:
+			lbl("· " + str(r.txt), 22)
+		sep()
+		var sc := int(tax.total_scandal)
+		lbl("Totaal: %s   |   schandaal %s%d" % [eur(tax.total_money), "+" if sc > 0 else "", sc], 26)
+		btn("Verder →", _finish_tax)
+
+
+func _choose_tax(post_idx: int, option: int) -> void:
+	tax.choose(post_idx, option)
+	show_tax()
+
+
+func _resolve_tax() -> void:
+	tax.resolve(Game.rng)
+	show_tax()
+
+
+func _finish_tax() -> void:
+	Game.apply_effects({"money": tax.total_money, "scandal": tax.total_scandal}, "")
+	tax = null
+	_next_event()
 
 
 # ---------------------------------------------------------------- fase 4: window

@@ -52,7 +52,11 @@ voetbalmakelaar/
     ├── meta.gd            # AUTOLOAD "Meta": meta-progressie (legacy points, perks), overleeft runs
     ├── world_gen.gd       # procedurele generatie (spelers, clubs, namen)
     ├── events_db.gd       # alle 64 events als pure data
-    ├── negotiation.gd     # het onderhandelings-minigame
+    ├── negotiation.gd     # het onderhandelings-minigame (transferwindow)
+    ├── bidding_war.gd     # minigame "Biedingsoorlog" (event: overboden)
+    ├── press_conference.gd  # minigame "Persconferentie" (event: persconferentie_druk)
+    ├── sponsor_pitch.gd   # minigame "Sponsorpitch" (event: sponsorpitch)
+    ├── tax_settlement.gd  # minigame "Fiscale schikking" (event: fiscale_schikking)
     └── main.gd            # de UI: bouwt elk scherm programmatisch
 ```
 
@@ -90,6 +94,13 @@ Kansgebaseerde optie:
 ```
 
 Beschikbare effect-keys: `money`, `rep`, `scandal`, `favors`, `trust` (de gekoppelde cliënt), `all_trust`, `scout_points`, `new_client` (voegt een vrij talent toe aan je stal en meldt wie). Poortwachters: `req_money` en `req_favors` schakelen de knop uit als de speler het niet heeft. Event-voorwaarden: `min_season` (verschijnt pas vanaf dat seizoen), `needs_client` (koppelt een cliënt) en `needs_slot` (verschijnt alleen als je stal niet vol is — verplicht bij events met `new_client`). Elk event komt maximaal één keer per run voor (`used_events`).
+
+**Events met een minigame.** Een event kan in plaats van `options` een `"minigame": "<key>"` hebben (zie `overboden`, `persconferentie_druk`, `sponsorpitch`, `fiscale_schikking` in `events_db.gd`). `show_event()` in `main.gd` toont dan alleen intro-tekst plus een "Beginnen →"-knop; `_start_minigame()` bouwt het bijbehorende object op en toont het eigen scherm. Elke minigame is een losse `RefCounted`-klasse naar het patroon van `negotiation.gd` (state + `play()`-methodes + een `outcome()`/resultaat), met een eigen script en `show_*()`/`_play_*()`/`_finish_*()`-functies in `main.gd`. Bij afsluiten roept de `_finish_*()`-functie `Game.apply_effects()` (of, bij de biedingsoorlog, `Game.complete_transfer()`) aan en gaat daarna verder via `_next_event()` — exact het patroon van een normaal event. Vier huidige minigames:
+
+- **Biedingsoorlog** (`bidding_war.gd`, event `overboden`) — drie clubs denken door een miscommunicatie dat er een concurrerend bod ligt. Tactieken: bluffen richting een specifieke club, deadline-druk op de huidige leider, vergelijken (alle clubs zien elkaars bod) en direct aannemen. 4 rondes; bij een deal volgt een échte transfer via `Game.complete_transfer()`.
+- **Persconferentie** (`press_conference.gd`, event `persconferentie_druk`) — 5 vragen, een spanningsmeter (0–100) die bij zwakke antwoorden oploopt. Ontwijken (veilig maar bouwt spanning op), Toegeven (kalmeert meestal) of Aanvallen (hoog risico/beloning). Loopt de spanning naar 100, dan ontspoort het gesprek volledig.
+- **Sponsorpitch** (`sponsor_pitch.gd`, event `sponsorpitch`) — verkorte negotiation-variant gericht op een merk: "terughoudendheid" in plaats van TD-weerstand, 3 rondes, tactieken Cijfers tonen / Exclusiviteit beloven (groot effect, kost vertrouwen) / Prestatiebonus voorstellen.
+- **Fiscale schikking** (`tax_settlement.gd`, event `fiscale_schikking`) — risicoverdeling in plaats van één worp: drie boekhoudposten, elk met een keuze tussen open aangeven, deels verhullen of volledig verhullen. Meer verhullen = grotere besparing bij succes maar hoger ontdekkingsrisico én een zwaardere boete als het misgaat.
 
 Het GDD mikt op 120+ events voor launch. Dit bestand is dus waar het meeste van je toekomstige werk zit — en je hoeft er geen regel engine-code voor aan te raken.
 
