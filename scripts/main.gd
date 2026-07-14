@@ -1398,6 +1398,10 @@ func show_window() -> void:
 
 		if budget <= 0:
 			lbl("Geen acties meer over voor %s dit transferwindow." % p.name, 20)
+		elif extended.has(cid):
+			# Verlengen sluit clubonderhandelingen voor dit window uit — hij
+			# heeft net getekend, dus een nieuwe club is niet meer aan de orde.
+			lbl("Contract dit window al verlengd. Geen nieuwe clubonderhandeling meer mogelijk.", 20)
 		else:
 			for club_id in ints:
 				var c: Dictionary = Game.state.clubs[club_id]
@@ -1405,9 +1409,7 @@ func show_window() -> void:
 				if Game.td_known(club_id):
 					td_txt += " — " + str(Negotiation.PERS_INFO[Game.td_personality(club_id)]).split(" — ")[0]
 				btn("Onderhandel met %s (TD: %s)" % [c.name, td_txt], func(): _start_nego(cid, club_id))
-			if extended.has(cid):
-				lbl("Contract dit window al verlengd.", 20)
-			elif can_extend:
+			if can_extend:
 				if high and not ints.is_empty():
 					lbl("Hoge rating: verlengen blijft een optie náást beide clubgesprekken, maar het tekengeld is lager — met clubs in de rij bindt hij zich niet goedkoop.", 19)
 				var tg_preview := int(Game.value(p) * 0.02 * Game.tekengeld_mult() * Game.extend_mult(p))
@@ -1504,7 +1506,11 @@ func show_nego() -> void:
 
 		content = right_col
 		lbl("COMBO'S (opeenvolgende successen; ×1 per gesprek):", 20)
-		for combo in Negotiation.COMBOS:
+		# Combo's waar je verder in zit (meer stappen op koers, of al
+		# voltooid) staan bovenaan — hoe hoger je zit, hoe relevanter nu.
+		var combo_list: Array = Negotiation.COMBOS.duplicate()
+		combo_list.sort_custom(func(a, b): return nego.combo_progress(a) > nego.combo_progress(b))
+		for combo in combo_list:
 			var done: bool = str(combo.id) in nego.combos_done
 			var progress := nego.combo_progress(combo)
 			var req := ""
