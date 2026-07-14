@@ -646,6 +646,7 @@ func show_event(ev: Dictionary) -> void:
 	if ev.has("minigame"):
 		btn("Beginnen →", func(): _start_minigame(ev))
 		return
+	var em_ctx := _event_emphasis_context(ev)
 	for opt in ev.options:
 		var enabled := true
 		var suffix := ""
@@ -661,8 +662,10 @@ func show_event(ev: Dictionary) -> void:
 			var shown := clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98)
 			label += "  [%d%% kans]" % int(round(shown * 100))
 			btn(label + suffix, func(): _resolve(ev, opt), enabled)
-			var succ_rows := _effect_rows(Game.scale_money_effects(opt.get("success", {})), "", false)
-			var fail_rows := _effect_rows(Game.scale_money_effects(opt.get("fail", {})), "", false)
+			var succ_eff := Game.scale_money_effects(opt.get("success", {}))
+			var fail_eff := Game.scale_money_effects(opt.get("fail", {}))
+			var succ_rows := _effect_rows(succ_eff, "", false, _emphasis_for(succ_eff, em_ctx.max_abs, em_ctx.distinct_counts))
+			var fail_rows := _effect_rows(fail_eff, "", false, _emphasis_for(fail_eff, em_ctx.max_abs, em_ctx.distinct_counts))
 			if not succ_rows.is_empty():
 				lbl("Bij succes:", 18)
 				for row in succ_rows:
@@ -675,7 +678,8 @@ func show_event(ev: Dictionary) -> void:
 					l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35))
 		else:
 			btn(label + suffix, func(): _resolve(ev, opt), enabled)
-			_show_effect_rows(Game.scale_money_effects(opt.get("effects", {})), "", false)
+			var eff := Game.scale_money_effects(opt.get("effects", {}))
+			_show_effect_rows(eff, "", false, _emphasis_for(eff, em_ctx.max_abs, em_ctx.distinct_counts))
 
 
 func _resolve(ev: Dictionary, opt: Dictionary) -> void:
@@ -733,11 +737,19 @@ const EFFECT_GOOD_HIGH := {
 }
 
 
-func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: bool = true) -> Array:
+func _emphasis_symbol(key: String, emphasize: Dictionary, v: int) -> String:
+	var sym := "+" if v > 0 else "-"
+	var reps := 3 if bool(emphasize.get(key, false)) else 2
+	return sym.repeat(reps)
+
+
+func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: bool = true, emphasize: Dictionary = {}) -> Array:
 	# Eén rij per gewijzigde variabele, altijd gekleurd (groen = goed voor
 	# jou, rood = slecht). show_numbers=false geeft de kwalitatieve preview
-	# (++/--, geen bedragen) voor vóór een keuze; show_numbers=true geeft de
-	# exacte bedragen voor het uitkomstscherm ná een keuze.
+	# (++/-- , of +++/---- als `emphasize` deze variabele als grootste
+	# impact aanmerkt — vergeleken met de andere opties van hetzelfde
+	# event) voor vóór een keuze; show_numbers=true geeft de exacte
+	# bedragen voor het uitkomstscherm ná een keuze.
 	var rows: Array = []
 	for key in ["money", "rep", "scandal", "favors", "scout_points"]:
 		if effects.has(key) and int(effects[key]) != 0:
@@ -749,25 +761,72 @@ func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: b
 				var amount := eur(v) if key == "money" else _fmt_delta(v)
 				text = "%s: %s" % [label, amount]
 			else:
-				text = "%s %s" % ["++" if v > 0 else "--", label]
+				text = "%s %s" % [_emphasis_symbol(key, emphasize, v), label]
 			rows.append({"text": text, "good": good})
 	if effects.has("trust") and int(effects.trust) != 0:
 		var v := int(effects.trust)
 		var who := client_name if client_name != "" else "cliënt"
-		var text := ("Vertrouwen (%s): %s" % [who, _fmt_delta(v)]) if show_numbers else ("%s Vertrouwen (%s)" % ["++" if v > 0 else "--", who])
+		var text := ("Vertrouwen (%s): %s" % [who, _fmt_delta(v)]) if show_numbers else ("%s Vertrouwen (%s)" % [_emphasis_symbol("trust", emphasize, v), who])
 		rows.append({"text": text, "good": v > 0})
 	if effects.has("all_trust") and int(effects.all_trust) != 0:
 		var v := int(effects.all_trust)
-		var text := ("Vertrouwen (hele stal): %s" % _fmt_delta(v)) if show_numbers else ("%s Vertrouwen (hele stal)" % ("++" if v > 0 else "--"))
+		var text := ("Vertrouwen (hele stal): %s" % _fmt_delta(v)) if show_numbers else ("%s Vertrouwen (hele stal)" % _emphasis_symbol("all_trust", emphasize, v))
 		rows.append({"text": text, "good": v > 0})
 	return rows
 
 
-func _show_effect_rows(effects: Dictionary, client_name: String = "", show_numbers: bool = true) -> void:
-	var rows := _effect_rows(effects, client_name, show_numbers)
+func _show_effect_rows(effects: Dictionary, client_name: String = "", show_numbers: bool = true, emphasize: Dictionary = {}) -> void:
+	var rows := _effect_rows(effects, client_name, show_numbers, emphasize)
 	for row in rows:
 		var l := lbl(str(row.text), 24 if show_numbers else 20)
 		l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35))
+
+
+# ---------------------------------------------------------------- preview-nadruk
+# Vergelijkt alle mogelijke uitkomsten van een event (alle opties, succes én
+# mislukking) en merkt per variabele de GROOTSTE impact aan — die krijgt in
+# de preview 3 tekens (+++/---) i.p.v. 2, zodat het zwaarder weegt in de
+# afweging. Alleen relevant als er ook daadwerkelijk variatie is (anders
+# is "grootst" zinloos).
+
+const EFFECT_KEYS_FOR_EMPHASIS := ["money", "rep", "scandal", "favors", "scout_points", "trust", "all_trust"]
+
+
+func _collect_branches(ev: Dictionary) -> Array:
+	var branches: Array = []
+	for opt in ev.options:
+		if opt.has("chance"):
+			branches.append(Game.scale_money_effects(opt.get("success", {})))
+			branches.append(Game.scale_money_effects(opt.get("fail", {})))
+		else:
+			branches.append(Game.scale_money_effects(opt.get("effects", {})))
+	return branches
+
+
+func _emphasis_for(effects: Dictionary, max_abs: Dictionary, distinct_counts: Dictionary) -> Dictionary:
+	var em := {}
+	for key in EFFECT_KEYS_FOR_EMPHASIS:
+		if not effects.has(key) or int(effects[key]) == 0:
+			continue
+		var av := absi(int(effects[key]))
+		var seen: Dictionary = distinct_counts.get(key, {})
+		if av == int(max_abs.get(key, 0)) and seen.size() > 1:
+			em[key] = true
+	return em
+
+
+func _event_emphasis_context(ev: Dictionary) -> Dictionary:
+	var max_abs: Dictionary = {}
+	var distinct_counts: Dictionary = {}
+	for eff in _collect_branches(ev):
+		for key in EFFECT_KEYS_FOR_EMPHASIS:
+			if eff.has(key) and int(eff[key]) != 0:
+				var av := absi(int(eff[key]))
+				max_abs[key] = maxi(int(max_abs.get(key, 0)), av)
+				var seen: Dictionary = distinct_counts.get(key, {})
+				seen[av] = true
+				distinct_counts[key] = seen
+	return {"max_abs": max_abs, "distinct_counts": distinct_counts}
 
 
 func _show_effect_lines(effects: Dictionary, client_name: String = "") -> void:
