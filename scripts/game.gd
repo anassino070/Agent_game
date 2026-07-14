@@ -419,9 +419,24 @@ func tekengeld_mult() -> float:
 	return 1.0 + float(Meta.perk_bonus("tekengeld")) / 100.0
 
 
+const HIGH_RATING_THRESHOLD := 78
+
+
+func is_high_rated(p: Dictionary) -> bool:
+	return int(p.rating) >= HIGH_RATING_THRESHOLD
+
+
+func extend_mult(p: Dictionary) -> float:
+	# Bij een hoog gewaardeerde speler is verlengen een derde optie náást
+	# beide clubgesprekken (i.p.v. dat het de derde optie blokkeert), maar
+	# het tekengeld is dan lager: met clubs in de rij bindt hij zich niet
+	# goedkoop voor een verlenging.
+	return 0.5 if is_high_rated(p) else 1.0
+
+
 func extend_contract(client_id: String) -> int:
 	var p: Dictionary = state.players[client_id]
-	var tekengeld := int(value(p) * 0.02 * tekengeld_mult())
+	var tekengeld := int(value(p) * 0.02 * tekengeld_mult() * extend_mult(p))
 	state.money = int(state.money) + tekengeld
 	state.total_fees = int(state.total_fees) + tekengeld
 	p["contract"] = int(p.contract) + 2

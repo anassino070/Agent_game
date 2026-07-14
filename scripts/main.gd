@@ -7,7 +7,8 @@ var header: Label
 var content: VBoxContainer
 
 var event_queue: Array = []
-var interest: Dictionary = {}      # client_id -> Array van club_ids
+var interest: Dictionary = {}      # client_id -> Array van (nog niet gebruikte) club_ids
+var interest_total: Dictionary = {} # client_id -> oorspronkelijk aantal geïnteresseerde clubs
 var candidates: Array = []         # scouting/tekendoelen dit seizoen
 var approached: Array = []         # al benaderd dit seizoen (één poging p.p.)
 var extended: Array = []           # contract al verlengd dit window
@@ -1365,9 +1366,11 @@ func _finish_simon(o: Dictionary) -> void:
 
 func _goto_window() -> void:
 	interest = {}
+	interest_total = {}
 	extended = []
 	for cid in Game.state.clients:
 		interest[cid] = Game.gen_interest(cid)
+		interest_total[cid] = interest[cid].size()
 	show_window()
 
 
@@ -1390,12 +1393,19 @@ func show_window() -> void:
 		var ints: Array = interest.get(cid, [])
 		if ints.is_empty():
 			lbl("Geen interesse van clubs dit seizoen.", 22)
-			if extended.has(cid):
-				lbl("Contract dit window al verlengd.", 20)
-			elif str(p.club) != "" and int(p.contract) <= 1:
-				btn("Contract verlengen (tekengeld ~%s)" % eur(int(Game.value(p) * 0.02)), func(): _extend(cid))
-			elif str(p.club) != "":
-				lbl("Contract loopt nog %d jaar — verlengen is pas in het laatste jaar aan de orde." % int(p.contract), 20)
+
+		# Drie mogelijke opties per cliënt: onderhandelen met elke
+		# geïnteresseerde club plus contract verlengen. Normaal mag je er
+		# maar 2 van de 3 doen — bij een hoog gewaardeerde speler blijft de
+		# derde staan (tegen een lager tekengeld, zie extend_mult()).
+		var high := Game.is_high_rated(p)
+		var max_actions := 3 if high else 2
+		var used := (int(interest_total.get(cid, 0)) - ints.size()) + (1 if extended.has(cid) else 0)
+		var budget := max_actions - used
+		var can_extend := str(p.club) != "" and int(p.contract) <= 1 and not extended.has(cid)
+
+		if budget <= 0:
+			lbl("Geen acties meer over voor %s dit transferwindow." % p.name, 20)
 		else:
 			for club_id in ints:
 				var c: Dictionary = Game.state.clubs[club_id]
@@ -1403,13 +1413,21 @@ func show_window() -> void:
 				if Game.td_known(club_id):
 					td_txt += " — " + str(Negotiation.PERS_INFO[Game.td_personality(club_id)]).split(" — ")[0]
 				btn("Onderhandel met %s (TD: %s)" % [c.name, td_txt], func(): _start_nego(cid, club_id))
+			if extended.has(cid):
+				lbl("Contract dit window al verlengd.", 20)
+			elif can_extend:
+				if high and not ints.is_empty():
+					lbl("Hoge rating: verlengen blijft een optie náást beide clubgesprekken, maar het tekengeld is lager — met clubs in de rij bindt hij zich niet goedkoop.", 19)
+				var tg_preview := int(Game.value(p) * 0.02 * Game.tekengeld_mult() * Game.extend_mult(p))
+				btn("Contract verlengen (tekengeld ~%s)" % eur(tg_preview), func(): _extend(cid))
+			elif str(p.club) != "":
+				lbl("Contract loopt nog %d jaar — verlengen is pas in het laatste jaar aan de orde." % int(p.contract), 20)
 	sep()
 	btn("Seizoen afronden →", _goto_wrapup)
 
 
 func _extend(cid: String) -> void:
 	var tg := Game.extend_contract(cid)
-	interest[cid] = []
 	extended.append(cid)
 	flash = "Contract verlengd. Tekengeld: %s." % eur(tg)
 	show_window()
@@ -1467,6 +1485,23 @@ func show_nego() -> void:
 			lbl("Geen deal." + ("  De relatie heeft een deuk." if nego.walked else ""), 28)
 			btn("Terug naar het window →", func(): _close_nego(false))
 	else:
+		# Tactieken links, combo's rechts — twee kolommen naast elkaar. De
+		# btn()/lbl()-helpers schrijven altijd naar `content`, dus we wisselen
+		# die tijdelijk om zonder de styling-logica te dupliceren.
+		var row := HBoxContainer.new()
+		row.add_theme_constant_override("separation", 24)
+		content.add_child(row)
+		var left_col := VBoxContainer.new()
+		left_col.add_theme_constant_override("separation", 14)
+		left_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		var right_col := VBoxContainer.new()
+		right_col.add_theme_constant_override("separation", 8)
+		right_col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		row.add_child(left_col)
+		row.add_child(right_col)
+
+		var real_content := content
+		content = left_col
 		# Onderhandelaar-perk: elke +5 effectieve rep = +1% tactiekkans.
 		for t in nego.tactics(int(Game.state.rep) + Meta.perk_bonus("onderhandelen") * 5):
 			if str(t.id) == "aftasten":
@@ -1474,7 +1509,8 @@ func show_nego() -> void:
 			else:
 				btn("%s  [%d%%, weerstand -%d]" % [str(t.label), int(round(float(t.chance) * 100)), int(t.drop)], func(): _play_tactic(t))
 		btn("Weglopen (geen schade, maar de kans vervalt)", func(): _close_nego(false))
-		sep()
+
+		content = right_col
 		lbl("COMBO'S (opeenvolgende successen; ×1 per gesprek):", 20)
 		for combo in Negotiation.COMBOS:
 			var done: bool = str(combo.id) in nego.combos_done
@@ -1499,6 +1535,8 @@ func show_nego() -> void:
 			l.add_theme_color_override("font_color", color)
 			if progress > 0 and not done:
 				l.add_theme_font_size_override("font_size", 21)
+
+		content = real_content
 
 
 func _play_tactic(t: Dictionary) -> void:
