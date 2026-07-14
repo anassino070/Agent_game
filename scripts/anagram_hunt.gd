@@ -1,13 +1,17 @@
 # anagram_hunt.gd — minigame "Anagramjacht" (event: anagram_jacht).
-# Drie gehusselde woorden uit een gelekt clubdocument; kies steeds het juiste
-# woord uit vier opties voordat een rivaal-makelaar het document doorheeft.
+# Drie gehusselde woorden uit een gelekt clubdocument; type het juiste woord
+# via een virtueel toetsenbord binnen ROUND_SECONDS per woord, voordat een
+# rivaal-makelaar het document doorheeft. De echte klok loopt in main.gd
+# (Godot _process); deze klasse kent alleen "tijd om" via timeout().
 class_name AnagramHunt
 extends RefCounted
 
 const WORD_BANK := ["CONTRACT", "CLAUSULE", "BUDGET", "TRANSFER", "SPONSOR", "RESERVE", "SCOUTING", "SEIZOEN"]
+const ROUND_SECONDS := 25.0
 
-var rounds: Array = []     # [{scrambled, answer, options}]
+var rounds: Array = []     # [{scrambled, answer}]
 var round_idx := 0
+var typed := ""
 var correct_count := 0
 var finished := false
 var log: Array = []
@@ -32,34 +36,49 @@ func setup(rng: RandomNumberGenerator) -> void:
 			letters[i] = letters[j]
 			letters[j] = tmp
 		var scrambled: String = "".join(letters)
-		var decoys: Array = []
-		for w in pool:
-			if w != t and decoys.size() < 3:
-				decoys.append(w)
-		var options: Array = decoys + [t]
-		for i in range(options.size() - 1, 0, -1):
-			var j := rng.randi_range(0, i)
-			var tmp = options[i]
-			options[i] = options[j]
-			options[j] = tmp
-		rounds.append({"scrambled": scrambled, "answer": t, "options": options})
+		rounds.append({"scrambled": scrambled, "answer": word})
 
 
 func current() -> Dictionary:
 	return rounds[round_idx]
 
 
-func guess(word: String) -> bool:
-	var correct: bool = word == str(rounds[round_idx].answer)
+func type_letter(ch: String) -> void:
+	if finished:
+		return
+	if typed.length() < str(current().answer).length():
+		typed += ch
+
+
+func backspace() -> void:
+	if typed.length() > 0:
+		typed = typed.substr(0, typed.length() - 1)
+
+
+func can_submit() -> bool:
+	return typed.length() == str(current().answer).length() and typed.length() > 0
+
+
+func submit() -> void:
+	var correct: bool = typed == str(current().answer)
+	_advance(correct, false)
+
+
+func timeout() -> void:
+	log.append("Tijd is om! Het was %s." % str(current().answer))
+	_advance(false, true)
+
+
+func _advance(correct: bool, was_timeout: bool) -> void:
 	if correct:
 		correct_count += 1
-		log.append("Juist! Het was %s." % str(rounds[round_idx].answer))
-	else:
-		log.append("Mis — het was %s." % str(rounds[round_idx].answer))
+		log.append("Juist! Het was %s." % str(current().answer))
+	elif not was_timeout:
+		log.append("Fout — het was %s." % str(current().answer))
 	round_idx += 1
+	typed = ""
 	if round_idx >= rounds.size():
 		finished = true
-	return correct
 
 
 func outcome(money_scale: float = 1.0) -> Dictionary:

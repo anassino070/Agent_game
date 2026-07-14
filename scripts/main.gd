@@ -32,6 +32,13 @@ var anagram: AnagramHunt = null
 var scoutdate: ScoutSpeedDate = null
 var simon: SimonMedia = null
 
+# Anagramjacht heeft een ECHTE klok (Godot _process), geen beurt-gebaseerde
+# ronde — vandaar deze aparte trackingvariabelen.
+var anagram_active := false
+var anagram_round_started_idx := -1
+var anagram_time_left := 0.0
+var anagram_timer_label: Label = null
+
 var home_btn: Button
 var inf_btn: Button                # ∞-upgrade, klein vierkant rechtsboven op het perkscherm
 var confirm_reset := false         # tweestaps-bevestiging voor de perk-reset
@@ -51,9 +58,22 @@ const DEV_TEST_MONEY := 999999999
 var dev_test_mode := false
 var dev_test_index := 0
 var dev_test_total := 0
+var dev_test_all: Array = []
+var dev_jump_input: LineEdit = null
 
 
 # ---------------------------------------------------------------- opbouw
+
+func _process(delta: float) -> void:
+	if not anagram_active or anagram == null or anagram.finished:
+		return
+	anagram_time_left -= delta
+	if anagram_time_left <= 0.0:
+		anagram_time_left = 0.0
+		_anagram_timeout()
+	elif anagram_timer_label != null and is_instance_valid(anagram_timer_label):
+		anagram_timer_label.text = "Tijd: %ds" % int(ceil(anagram_time_left))
+
 
 func _ready() -> void:
 	var th := Theme.new()
@@ -276,6 +296,17 @@ func _dev_test_banner() -> void:
 		return
 	var l := lbl("[DEV TEST] Event %d/%d — id: %s" % [dev_test_index, dev_test_total, str(mg_ev.get("id", "?"))], 18)
 	l.add_theme_color_override("font_color", Color(1.0, 0.6, 0.2))
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 8)
+	content.add_child(row)
+	dev_jump_input = LineEdit.new()
+	dev_jump_input.placeholder_text = "nr"
+	dev_jump_input.custom_minimum_size = Vector2(70, 40)
+	row.add_child(dev_jump_input)
+	var jump_btn := Button.new()
+	jump_btn.text = "Ga naar event"
+	jump_btn.pressed.connect(_dev_jump_to_event)
+	row.add_child(jump_btn)
 
 
 func _start_event_test() -> void:
@@ -283,17 +314,50 @@ func _start_event_test() -> void:
 	Game.ensure_test_client()
 	Game.state.money = DEV_TEST_MONEY
 	dev_test_mode = true
-	event_queue = []
+	dev_test_all = []
 	for ev in EventsDB.get_events():
 		var e: Dictionary = ev.duplicate(true)
 		if bool(e.get("needs_client", false)):
 			e["client_id"] = Game.state.clients[0] if not Game.state.clients.is_empty() else ""
 		else:
 			e["client_id"] = ""
-		event_queue.append(e)
+		dev_test_all.append(e)
+	event_queue = dev_test_all.duplicate()
 	dev_test_total = event_queue.size()
 	dev_test_index = 0
 	_next_event()
+
+
+func _dev_jump_to_event() -> void:
+	if dev_jump_input == null:
+		return
+	var n := int(dev_jump_input.text)
+	if n < 1 or n > dev_test_all.size():
+		return
+	_dev_cleanup_minigames()
+	event_queue = dev_test_all.duplicate().slice(n - 1)
+	dev_test_index = n - 1
+	_next_event()
+
+
+func _dev_cleanup_minigames() -> void:
+	# Sluit een eventueel actieve minigame af zonder de effecten toe te
+	# passen — puur navigatie tijdens het testen, geen echte uitkomst.
+	bidding = null
+	press = null
+	sponsor = null
+	tax = null
+	poker = null
+	poker_notes = []
+	poker_applied = false
+	dice = null
+	accounting = null
+	anagram = null
+	anagram_active = false
+	anagram_round_started_idx = -1
+	anagram_timer_label = null
+	scoutdate = null
+	simon = null
 
 
 func _finish_event_test() -> void:
@@ -595,6 +659,19 @@ func show_event(ev: Dictionary) -> void:
 			# Geluksvogel-perk telt mee in de getoonde én de echte kans.
 			var shown := clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98)
 			label += "  [%d%% kans]" % int(round(shown * 100))
+			var succ := _effect_preview(opt.get("success", {}))
+			var fail := _effect_preview(opt.get("fail", {}))
+			var extra: Array = []
+			if succ != "":
+				extra.append("bij succes: " + succ)
+			if fail != "":
+				extra.append("bij mislukking: " + fail)
+			if not extra.is_empty():
+				label += "\n" + " | ".join(extra)
+		else:
+			var prev := _effect_preview(opt.get("effects", {}))
+			if prev != "":
+				label += "\n" + prev
 		btn(label + suffix, func(): _resolve(ev, opt), enabled)
 
 
@@ -662,6 +739,13 @@ func _effect_lines(effects: Dictionary, client_name: String = "") -> Array:
 	return lines
 
 
+func _effect_preview(effects: Dictionary) -> String:
+	# Compacte, komma-gescheiden versie voor op een optieknop (vóór de keuze).
+	var scaled := Game.scale_money_effects(effects)
+	var lines := _effect_lines(scaled)
+	return ", ".join(lines)
+
+
 func _show_effect_lines(effects: Dictionary, client_name: String = "") -> void:
 	var lines := _effect_lines(effects, client_name)
 	if lines.is_empty():
@@ -694,6 +778,7 @@ func _start_minigame(ev: Dictionary) -> void:
 			show_bidding()
 		"persconferentie":
 			press = PressConference.new()
+			press.setup(Game.rng)
 			show_press()
 		"sponsorpitch":
 			sponsor = SponsorPitch.new()
@@ -711,7 +796,7 @@ func _start_minigame(ev: Dictionary) -> void:
 			show_dice()
 		"boekhoudpuzzel":
 			accounting = AccountingPuzzle.new()
-			accounting.setup(Game.rng)
+			accounting.setup(Game.rng, int(Game.state.season))
 			show_accounting()
 		"anagramjacht":
 			anagram = AnagramHunt.new()
@@ -723,7 +808,7 @@ func _start_minigame(ev: Dictionary) -> void:
 			show_scoutdate()
 		"simonmedia":
 			simon = SimonMedia.new()
-			simon.setup(Game.rng)
+			simon.setup(Game.rng, int(Game.state.season))
 			show_simon()
 
 
@@ -809,9 +894,12 @@ func show_press() -> void:
 		_show_effect_lines(o.effects, str(Game.state.players[cid].name))
 		btn("Verder →", func(): _finish_press(o))
 	else:
-		btn("Ontwijken", func(): _play_press("ontwijken"))
-		btn("Toegeven (eerlijk antwoord)", func(): _play_press("toegeven"))
-		btn("Aanvallen (weerwoord geven)", func(): _play_press("aanvallen"))
+		var q := lbl(press.current_question(), 26)
+		q.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
+		sep()
+		btn("Ontwijken — 'Daar ga ik nu niet op in.'", func(): _play_press("ontwijken"))
+		btn("Toegeven — vertel het eerlijke verhaal", func(): _play_press("toegeven"))
+		btn("Aanvallen — de vraag zelf onterecht noemen", func(): _play_press("aanvallen"))
 
 
 func _play_press(action: String) -> void:
@@ -914,14 +1002,23 @@ func show_poker() -> void:
 	refresh_header()
 	clear()
 	_dev_test_banner()
-	lbl("POKERBLUF TEGEN EEN RIVAAL", 32)
-	lbl("Jouw hand: %d/100   |   Pot: %s   |   Rondes over: %d" % [poker.my_strength, eur(poker.pot), poker.rounds_left], 24)
+	lbl("POKER OM EEN TALENT", 32)
+	lbl("Straat: %s   |   Pot: %s" % [str(poker.street).capitalize(), eur(poker.pot)], 26)
+	lbl("Jouw kaarten: %s   |   Bord: %s" % [
+		poker.cards_text(poker.my_hole),
+		poker.cards_text(poker.community) if not poker.community.is_empty() else "—",
+	], 24)
+	lbl("Jouw stack: %s   |   Tegenstander: %s%s" % [
+		eur(poker.my_stack), eur(poker.opp_stack),
+		"   |   Bij te leggen: %s" % eur(poker.to_call) if poker.to_call > 0 else "",
+	], 22)
 	if not poker.log.is_empty():
 		sep()
 		for line in poker.log:
 			lbl("· " + str(line), 20)
 	sep()
 	if poker.finished:
+		lbl("Tegenstander had: %s" % poker.cards_text(poker.opp_hole), 22)
 		var o := poker.outcome()
 		lbl(str(o.txt), 26)
 		_show_effect_lines(o.effects)
@@ -929,9 +1026,8 @@ func show_poker() -> void:
 			lbl(">> " + str(n), 24)
 		btn("Verder →", _finish_poker)
 	else:
-		btn("Meegaan", func(): _play_poker("meegaan"))
+		btn("Meegaan" if poker.to_call > 0 else "Checken", func(): _play_poker("meegaan"))
 		btn("Verhogen", func(): _play_poker("verhogen"))
-		btn("Bluffen", func(): _play_poker("bluffen"))
 		btn("Passen (veilig wegwezen)", func(): _play_poker("passen"))
 
 
@@ -961,6 +1057,7 @@ func show_dice() -> void:
 	_dev_test_banner()
 	lbl("DOBBELEN BIJ DE BOOKMAKER", 32)
 	lbl("Inzet: %s   |   Herkansingen over: %d" % [eur(dice.stake), dice.rolls_left], 24)
+	lbl("Uitbetaling op je inzet: 5 gelijke ogen ×10, 4 gelijk ×4, full house ×3, 3 gelijk ×1,5, twee paar ×0,5. Niets van dit alles? Dan ben je je inzet kwijt.", 19)
 	sep()
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
@@ -1017,18 +1114,18 @@ func show_accounting() -> void:
 	clear()
 	_dev_test_banner()
 	lbl("DE BOEKHOUDPUZZEL", 32)
-	lbl("Vul elke rij, kolom en 2×2-vak met de cijfers 1-4, elk precies één keer. Pogingen over: %d" % accounting.attempts_left, 22)
+	lbl("Vul elke rij en kolom met de cijfers 1-5, elk precies één keer. Pogingen over: %d" % accounting.attempts_left, 22)
 	sep()
 	var grid := GridContainer.new()
-	grid.columns = 4
-	grid.add_theme_constant_override("h_separation", 8)
-	grid.add_theme_constant_override("v_separation", 8)
+	grid.columns = AccountingPuzzle.SIZE
+	grid.add_theme_constant_override("h_separation", 6)
+	grid.add_theme_constant_override("v_separation", 6)
 	content.add_child(grid)
-	for i in range(16):
+	for i in range(AccountingPuzzle.CELLS):
 		var b := Button.new()
 		var v := int(accounting.grid[i])
 		b.text = str(v) if v > 0 else "·"
-		b.custom_minimum_size = Vector2(64, 64)
+		b.custom_minimum_size = Vector2(56, 56)
 		b.disabled = bool(accounting.fixed[i]) or accounting.finished
 		if bool(accounting.fixed[i]):
 			b.modulate = Color(1, 1, 1, 0.5)
@@ -1074,15 +1171,35 @@ func show_anagram() -> void:
 	lbl("HET GELEKTE DOCUMENT", 32)
 	if not anagram.finished:
 		var r: Dictionary = anagram.current()
+		if anagram_round_started_idx != anagram.round_idx:
+			anagram_round_started_idx = anagram.round_idx
+			anagram_time_left = AnagramHunt.ROUND_SECONDS
+			anagram_active = true
 		lbl("Woord %d/3: %s" % [anagram.round_idx + 1, str(r.scrambled)], 28)
+		anagram_timer_label = lbl("Tijd: %ds" % int(ceil(anagram_time_left)), 22)
+		lbl("Getypt: %s" % (str(anagram.typed) if str(anagram.typed) != "" else "_"), 26)
 		sep()
-		for opt in r.options:
-			btn(str(opt), func(): _guess_anagram(str(opt)))
+		var kb := GridContainer.new()
+		kb.columns = 13
+		kb.add_theme_constant_override("h_separation", 4)
+		kb.add_theme_constant_override("v_separation", 4)
+		content.add_child(kb)
+		for code in range(65, 91):
+			var ch := char(code)
+			var kbtn := Button.new()
+			kbtn.text = ch
+			kbtn.custom_minimum_size = Vector2(40, 40)
+			kbtn.pressed.connect(func(): _type_anagram_letter(ch))
+			kb.add_child(kbtn)
+		sep()
+		btn("⌫ Wis", _backspace_anagram)
+		btn("Indienen", _submit_anagram, anagram.can_submit())
 	if not anagram.log.is_empty():
 		sep()
 		for line in anagram.log:
 			lbl("· " + str(line), 20)
 	if anagram.finished:
+		anagram_active = false
 		sep()
 		var o := anagram.outcome(Game.event_money_scale())
 		lbl(str(o.txt), 26)
@@ -1090,14 +1207,33 @@ func show_anagram() -> void:
 		btn("Verder →", func(): _finish_anagram(o))
 
 
-func _guess_anagram(word: String) -> void:
-	anagram.guess(word)
+func _type_anagram_letter(ch: String) -> void:
+	anagram.type_letter(ch)
+	show_anagram()
+
+
+func _backspace_anagram() -> void:
+	anagram.backspace()
+	show_anagram()
+
+
+func _submit_anagram() -> void:
+	anagram.submit()
+	show_anagram()
+
+
+func _anagram_timeout() -> void:
+	anagram_active = false
+	anagram.timeout()
 	show_anagram()
 
 
 func _finish_anagram(o: Dictionary) -> void:
 	Game.apply_effects(o.effects, "")
 	anagram = null
+	anagram_active = false
+	anagram_round_started_idx = -1
+	anagram_timer_label = null
 	_next_event()
 
 
@@ -1120,9 +1256,13 @@ func show_scoutdate() -> void:
 		_show_effect_lines(o.effects)
 		btn("Verder →", func(): _finish_scoutdate(o))
 	else:
+		lbl("Let op: een fout aanbod verbrandt de scout — hij is dan niet meer beschikbaar.", 19)
 		for si in range(ScoutSpeedDate.SCOUTS.size()):
 			if bool(scoutdate.locked[si]):
 				lbl("✔ %s — vastgezet" % str(ScoutSpeedDate.SCOUTS[si]), 22)
+				continue
+			if bool(scoutdate.burned[si]):
+				lbl("✘ %s — afgehaakt" % str(ScoutSpeedDate.SCOUTS[si]), 22)
 				continue
 			lbl(str(ScoutSpeedDate.SCOUTS[si]), 22)
 			var row := HBoxContainer.new()
@@ -1169,9 +1309,9 @@ func show_simon() -> void:
 		btn("Ik heb het onthouden →", _start_simon_input)
 	else:
 		lbl("Herhaal de reeks (stap %d/%d):" % [simon.player_progress + 1, simon.sequence.size()], 22)
-		for i in range(SimonMedia.MOVES.size()):
+		for i in range(simon.moves.size()):
 			var mv := i
-			btn(str(SimonMedia.MOVES[i]), func(): _play_simon(mv))
+			btn(str(simon.moves[i]), func(): _play_simon(mv))
 
 
 func _start_simon_input() -> void:

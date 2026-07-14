@@ -466,12 +466,13 @@ func end_of_season() -> Array:
 			lines.append("%s verlengt bij zijn club; tekengeld €%d voor jou." % [p.name, tg])
 		if Meta.perk_level("ijzeren_stal") == 0 and int(p.trust) < LEAVE_TRUST - Meta.perk_bonus("empathie") and rng.randf() < LEAVE_CHANCE:
 			leavers.append(cid)
-			lines.append("!! %s VERTREKT naar een andere makelaar. Het vertrouwen was op." % p.name)
+			lines.append("!! %s VERTREKT naar een andere makelaar. Het vertrouwen was op (%d)." % [p.name, int(p.trust)])
 		elif rng.randf() < poach_chance(p):
-			# Rivaal-makelaars azen op je stal; toppers zijn extra gewild.
+			# Rivaal-makelaars azen op je stal; toppers zijn extra gewild, hoog
+			# vertrouwen beschermt (zie poach_chance()) — vandaar dat cijfer erbij.
 			var rivaal: String = RIVAL_NAMES[rng.randi_range(0, RIVAL_NAMES.size() - 1)]
 			leavers.append(cid)
-			lines.append("!! %s wordt WEGGEKAAPT door %s. 'Zij beloven me meer.'" % [p.name, rivaal])
+			lines.append("!! %s (vertrouwen %d) wordt WEGGEKAAPT door %s. 'Zij beloven me meer.'" % [p.name, int(p.trust), rivaal])
 
 	for cid in leavers:
 		state.clients.erase(cid)

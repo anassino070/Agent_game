@@ -2,12 +2,16 @@
 # Klassiek geheugenspel: een reeks "veilige" reacties groeit elke ronde met
 # één stap. Bekijk de reeks, en herhaal haar daarna blind. Vijf rondes
 # foutloos = volledig getraind; een fout beëindigt de sessie direct.
+# Aantal beschikbare reacties groeit mee met het seizoen:
+# round(4 + 0,4×seizoen), begrensd door de poolgrootte — later in de run
+# moet je uit meer opties kiezen, dus wordt onthouden lastiger.
 class_name SimonMedia
 extends RefCounted
 
-const MOVES := ["Rustig", "Trots", "Nederig", "Grapje"]
+const MOVE_POOL := ["Rustig", "Trots", "Nederig", "Grapje", "Empathie", "Feiten", "Ontwijkend", "Zelfspot", "Dankbaar", "Strijdlust"]
 const TARGET_ROUNDS := 5
 
+var moves: Array = []
 var sequence: Array = []
 var player_progress := 0
 var round_num := 0
@@ -17,12 +21,20 @@ var failed := false
 var log: Array = []
 
 
-func setup(rng: RandomNumberGenerator) -> void:
+func setup(rng: RandomNumberGenerator, season: int = 1) -> void:
+	var count := clampi(int(round(4.0 + 0.4 * float(season))), 4, MOVE_POOL.size())
+	var pool: Array = MOVE_POOL.duplicate()
+	for i in range(pool.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp = pool[i]
+		pool[i] = pool[j]
+		pool[j] = tmp
+	moves = pool.slice(0, count)
 	_extend(rng)
 
 
 func _extend(rng: RandomNumberGenerator) -> void:
-	sequence.append(rng.randi_range(0, MOVES.size() - 1))
+	sequence.append(rng.randi_range(0, moves.size() - 1))
 	player_progress = 0
 	phase = "show"
 	round_num += 1
@@ -52,7 +64,7 @@ func input_move(move_idx: int, rng: RandomNumberGenerator) -> bool:
 func sequence_text() -> String:
 	var parts: Array = []
 	for m in sequence:
-		parts.append(str(MOVES[int(m)]))
+		parts.append(str(moves[int(m)]))
 	return " → ".join(parts)
 
 
