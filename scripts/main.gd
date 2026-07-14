@@ -511,7 +511,12 @@ func show_prep() -> void:
 	sep()
 	lbl("DE BANK — stort geld weg, krijg het na %d seizoenen verdubbeld terug." % Game.BANK_MATURITY_SEASONS, 20)
 	if Game.bank_deposit_count() > 0:
-		lbl("Nog uitstaand: %s in %d storting(en)." % [eur(Game.bank_total_pending()), Game.bank_deposit_count()], 19)
+		# Elke storting loopt onafhankelijk af — dus ook los getoond, niet
+		# als één opgeteld bedrag met één gedeelde termijn.
+		for d in Game.bank_deposits_list():
+			lbl("• %s gestort — nog %d seizoen(en), dan %s terug." % [
+				eur(int(d.amount)), int(d.seasons_left), eur(int(round(float(d.amount) * Game.BANK_MULTIPLIER))),
+			], 19)
 	var bank_row := HBoxContainer.new()
 	bank_row.add_theme_constant_override("separation", 10)
 	content.add_child(bank_row)

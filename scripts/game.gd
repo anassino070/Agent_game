@@ -81,15 +81,14 @@ func bank_deposit(amount: int) -> bool:
 	return true
 
 
-func bank_total_pending() -> int:
-	var total := 0
-	for d in state.get("bank_deposits", []):
-		total += int(d.amount)
-	return total
-
-
 func bank_deposit_count() -> int:
 	return state.get("bank_deposits", []).size()
+
+
+func bank_deposits_list() -> Array:
+	# Elke storting blijft een los item met zijn eigen resterende termijn —
+	# gebruikt door de UI om ze apart te tonen (nooit samengevoegd).
+	return state.get("bank_deposits", [])
 
 
 # ---------------------------------------------------------------- de shop
