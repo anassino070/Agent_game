@@ -126,6 +126,8 @@ Het GDD mikt op 120+ events voor launch. Dit bestand is dus waar het meeste van 
 
 Alle knoppen staan bovenin `scripts/game.gd` als constants: startgeld, aantal seizoenen (`MAX_SEASONS`, standaard 15), cliënten-cap, kantoorkosten, fee-percentage, vertrek-drempel en -kans. De waardeformule (`value()`) en de interesse-kansen (`gen_interest()`) staan er direct onder.
 
+**Markt- en ratingbalans.** `value()` gebruikt `pow(max(rating-40, 5), 2) * 3000` (was `* 650`): een veel steilere curve, zodat een fee al rond seizoen 4 meetelt tegen de exponentieel stijgende kantoorkosten in plaats van na een paar seizoenen zakgeld te worden. `WorldGen.generate()` genereert spelers nu met een lagere basisrating en een lager plafond (35-52 basis, clamp 38-82, was 42-62/45-88) — de markt is dus duurder per rating-punt, maar spelers zijn zelf ook wat minder goed; per saldo hoort bij eenzelfde transferfee nu een lagere rating dan voorheen (een speler die vroeger ~rating 70 was voor €500k, is nu ~rating 54 voor hetzelfde bedrag). `rating_cap_young()`/`rating_cap_older()` in `game.gd` tellen daarnaast een `+2×seizoen`-term mee, los van reputatie — zo kom je in latere seizoenen gegarandeerd beter spelersaanbod tegen, ook als je reputatie achterblijft.
+
 ### 4.3 Meta-progressie (legacy points en perks)
 
 `scripts/meta.gd` (autoload `Meta`) houdt een tweede savebestand bij (`user://meta.json`) dat runs overleeft, los van `Game.state`. Elke afgeronde run — ook een game over — levert legacy points op (`Meta.award_run()`, aangeroepen vanuit `main.gd` in `show_gameover()`/`show_win()`), op basis van verdiende fees en aantal overleefde seizoenen. Die punten besteed je op het "Perks"-scherm (bereikbaar vanaf het startscherm) aan permanente upgrades in `Meta.PERKS`.

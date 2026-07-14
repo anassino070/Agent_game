@@ -73,9 +73,12 @@ func ensure_test_client() -> void:
 # ---------------------------------------------------------------- helpers
 
 func value(p: Dictionary) -> int:
-	# Marktwaarde: kwadratisch in rating, zodat toppers écht lonen.
+	# Marktwaarde: kwadratisch in rating, zodat toppers écht lonen. Factor
+	# fors verhoogd (was 650) zodat een fee al vanaf pak 'm beet seizoen 4
+	# meetelt tegen de exponentieel stijgende kantoorkosten — anders voelt
+	# een deal van €40k fee al na een paar seizoenen als zakgeld.
 	var r: float = float(p.rating)
-	var v := pow(maxf(r - 40.0, 5.0), 2.0) * 650.0
+	var v := pow(maxf(r - 40.0, 5.0), 2.0) * 3000.0
 	v *= 1.0 + float(Meta.perk_bonus("waardestijging")) / 100.0
 	return int(v)
 
@@ -210,12 +213,14 @@ func _sign_event_talent() -> String:
 # ---------------------------------------------------------------- scouting
 
 func rating_cap_young() -> int:
-	# Reputatie bepaalt wie je telefoontje beantwoordt.
-	return 50 + int(state.rep) / 4 + Meta.perk_bonus("talentmagneet")
+	# Reputatie bepaalt wie je telefoontje beantwoordt — maar naarmate de run
+	# vordert, opent de markt zich ook vanzelf (nieuwe namen, meer exposure),
+	# los van hoe snel je reputatie zelf groeit.
+	return 50 + int(state.rep) / 4 + int(state.season) * 2 + Meta.perk_bonus("talentmagneet")
 
 
 func rating_cap_older() -> int:
-	return 55 + int(state.rep) / 3 + Meta.perk_bonus("grote_naam")
+	return 55 + int(state.rep) / 3 + int(state.season) * 2 + Meta.perk_bonus("grote_naam")
 
 
 func gen_candidates() -> Array:

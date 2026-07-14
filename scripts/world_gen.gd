@@ -44,7 +44,11 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 	for i in range(80):
 		var age := rng.randi_range(16, 33)
 		# Oudere spelers zijn verder ontwikkeld: rating stijgt mee met leeftijd…
-		var rating := clampi(rng.randi_range(42, 62) + int(float(age - 16) * 1.4) + rng.randi_range(-3, 3), 45, 88)
+		# Basis en plafond bewust verlaagd (was 42-62 / clamp 45-88): spelers
+		# zijn nu overal wat minder goed, wat samen met de veel steilere
+		# waardeformule (zie value()) betekent dat eenzelfde transferfee nu
+		# bij een lagere rating hoort — de markt is duurder geworden.
+		var rating := clampi(rng.randi_range(35, 52) + int(float(age - 16) * 1.1) + rng.randi_range(-3, 3), 38, 82)
 		# …maar de rek is eruit: de potentieel-marge loopt richting 27 jaar naar 0.
 		var headroom := maxi(27 - age, 0) * 2
 		var pot := rating
