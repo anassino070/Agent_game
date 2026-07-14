@@ -1743,6 +1743,18 @@ func _close_nego(deal: bool) -> void:
 
 # ---------------------------------------------------------------- fase 5: afsluiting
 
+# Kleurt een seizoensrapport-regel op basis van het bedrag erin: "-€" is
+# altijd een uitgave (rood), "+€" of een kaal "€" (bank/tekengeld-stijl,
+# altijd inkomend in deze regels) is groen. Regels zonder bedrag (ontwikkeling,
+# vertrek, vertrouwen) blijven ongekleurd.
+func _wrapup_color(line: String):
+	if line.find("-€") != -1:
+		return Color(1.0, 0.4, 0.4)
+	if line.find("€") != -1:
+		return Color(0.4, 0.9, 0.45)
+	return null
+
+
 func _goto_wrapup() -> void:
 	var report: Array = Game.end_of_season()
 	Game.save_game()
@@ -1750,7 +1762,10 @@ func _goto_wrapup() -> void:
 	clear()
 	lbl("SEIZOENSAFSLUITING", 34)
 	for line in report:
-		lbl("· " + str(line), 23)
+		var l := lbl("· " + str(line), 23)
+		var c := _wrapup_color(str(line))
+		if c != null:
+			l.add_theme_color_override("font_color", c)
 	sep()
 	if str(Game.state.game_over) != "":
 		btn("Bekijk het einde →", show_gameover)
