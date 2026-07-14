@@ -660,20 +660,22 @@ func show_event(ev: Dictionary) -> void:
 			# Geluksvogel-perk telt mee in de getoonde én de echte kans.
 			var shown := clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98)
 			label += "  [%d%% kans]" % int(round(shown * 100))
-			var succ := _effect_preview(opt.get("success", {}))
-			var fail := _effect_preview(opt.get("fail", {}))
-			var extra: Array = []
-			if succ != "":
-				extra.append("bij succes: " + succ)
-			if fail != "":
-				extra.append("bij mislukking: " + fail)
-			if not extra.is_empty():
-				label += "\n" + " | ".join(extra)
+			btn(label + suffix, func(): _resolve(ev, opt), enabled)
+			var succ_rows := _effect_rows(Game.scale_money_effects(opt.get("success", {})), "", false)
+			var fail_rows := _effect_rows(Game.scale_money_effects(opt.get("fail", {})), "", false)
+			if not succ_rows.is_empty():
+				lbl("Bij succes:", 18)
+				for row in succ_rows:
+					var l := lbl(str(row.text), 19)
+					l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35))
+			if not fail_rows.is_empty():
+				lbl("Bij mislukking:", 18)
+				for row in fail_rows:
+					var l := lbl(str(row.text), 19)
+					l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35))
 		else:
-			var prev := _effect_preview(opt.get("effects", {}))
-			if prev != "":
-				label += "\n" + prev
-		btn(label + suffix, func(): _resolve(ev, opt), enabled)
+			btn(label + suffix, func(): _resolve(ev, opt), enabled)
+			_show_effect_rows(Game.scale_money_effects(opt.get("effects", {})), "", false)
 
 
 func _resolve(ev: Dictionary, opt: Dictionary) -> void:
@@ -720,33 +722,6 @@ func _money_delta(v: int) -> String:
 	return ("+" + eur(v)) if v > 0 else eur(v)
 
 
-func _effect_lines(effects: Dictionary, client_name: String = "") -> Array:
-	var lines: Array = []
-	if effects.has("money") and int(effects.money) != 0:
-		lines.append("Geld: %s" % _money_delta(int(effects.money)))
-	if effects.has("rep") and int(effects.rep) != 0:
-		lines.append("Reputatie: %s" % _fmt_delta(int(effects.rep)))
-	if effects.has("scandal") and int(effects.scandal) != 0:
-		lines.append("Schandaal: %s" % _fmt_delta(int(effects.scandal)))
-	if effects.has("favors") and int(effects.favors) != 0:
-		lines.append("Gunsten: %s" % _fmt_delta(int(effects.favors)))
-	if effects.has("scout_points") and int(effects.scout_points) != 0:
-		lines.append("Scoutpunten: %s" % _fmt_delta(int(effects.scout_points)))
-	if effects.has("trust") and int(effects.trust) != 0:
-		var who := client_name if client_name != "" else "cliënt"
-		lines.append("Vertrouwen (%s): %s" % [who, _fmt_delta(int(effects.trust))])
-	if effects.has("all_trust") and int(effects.all_trust) != 0:
-		lines.append("Vertrouwen (hele stal): %s" % _fmt_delta(int(effects.all_trust)))
-	return lines
-
-
-func _effect_preview(effects: Dictionary) -> String:
-	# Compacte, komma-gescheiden versie voor op een optieknop (vóór de keuze).
-	var scaled := Game.scale_money_effects(effects)
-	var lines := _effect_lines(scaled)
-	return ", ".join(lines)
-
-
 # Welke kant van een effect "goed" is voor de speler — schandaal is omgekeerd
 # (hoger = slechter), de rest is hoger = beter.
 const EFFECT_LABELS := {
@@ -758,33 +733,50 @@ const EFFECT_GOOD_HIGH := {
 }
 
 
-func _effect_rows(effects: Dictionary, client_name: String = "") -> Array:
-	# Kwalitatieve rijen voor het uitkomstscherm: geen bedragen, alleen
-	# richting (++/--) en kleur (goed/slecht) per variabele, onder elkaar.
+func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: bool = true) -> Array:
+	# Eén rij per gewijzigde variabele, altijd gekleurd (groen = goed voor
+	# jou, rood = slecht). show_numbers=false geeft de kwalitatieve preview
+	# (++/--, geen bedragen) voor vóór een keuze; show_numbers=true geeft de
+	# exacte bedragen voor het uitkomstscherm ná een keuze.
 	var rows: Array = []
 	for key in ["money", "rep", "scandal", "favors", "scout_points"]:
 		if effects.has(key) and int(effects[key]) != 0:
 			var v := int(effects[key])
 			var good: bool = (v > 0) == bool(EFFECT_GOOD_HIGH[key])
-			rows.append({"text": "%s %s" % ["++" if v > 0 else "--", str(EFFECT_LABELS[key])], "good": good})
+			var label := str(EFFECT_LABELS[key])
+			var text: String
+			if show_numbers:
+				var amount := eur(v) if key == "money" else _fmt_delta(v)
+				text = "%s: %s" % [label, amount]
+			else:
+				text = "%s %s" % ["++" if v > 0 else "--", label]
+			rows.append({"text": text, "good": good})
 	if effects.has("trust") and int(effects.trust) != 0:
 		var v := int(effects.trust)
 		var who := client_name if client_name != "" else "cliënt"
-		rows.append({"text": "%s Vertrouwen (%s)" % ["++" if v > 0 else "--", who], "good": v > 0})
+		var text := ("Vertrouwen (%s): %s" % [who, _fmt_delta(v)]) if show_numbers else ("%s Vertrouwen (%s)" % ["++" if v > 0 else "--", who])
+		rows.append({"text": text, "good": v > 0})
 	if effects.has("all_trust") and int(effects.all_trust) != 0:
 		var v := int(effects.all_trust)
-		rows.append({"text": "%s Vertrouwen (hele stal)" % ("++" if v > 0 else "--"), "good": v > 0})
+		var text := ("Vertrouwen (hele stal): %s" % _fmt_delta(v)) if show_numbers else ("%s Vertrouwen (hele stal)" % ("++" if v > 0 else "--"))
+		rows.append({"text": text, "good": v > 0})
 	return rows
 
 
+func _show_effect_rows(effects: Dictionary, client_name: String = "", show_numbers: bool = true) -> void:
+	var rows := _effect_rows(effects, client_name, show_numbers)
+	for row in rows:
+		var l := lbl(str(row.text), 24 if show_numbers else 20)
+		l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35))
+
+
 func _show_effect_lines(effects: Dictionary, client_name: String = "") -> void:
-	var rows := _effect_rows(effects, client_name)
+	# Uitkomstscherm: mét bedragen, mét kleur.
+	var rows := _effect_rows(effects, client_name, true)
 	if rows.is_empty():
 		return
 	sep()
-	for row in rows:
-		var l := lbl(str(row.text), 24)
-		l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35))
+	_show_effect_rows(effects, client_name, true)
 
 
 # ---------------------------------------------------------------- event-minigames
