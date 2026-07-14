@@ -1379,8 +1379,9 @@ func show_window() -> void:
 	for cid in Game.state.clients:
 		sep()
 		var p: Dictionary = Game.state.players[cid]
-		lbl("%s — rating %d, %s, waarde %s" % [
-			p.name, int(p.rating), Game.club_name(str(p.club)), eur(Game.value(p)),
+		var contract_txt := "contract loopt af" if int(p.contract) <= 1 else "contract nog %d jaar" % int(p.contract)
+		lbl("%s — rating %d, %s, waarde %s, %s" % [
+			p.name, int(p.rating), Game.club_name(str(p.club)), eur(Game.value(p)), contract_txt,
 		], 26)
 		var ints: Array = interest.get(cid, [])
 		if ints.is_empty():
@@ -1415,7 +1416,7 @@ func show_window() -> void:
 				var tg_preview := int(Game.value(p) * 0.02 * Game.tekengeld_mult() * Game.extend_mult(p))
 				btn("Contract verlengen (tekengeld ~%s)" % eur(tg_preview), func(): _extend(cid))
 			elif str(p.club) != "":
-				lbl("Contract loopt nog %d jaar — verlengen is pas in het laatste jaar aan de orde." % int(p.contract), 20)
+				lbl("Verlengen kan pas in het laatste contractjaar.", 19)
 	sep()
 	btn("Seizoen afronden →", _goto_wrapup)
 
