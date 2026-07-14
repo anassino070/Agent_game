@@ -67,6 +67,9 @@ var clausule_cost := 0.02    # fee-kost per clausule (Clausulemeester)
 var aftast_cost := 2         # rondes die aftasten kost (Dossierkennis)
 var bluf_bonus := 0.0        # extra slagingskans op bluffen (Koelbloedig)
 
+const RAISE_FEE_STEP := 0.02
+const MAX_CUT := 0.30
+
 
 func setup(value: int, start_resistance: float, personality: String, known: bool) -> void:
 	deal_value = value
@@ -264,6 +267,26 @@ func combo_pattern_text(combo: Dictionary) -> String:
 	for id in combo.pattern:
 		labels.append(str(MOVE_LABELS.get(id, id)))
 	return " → ".join(labels)
+
+
+# Gunst ingezet: een contact belt de TD persoonlijk op. Gegarandeerd succes,
+# kost een ronde en telt gewoon mee voor streak/flow — maar heeft geen eigen
+# tactiek-id, dus doorbreekt geen lopende combo (en voltooit er ook geen).
+func halve_resistance() -> void:
+	rounds_left -= 1
+	resistance = maxf(resistance / 2.0, 0.0)
+	streak += 1
+	log.append("Je zet een gunst in: een contact belt de TD persoonlijk. Weerstand halveert naar %d." % int(resistance))
+	_check_end()
+
+
+# Verhoogt alleen je fee-percentage; raakt weerstand, stemming, streak en
+# combo's helemaal niet — een zuivere zijstap.
+func raise_fee() -> void:
+	rounds_left -= 1
+	cut = minf(cut + RAISE_FEE_STEP, MAX_CUT)
+	log.append("Je onderhandelt een hoger percentage: jouw fee stijgt naar %d%%." % int(round(cut * 100)))
+	_check_end()
 
 
 func _check_end() -> void:

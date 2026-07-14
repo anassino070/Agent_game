@@ -1503,7 +1503,25 @@ func show_nego() -> void:
 				btn("%s  [kost %d ronde%s]" % [str(t.label), nego.aftast_cost, "" if nego.aftast_cost == 1 else "s"], func(): _play_tactic(t))
 			else:
 				btn("%s  [%d%%, weerstand -%d]" % [str(t.label), int(round(float(t.chance) * 100)), int(t.drop)], func(): _play_tactic(t))
-		btn("Weglopen (geen schade, maar de kans vervalt)", func(): _close_nego(false))
+		btn("Percentage verhogen (+%d%%, raakt weerstand/flow niet)" % int(round(Negotiation.RAISE_FEE_STEP * 100)), _raise_fee, nego.cut < Negotiation.MAX_CUT)
+
+		var favor_btn := Button.new()
+		favor_btn.text = "🪙 Gunst inzetten: weerstand halveren"
+		favor_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		favor_btn.custom_minimum_size = Vector2(0, 56)
+		favor_btn.disabled = int(Game.state.favors) <= 0
+		var favor_style := StyleBoxFlat.new()
+		favor_style.bg_color = Color(0.82, 0.64, 0.1)
+		favor_style.set_corner_radius_all(10)
+		favor_style.content_margin_left = 10
+		favor_style.content_margin_right = 10
+		favor_btn.add_theme_stylebox_override("normal", favor_style)
+		favor_btn.add_theme_stylebox_override("hover", favor_style)
+		favor_btn.add_theme_stylebox_override("pressed", favor_style)
+		favor_btn.add_theme_color_override("font_color", Color(0.15, 0.09, 0.0))
+		favor_btn.add_theme_color_override("font_disabled_color", Color(0.4, 0.36, 0.28))
+		favor_btn.pressed.connect(_play_favor_halve)
+		left_col.add_child(favor_btn)
 
 		content = right_col
 		lbl("COMBO'S (opeenvolgende successen; ×1 per gesprek):", 20)
@@ -1545,6 +1563,19 @@ func _play_tactic(t: Dictionary) -> void:
 	show_nego()
 	if nego.last_combo != "":
 		_confetti_burst(nego.last_combo)
+
+
+func _raise_fee() -> void:
+	nego.raise_fee()
+	show_nego()
+
+
+func _play_favor_halve() -> void:
+	if int(Game.state.favors) <= 0:
+		return
+	Game.apply_effects({"favors": -1}, "")
+	nego.halve_resistance()
+	show_nego()
 
 
 # ---------------------------------------------------------------- confetti
