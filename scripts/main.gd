@@ -746,13 +746,44 @@ func _effect_preview(effects: Dictionary) -> String:
 	return ", ".join(lines)
 
 
+# Welke kant van een effect "goed" is voor de speler — schandaal is omgekeerd
+# (hoger = slechter), de rest is hoger = beter.
+const EFFECT_LABELS := {
+	"money": "Geld", "rep": "Reputatie", "scandal": "Schandaal",
+	"favors": "Gunsten", "scout_points": "Scoutpunten",
+}
+const EFFECT_GOOD_HIGH := {
+	"money": true, "rep": true, "scandal": false, "favors": true, "scout_points": true,
+}
+
+
+func _effect_rows(effects: Dictionary, client_name: String = "") -> Array:
+	# Kwalitatieve rijen voor het uitkomstscherm: geen bedragen, alleen
+	# richting (++/--) en kleur (goed/slecht) per variabele, onder elkaar.
+	var rows: Array = []
+	for key in ["money", "rep", "scandal", "favors", "scout_points"]:
+		if effects.has(key) and int(effects[key]) != 0:
+			var v := int(effects[key])
+			var good: bool = (v > 0) == bool(EFFECT_GOOD_HIGH[key])
+			rows.append({"text": "%s %s" % ["++" if v > 0 else "--", str(EFFECT_LABELS[key])], "good": good})
+	if effects.has("trust") and int(effects.trust) != 0:
+		var v := int(effects.trust)
+		var who := client_name if client_name != "" else "cliënt"
+		rows.append({"text": "%s Vertrouwen (%s)" % ["++" if v > 0 else "--", who], "good": v > 0})
+	if effects.has("all_trust") and int(effects.all_trust) != 0:
+		var v := int(effects.all_trust)
+		rows.append({"text": "%s Vertrouwen (hele stal)" % ("++" if v > 0 else "--"), "good": v > 0})
+	return rows
+
+
 func _show_effect_lines(effects: Dictionary, client_name: String = "") -> void:
-	var lines := _effect_lines(effects, client_name)
-	if lines.is_empty():
+	var rows := _effect_rows(effects, client_name)
+	if rows.is_empty():
 		return
 	sep()
-	for line in lines:
-		lbl(line, 22)
+	for row in rows:
+		var l := lbl(str(row.text), 24)
+		l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35))
 
 
 # ---------------------------------------------------------------- event-minigames
