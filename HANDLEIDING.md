@@ -32,9 +32,23 @@ Elke run bestaat uit 15 seizoenen. De balans is bewust hard: zonder perks is een
    - **Combo's** (opeenvolgende successen; elk maximaal één keer per gesprek): De Goede Cop (charme → charme → feiten, +6), De Slotklap (charme → feiten → charme → druk, +14), De Boekhouder (feiten → feiten tegen een bekende Rekenmeester, +8), Het Ultimatum (clausule → clausule → druk, +10 — maar je fee is dan al 4% gezakt), De Nerveuze Val (druk → druk tegen een bekende Nerveus, +16 — het hoogste, maar risico-op-risico), Slow Play (clausule → charme → feiten → bluf, +12 — de veilige lange route). Het scherm toont de lijst en kleurt een combo **goud** ("OP KOERS") zodra je huidige reeks er een prefix van is, en **groen** met ✔ als hij al is afgerond. Bij het voltooien van een combo verschijnt een korte confetti-uitbarsting met de combonaam.
 
    Weglopen kan zonder schade, maar elke club biedt maar één kans per window: ketst het af, dan is die deal dit seizoen weg. Contract verlengen kan alleen als een cliënt in zijn laatste contractjaar zit (en maximaal één keer per window). Elk 5e seizoen is het Deadline Day: TD's beginnen met lagere weerstand.
-6. **Afsluiting** — kantoorkosten (×1,8 per seizoen: €10k in seizoen 1, €33k in seizoen 3, €105k in seizoen 5, €612k in seizoen 8 — de kosten zijn de échte klok van de run), spelerontwikkeling, vertrouwensdrift, contractafloop, en de fail-checks.
+6. **Afsluiting** — kantoorkosten (×1,8 per seizoen: €10k in seizoen 1, €33k in seizoen 3, €105k in seizoen 5, €612k in seizoen 8 — de kosten zijn de échte klok van de run), De Bank keert rijpe stortingen uit (zie hieronder), spelerontwikkeling, vertrouwensdrift, contractafloop, en de fail-checks. Daarna volgt **🪙 De Shop** voor je verder gaat naar het volgende seizoen.
 
 **Fail states:** saldo onder €0 (failliet), schandaalmeter op 100 (licentie kwijt), of een lege stal (alle cliënten weg). Vertrouwen onder 30 geeft elk seizoen 40% vertrekkans per cliënt, en rivaal-makelaars kunnen daarnaast cliënten wegkapen — hoe hoger de rating en hoe lager het vertrouwen, hoe groter dat risico.
+
+**De Bank** (`Game.bank_deposit()`, voorbereidingsscherm) — stort een zelfgekozen bedrag; na 2 seizoenen (`BANK_MATURITY_SEASONS`) krijg je het verdubbeld terug (`BANK_MULTIPLIER`). Geen risico, wel je geld 2 seizoenen lang vastgezet — een gegarandeerd maar traag tegenwicht tegen de exponentiële kosten.
+
+**🪙 De Shop** (`Game.SHOP_UPGRADES`, `show_shop()` in `main.gd`) — na elke seizoensafsluiting krijg je 2 willekeurige, nog niet gekochte upgrades te koop aangeboden (`Game.shop_offer()`); je kunt ook gewoon doorlopen. Alle upgrades zijn eenmalig en gelden alleen **voor deze run** (los van de permanente legacy-perks uit §4.3), met prijzen die meeschalen via `event_money_scale()`. Tien upgrades:
+- **Groter kantoor** (€15k) — +1 stalplek, rest van de run.
+- **PR-bureau** (€12k) — +2 extra schandaalverval per seizoen.
+- **Eigen jeugdscout** (€18k) — +1 scoutpunt per seizoen.
+- **Juridisch adviseur** (€14k) — schandaal-stijgingen 1 lager (min. 1).
+- **Media-trainer voor je stal** (€10k) — eenmalig +15 vertrouwen bij al je huidige cliënten.
+- **Netwerkdiner-abonnement** (€20k) — +1 gunst per seizoen.
+- **Kantoorrenovatie** (€16k) — eenmalig +8 reputatie, plus +3 op je rating-plafonds.
+- **Data-analytics abonnement** (€17k) — scouten verlaagt onzekerheid 2 extra.
+- **Onderhandelaar-coach** (€15k) — +3% slagingskans op alle onderhandeltactieken.
+- **★ Noodfonds — lifeline** (€25k) — kom je onder €0, dan reset je saldo eenmalig per run naar €0 en ga je door (`Game.try_shop_bailout()`, los van en naast de gelijknamige `laatste_redmiddel`-legacy-perk).
 
 Er wordt automatisch opgeslagen aan het eind van elk seizoen (`user://save.json`); "Doorgaan" op het startscherm pakt de run weer op bij de voorbereiding.
 

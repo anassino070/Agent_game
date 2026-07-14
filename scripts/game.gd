@@ -42,6 +42,8 @@ func new_run() -> void:
 		"game_over": "",
 		"meta_awarded": false,
 		"bank_deposits": [],   # [{"amount": int, "seasons_left": int}] — De Bank
+		"shop_owned": [],      # ids uit SHOP_UPGRADES die je deze run al kocht
+		"noodfonds_used": false,
 	}
 	# Startcliënt: een jong, beloftevol maar betaalbaar talent.
 	var pool: Array = []
@@ -90,6 +92,117 @@ func bank_deposit_count() -> int:
 	return state.get("bank_deposits", []).size()
 
 
+# ---------------------------------------------------------------- de shop
+# Tien eenmalige upgrades voor déze run (géén legacy-perks — die verdwijnen
+# aan het einde van de run net als de rest van Game.state). Elk seizoen na
+# de afsluiting kies je uit 2 willekeurige, nog niet gekochte upgrades.
+# Prijzen schalen mee met event_money_scale() zodat ze de hele run relevant
+# blijven.
+const SHOP_UPGRADES := {
+	"groter_kantoor": {
+		"name": "Groter kantoor", "price": 15000,
+		"desc": "+1 stalplek voor de rest van deze run.",
+	},
+	"pr_bureau": {
+		"name": "PR-bureau", "price": 12000,
+		"desc": "+2 extra schandaalverval per seizoen, de rest van de run.",
+	},
+	"jeugdscout": {
+		"name": "Eigen jeugdscout", "price": 18000,
+		"desc": "+1 scoutpunt per seizoen, de rest van de run.",
+	},
+	"juridisch_adviseur": {
+		"name": "Juridisch adviseur", "price": 14000,
+		"desc": "Schandaal-stijgingen 1 lager (minimaal 1), de rest van de run.",
+	},
+	"mediatrainer_stal": {
+		"name": "Media-trainer voor je stal", "price": 10000,
+		"desc": "Eenmalig: +15 vertrouwen bij al je huidige cliënten.",
+	},
+	"netwerkdiner": {
+		"name": "Netwerkdiner-abonnement", "price": 20000,
+		"desc": "+1 gunst per seizoen, de rest van de run.",
+	},
+	"kantoorrenovatie": {
+		"name": "Kantoorrenovatie", "price": 16000,
+		"desc": "Eenmalig +8 reputatie, plus +3 op je rating-plafonds voor de rest van de run.",
+	},
+	"data_analytics": {
+		"name": "Data-analytics abonnement", "price": 17000,
+		"desc": "Scouten verlaagt de onzekerheid 2 extra, de rest van de run.",
+	},
+	"noodfonds": {
+		"name": "Noodfonds (lifeline)", "price": 25000,
+		"desc": "Eén keer per run: kom je onder €0, dan reset je saldo naar €0 en ga je door.",
+	},
+	"onderhandelcoach": {
+		"name": "Onderhandelaar-coach", "price": 15000,
+		"desc": "+3% slagingskans op alle onderhandeltactieken, de rest van de run.",
+	},
+}
+
+
+func shop_owned() -> Array:
+	return state.get("shop_owned", [])
+
+
+func has_shop(id: String) -> bool:
+	return id in shop_owned()
+
+
+func shop_price(id: String) -> int:
+	return int(round(float(SHOP_UPGRADES[id].price) * event_money_scale()))
+
+
+func can_buy_shop(id: String) -> bool:
+	if has_shop(id):
+		return false
+	return int(state.money) >= shop_price(id)
+
+
+func buy_shop_upgrade(id: String) -> bool:
+	if not can_buy_shop(id):
+		return false
+	state.money = int(state.money) - shop_price(id)
+	if not state.has("shop_owned"):
+		state.shop_owned = []
+	state.shop_owned.append(id)
+	match id:
+		"mediatrainer_stal":
+			for cid in state.clients:
+				var p: Dictionary = state.players[cid]
+				p["trust"] = clampi(int(p.trust) + 15, 0, 100)
+		"kantoorrenovatie":
+			state.rep = clampi(int(state.rep) + 8, 0, 100)
+	return true
+
+
+func shop_offer(rng_src: RandomNumberGenerator, count: int = 2) -> Array:
+	var pool: Array = []
+	for id in SHOP_UPGRADES:
+		if not has_shop(id):
+			pool.append(id)
+	var out: Array = []
+	while out.size() < count and not pool.is_empty():
+		var i := rng_src.randi_range(0, pool.size() - 1)
+		out.append(pool[i])
+		pool.remove_at(i)
+	return out
+
+
+func try_shop_bailout() -> bool:
+	# Noodfonds-upgrade: dekt één keer per run een negatief saldo.
+	if int(state.money) >= 0:
+		return false
+	if not has_shop("noodfonds"):
+		return false
+	if bool(state.get("noodfonds_used", false)):
+		return false
+	state.noodfonds_used = true
+	state.money = 0
+	return true
+
+
 func ensure_test_client() -> void:
 	# Developer-only: garandeert minstens één cliënt, zodat needs_client-events
 	# ook in de eventtest kunnen worden getoond.
@@ -115,11 +228,11 @@ func value(p: Dictionary) -> int:
 
 
 func scout_points_per_season() -> int:
-	return SCOUT_POINTS + Meta.perk_bonus("scouting")
+	return SCOUT_POINTS + Meta.perk_bonus("scouting") + (1 if has_shop("jeugdscout") else 0)
 
 
 func client_cap() -> int:
-	return CLIENT_CAP + Meta.perk_bonus("kantoor")
+	return CLIENT_CAP + Meta.perk_bonus("kantoor") + (1 if has_shop("groter_kantoor") else 0)
 
 
 func fee_cut() -> float:
@@ -196,9 +309,13 @@ func apply_effects(effects: Dictionary, client_id: String = "") -> Array:
 				state.rep = clampi(int(state.rep) + int(v), 0, 100)
 			"scandal":
 				var sv := int(v)
-				# Crisismanagement-perk dempt stijgingen (nooit onder 1).
+				# Crisismanagement-perk en Juridisch adviseur (shop) dempen
+				# stijgingen samen (nooit onder 1).
 				if sv > 0:
-					sv = maxi(sv - Meta.perk_bonus("crisismanagement"), 1)
+					var reduction := Meta.perk_bonus("crisismanagement")
+					if has_shop("juridisch_adviseur"):
+						reduction += 1
+					sv = maxi(sv - reduction, 1)
 				state.scandal = clampi(int(state.scandal) + sv, 0, 100)
 			"favors":
 				state.favors = maxi(int(state.favors) + int(v), 0)
@@ -277,11 +394,11 @@ func rating_cap_young() -> int:
 	# Reputatie bepaalt wie je telefoontje beantwoordt — maar naarmate de run
 	# vordert, opent de markt zich ook vanzelf (nieuwe namen, meer exposure),
 	# los van hoe snel je reputatie zelf groeit.
-	return 50 + int(state.rep) / 4 + int(state.season) * 2 + Meta.perk_bonus("talentmagneet")
+	return 50 + int(state.rep) / 4 + int(state.season) * 2 + Meta.perk_bonus("talentmagneet") + (3 if has_shop("kantoorrenovatie") else 0)
 
 
 func rating_cap_older() -> int:
-	return 55 + int(state.rep) / 3 + int(state.season) * 2 + Meta.perk_bonus("grote_naam")
+	return 55 + int(state.rep) / 3 + int(state.season) * 2 + Meta.perk_bonus("grote_naam") + (3 if has_shop("kantoorrenovatie") else 0)
 
 
 func gen_candidates() -> Array:
@@ -335,7 +452,8 @@ func scout(pid: String) -> bool:
 	if int(p.unc) <= 2:
 		return false
 	var old_unc := int(p.unc)
-	var new_unc := maxi(old_unc - (5 + Meta.perk_bonus("talentenoog")), 2)
+	var shop_bonus := 2 if has_shop("data_analytics") else 0
+	var new_unc := maxi(old_unc - (5 + Meta.perk_bonus("talentenoog") + shop_bonus), 2)
 	# De schatting kruipt richting het echte potentieel naarmate je beter
 	# kijkt — maar een "70–90"-belofte kan dus een 72-dud blijken.
 	var err := estimate(pid) - int(p.pot)
@@ -571,7 +689,8 @@ func end_of_season() -> Array:
 	for cid in leavers:
 		state.clients.erase(cid)
 
-	state.scandal = maxi(int(state.scandal) - (3 + Meta.perk_bonus("mediatraining")), 0)
+	var scandal_decay := 3 + Meta.perk_bonus("mediatraining") + (2 if has_shop("pr_bureau") else 0)
+	state.scandal = maxi(int(state.scandal) - scandal_decay, 0)
 
 	# Oud geld-perk: rente over een positief saldo.
 	var rente_pct := Meta.perk_bonus("oud_geld")
@@ -587,11 +706,19 @@ func end_of_season() -> Array:
 		state.favors = int(state.favors) + gf
 		lines.append("Je gunstenfabriek draait: +%d gunst(en)." % gf)
 
+	# Netwerkdiner-upgrade (shop): elk seizoen een gratis gunst.
+	if has_shop("netwerkdiner"):
+		state.favors = int(state.favors) + 1
+		lines.append("Je netwerkdiner levert weer een gunst op.")
+
 	state.news = _gen_news()
 
-	# Laatste redmiddel-perk: één keer per run wordt een tekort gedekt.
+	# Laatste redmiddel-perk / Noodfonds-upgrade: één keer per run wordt een
+	# tekort gedekt (los van elkaar bruikbaar als je beide hebt).
 	if int(state.money) < 0 and try_bailout():
 		lines.append("!! Een oude vriend dekt je tekort. 'Eén keer. Daarna sta je er alleen voor.'")
+	if int(state.money) < 0 and try_shop_bailout():
+		lines.append("!! Je noodfonds springt bij en zet je saldo op €0. Dat was 'm dan.")
 
 	# Fail states — in volgorde van drama.
 	if int(state.money) < 0:

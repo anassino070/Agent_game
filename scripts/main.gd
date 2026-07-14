@@ -64,6 +64,8 @@ var dev_jump_input: LineEdit = null
 
 var bank_deposit_input: LineEdit = null
 
+var shop_offers: Array = []
+
 
 # ---------------------------------------------------------------- opbouw
 
@@ -1588,7 +1590,9 @@ func show_nego() -> void:
 		var real_content := content
 		content = left_col
 		# Onderhandelaar-perk: elke +5 effectieve rep = +1% tactiekkans.
-		for t in nego.tactics(int(Game.state.rep) + Meta.perk_bonus("onderhandelen") * 5):
+		# Onderhandelcoach (shop): vlak +3% erbovenop, dus +15 effectieve rep.
+		var coach_bonus := 15 if Game.has_shop("onderhandelcoach") else 0
+		for t in nego.tactics(int(Game.state.rep) + Meta.perk_bonus("onderhandelen") * 5 + coach_bonus):
 			if str(t.id) == "aftasten":
 				btn("%s  [kost %d ronde%s]" % [str(t.label), nego.aftast_cost, "" if nego.aftast_cost == 1 else "s"], func(): _play_tactic(t))
 			else:
@@ -1748,7 +1752,40 @@ func _goto_wrapup() -> void:
 	elif int(Game.state.season) > Game.MAX_SEASONS:
 		btn("Bekijk het einde →", show_win)
 	else:
-		btn("Volgende seizoen →", show_prep)
+		btn("🪙 Naar de shop →", _enter_shop)
+
+
+# ---------------------------------------------------------------- de shop
+
+func _enter_shop() -> void:
+	shop_offers = Game.shop_offer(Game.rng, 2)
+	show_shop()
+
+
+func show_shop() -> void:
+	refresh_header()
+	clear()
+	lbl("🪙 DE SHOP", 34)
+	lbl("Elke seizoenswissel liggen hier 2 willekeurige upgrades voor de rest van deze run. Koop wat je wilt, of loop gewoon door — niets verplicht.", 22)
+	show_flash()
+	sep()
+	if shop_offers.is_empty():
+		lbl("Niets (meer) te koop deze keer.", 24)
+	for id in shop_offers:
+		var up: Dictionary = Game.SHOP_UPGRADES[id]
+		lbl("%s — %s" % [str(up.name), str(up.desc)], 23)
+		if Game.has_shop(id):
+			lbl("✔ Gekocht", 20)
+		else:
+			btn("Kopen (%s)" % eur(Game.shop_price(id)), func(): _buy_shop(id), Game.can_buy_shop(id))
+		sep()
+	btn("Doorgaan naar volgend seizoen →", show_prep)
+
+
+func _buy_shop(id: String) -> void:
+	if Game.buy_shop_upgrade(id):
+		flash = "%s gekocht!" % str(Game.SHOP_UPGRADES[id].name)
+	show_shop()
 
 
 # ---------------------------------------------------------------- einde
