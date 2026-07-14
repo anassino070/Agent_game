@@ -768,4 +768,17 @@ static func get_events() -> Array:
 			"minigame": "simonmedia",
 			"text": "{client} moet leren zijn mond te houden onder druk. Jullie oefenen een groeiende reeks veilige reacties — één foutje en de sessie is voorbij.",
 		},
+		{
+			"id": "topspeler_kaap", "title": "De sterspeler wil weg", "needs_slot": true, "min_season": 3,
+			"text": "Een sterspeler bij een concurrerend kantoor voelt zich verwaarloosd en fluistert je toe dat hij wel wil overstappen — voor een bedrag dat belachelijk laag is voor zijn niveau.",
+			"options": [
+				{"label": "Het risico nemen (omkopen + overtuigen)", "req_money": 12000, "chance": 0.5,
+					"success": {"money": -12000, "new_top_client": true, "rep": -6},
+					"success_txt": "Hij tekent bij je. Zijn oude makelaar raast, maar het papierwerk is al rond.",
+					"fail": {"money": -12000, "scandal": 10, "rep": -8},
+					"fail_txt": "Het lekt uit vóór hij tekent. Je bent de geldsmijter die probeerde te stropen — zonder resultaat."},
+				{"label": "Laten zitten, te riskant", "effects": {"rep": 2},
+					"txt": "Verstandig, misschien. Een andere makelaar is minder kieskeurig."},
+			],
+		},
 	]

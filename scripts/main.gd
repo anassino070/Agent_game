@@ -62,6 +62,8 @@ var dev_test_total := 0
 var dev_test_all: Array = []
 var dev_jump_input: LineEdit = null
 
+var bank_deposit_input: LineEdit = null
+
 
 # ---------------------------------------------------------------- opbouw
 
@@ -495,6 +497,7 @@ func show_prep() -> void:
 	lbl("VOORBEREIDING", 34)
 	if str(Game.state.news) != "":
 		lbl("Nieuws: " + str(Game.state.news), 24)
+	show_flash()
 	sep()
 	lbl("Jouw stal (%d/%d):" % [Game.state.clients.size(), Game.client_cap()], 28)
 	for cid in Game.state.clients:
@@ -504,7 +507,35 @@ func show_prep() -> void:
 			Game.club_name(str(p.club)), int(p.contract), eur(Game.value(p)),
 		], 23)
 	sep()
+	lbl("DE BANK — stort geld weg, krijg het na %d seizoenen verdubbeld terug." % Game.BANK_MATURITY_SEASONS, 20)
+	if Game.bank_deposit_count() > 0:
+		lbl("Nog uitstaand: %s in %d storting(en)." % [eur(Game.bank_total_pending()), Game.bank_deposit_count()], 19)
+	var bank_row := HBoxContainer.new()
+	bank_row.add_theme_constant_override("separation", 10)
+	content.add_child(bank_row)
+	bank_deposit_input = LineEdit.new()
+	bank_deposit_input.placeholder_text = "bedrag"
+	bank_deposit_input.custom_minimum_size = Vector2(140, 48)
+	bank_row.add_child(bank_deposit_input)
+	var deposit_btn := Button.new()
+	deposit_btn.text = "Storten"
+	deposit_btn.custom_minimum_size = Vector2(0, 48)
+	deposit_btn.pressed.connect(_do_bank_deposit)
+	bank_row.add_child(deposit_btn)
+	sep()
 	btn("Naar scouting →" if Meta.perk_level("vaste_kern") > 0 else "Naar stalbeheer →", _goto_release)
+
+
+func _do_bank_deposit() -> void:
+	if bank_deposit_input == null:
+		return
+	var amount := int(bank_deposit_input.text)
+	if Game.bank_deposit(amount):
+		var payout := int(round(float(amount) * Game.BANK_MULTIPLIER))
+		flash = "Gestort: %s. Komt over %d seizoenen terug als %s." % [eur(amount), Game.BANK_MATURITY_SEASONS, eur(payout)]
+	else:
+		flash = "Storting mislukt — vul een geldig bedrag in dat je ook echt hebt."
+	show_prep()
 
 
 # ---------------------------------------------------------------- fase 1b: stalbeheer

@@ -41,6 +41,7 @@ func new_run() -> void:
 		"total_fees": 0,
 		"game_over": "",
 		"meta_awarded": false,
+		"bank_deposits": [],   # [{"amount": int, "seasons_left": int}] — De Bank
 	}
 	# Startcliënt: een jong, beloftevol maar betaalbaar talent.
 	var pool: Array = []
@@ -57,6 +58,36 @@ func new_run() -> void:
 func _make_client(pid: String, trust: int) -> void:
 	state.players[pid]["trust"] = clampi(trust + Meta.perk_bonus("vertrouwenspersoon"), 0, 100)
 	state.clients.append(pid)
+
+
+# ---------------------------------------------------------------- de bank
+# Stort geld weg; na 2 seizoenen krijg je het verdubbeld terug. Een simpel,
+# gegarandeerd spaarmiddel tegenover de exponentieel stijgende kosten — de
+# prijs is dat het geld 2 seizoenen lang vaststaat en dus niet inzetbaar is.
+
+const BANK_MATURITY_SEASONS := 2
+const BANK_MULTIPLIER := 2.0
+
+
+func bank_deposit(amount: int) -> bool:
+	if amount <= 0 or amount > int(state.money):
+		return false
+	if not state.has("bank_deposits"):
+		state.bank_deposits = []
+	state.money = int(state.money) - amount
+	state.bank_deposits.append({"amount": amount, "seasons_left": BANK_MATURITY_SEASONS})
+	return true
+
+
+func bank_total_pending() -> int:
+	var total := 0
+	for d in state.get("bank_deposits", []):
+		total += int(d.amount)
+	return total
+
+
+func bank_deposit_count() -> int:
+	return state.get("bank_deposits", []).size()
 
 
 func ensure_test_client() -> void:
@@ -185,6 +216,10 @@ func apply_effects(effects: Dictionary, client_id: String = "") -> Array:
 				var nm := _sign_event_talent()
 				if nm != "":
 					notes.append("%s sluit zich aan bij jouw stal." % nm)
+			"new_top_client":
+				var nmt := _sign_top_talent()
+				if nmt != "":
+					notes.append("%s (topspeler) sluit zich aan bij jouw stal." % nmt)
 	return notes
 
 
@@ -207,6 +242,32 @@ func _sign_event_talent() -> String:
 		return ""
 	var pick: String = pool[rng.randi_range(0, pool.size() - 1)]
 	_make_client(pick, 60)
+	return str(state.players[pick].name)
+
+
+func _sign_top_talent() -> String:
+	# Net als _sign_event_talent(), maar gericht op een échte topper (voor
+	# events als 'topspeler_kaap') — met soepele terugvalopties zodat het
+	# altijd wel iemand oplevert.
+	if state.clients.size() >= client_cap():
+		return ""
+	var pool: Array = []
+	for pid in state.players:
+		if pid in state.clients:
+			continue
+		var p: Dictionary = state.players[pid]
+		if int(p.rating) >= HIGH_RATING_THRESHOLD:
+			pool.append(pid)
+	if pool.is_empty():
+		for pid in state.players:
+			if pid in state.clients:
+				continue
+			if int(state.players[pid].rating) >= 65:
+				pool.append(pid)
+	if pool.is_empty():
+		return _sign_event_talent()
+	var pick: String = pool[rng.randi_range(0, pool.size() - 1)]
+	_make_client(pick, 55)
 	return str(state.players[pick].name)
 
 
@@ -455,6 +516,19 @@ func end_of_season() -> Array:
 	costs = maxi(costs - Meta.perk_bonus("schuldpapier"), 0)
 	state.money = int(state.money) - costs
 	lines.append("Kantoorkosten: -€%d" % costs)
+
+	# De bank: rijpe stortingen keren verdubbeld uit; de rest tikt een jaar af.
+	# (get() met fallback: oudere saves van vóór De Bank kennen dit veld nog niet.)
+	var still_pending: Array = []
+	for d in state.get("bank_deposits", []):
+		var seasons_left := int(d.seasons_left) - 1
+		if seasons_left <= 0:
+			var payout := int(round(float(d.amount) * BANK_MULTIPLIER))
+			state.money = int(state.money) + payout
+			lines.append("De bank keert uit: je storting van €%d wordt €%d." % [int(d.amount), payout])
+		else:
+			still_pending.append({"amount": int(d.amount), "seasons_left": seasons_left})
+	state.bank_deposits = still_pending
 
 	var leavers: Array = []
 	for cid in state.clients:
