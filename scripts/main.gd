@@ -44,6 +44,12 @@ var home_btn: Button
 var inf_btn: Button                # ∞-upgrade, klein vierkant rechtsboven op het perkscherm
 var confirm_reset := false         # tweestaps-bevestiging voor de perk-reset
 
+# Permanent info-schermpje onderaan: hover werkt niet betrouwbaar (o.a. op
+# touch/mobiel), dus toont dit gewoon altijd de stats van de relevante
+# cliënt zodra een event/minigame een speler noemt.
+var player_info_panel: PanelContainer
+var player_info_label: Label
+
 # ---- Developer-only puntenreset: verborgen achter een tik-sequentie + wachtwoord.
 # Geen echte beveiliging (GDScript-bronnen zijn leesbaar), maar voorkomt dat
 # spelers of testers er per ongeluk tegenaan lopen.
@@ -124,6 +130,31 @@ func _ready() -> void:
 	home_btn.pressed.connect(_go_home)
 	add_child(home_btn)
 
+	# Permanent speler-infopaneel onderaan (vervangt hover, die niet overal
+	# betrouwbaar werkt). Laat ruimte vrij voor de home-knop rechtsonder.
+	player_info_panel = PanelContainer.new()
+	player_info_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
+	player_info_panel.offset_left = 12
+	player_info_panel.offset_right = -140
+	player_info_panel.offset_top = -100
+	player_info_panel.offset_bottom = -12
+	player_info_panel.visible = false
+	player_info_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	var info_style := StyleBoxFlat.new()
+	info_style.bg_color = Color(0.08, 0.08, 0.11, 0.94)
+	info_style.set_corner_radius_all(10)
+	info_style.content_margin_left = 12
+	info_style.content_margin_right = 12
+	info_style.content_margin_top = 8
+	info_style.content_margin_bottom = 8
+	player_info_panel.add_theme_stylebox_override("panel", info_style)
+	add_child(player_info_panel)
+
+	player_info_label = Label.new()
+	player_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+	player_info_label.add_theme_font_size_override("font_size", 19)
+	player_info_panel.add_child(player_info_label)
+
 	# ∞-upgrade: klein vierkantje rechtsboven, alleen zichtbaar op het
 	# perkscherm. Vaste prijs, oneindig te kopen, +0,1% punten per niveau.
 	inf_btn = Button.new()
@@ -155,6 +186,7 @@ func clear() -> void:
 		home_btn.visible = true
 	if inf_btn:
 		inf_btn.visible = false
+	_show_player_info("")
 
 
 func lbl(text: String, size := 28) -> Label:
@@ -212,10 +244,26 @@ func _player_tooltip(pid: String) -> String:
 	]
 
 
-# Rij tekst met de spelernaam als apart, hoverbaar Label (lichtblauw, met
-# tooltip) tussen een voor- en nastuk platte tekst. In een HFlowContainer
-# zodat het als lopende zin blijft aanvoelen, ook als het moet omwikkelen.
+# Vult het permanente infopaneel onderaan met de kerngegevens van pid, of
+# verbergt het als er geen (bekende) speler relevant is. Dit is de
+# betrouwbare vervanging voor hover (die niet overal werkt, bijv. op touch).
+func _show_player_info(pid: String) -> void:
+	if player_info_panel == null:
+		return
+	if pid == "" or not Game.state.players.has(pid):
+		player_info_panel.visible = false
+		return
+	player_info_panel.visible = true
+	player_info_label.text = _player_tooltip(pid).replace("\n", "   ·   ")
+
+
+# Rij tekst met de spelernaam als apart, gekleurd Label tussen een voor- en
+# nastuk platte tekst — allemaal met autowrap, anders loopt een lange
+# event-paragraaf zo van het scherm af. In een HFlowContainer zodat het als
+# lopende zin blijft aanvoelen. Stats staan in het infopaneel onderaan
+# (_show_player_info), niet meer via hover.
 func _name_row(before: String, pid: String, after: String, size := 24) -> void:
+	_show_player_info(pid)
 	var flow := HFlowContainer.new()
 	flow.add_theme_constant_override("h_separation", 6)
 	flow.add_theme_constant_override("v_separation", 4)
@@ -224,22 +272,25 @@ func _name_row(before: String, pid: String, after: String, size := 24) -> void:
 	if before != "":
 		var lb := Label.new()
 		lb.text = before
+		lb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		lb.add_theme_font_size_override("font_size", size)
 		flow.add_child(lb)
 
 	var known: bool = pid != "" and Game.state.players.has(pid)
 	var name_lbl := Label.new()
 	name_lbl.text = str(Game.state.players[pid].name) if known else "?"
+	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_lbl.add_theme_font_size_override("font_size", size)
 	if known:
 		name_lbl.add_theme_color_override("font_color", Color(0.55, 0.82, 1.0))
-		name_lbl.tooltip_text = _player_tooltip(pid)
-		name_lbl.mouse_filter = Control.MOUSE_FILTER_STOP
 	flow.add_child(name_lbl)
 
 	if after != "":
 		var la := Label.new()
 		la.text = after
+		la.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		la.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		la.add_theme_font_size_override("font_size", size)
 		flow.add_child(la)
 
@@ -731,12 +782,8 @@ func show_event(ev: Dictionary) -> void:
 		cname = str(Game.state.players[ev.client_id].name)
 	lbl("EVENT: %s" % str(ev.title), 32)
 	if str(ev.client_id) != "":
-		var full := str(ev.text)
-		var idx := full.find("{client}")
-		if idx != -1:
-			_name_row(full.substr(0, idx), str(ev.client_id), full.substr(idx + 8), 26)
-		else:
-			lbl(full, 26)
+		_show_player_info(str(ev.client_id))
+		lbl(str(ev.text).replace("{client}", cname), 26)
 	else:
 		lbl(str(ev.text), 26)
 	sep()
