@@ -263,6 +263,11 @@ func _show_player_info(pid: String) -> void:
 # lopende zin blijft aanvoelen. Stats staan in het infopaneel onderaan
 # (_show_player_info), niet meer via hover.
 func _name_row(before: String, pid: String, after: String, size := 24) -> void:
+	# Alleen voor KORTE statusregels (naam + wat cijfers) — geen autowrap
+	# nodig of gewenst: binnen een HFlowContainer duwt autowrap een Label
+	# zonder vaste breedte terug naar zijn minimale (soms 1 letter brede)
+	# grootte, waardoor de tekst verticaal, letter voor letter, uiteenvalt.
+	# Lange lopende tekst (event-paragrafen) gaat via een gewone lbl().
 	_show_player_info(pid)
 	var flow := HFlowContainer.new()
 	flow.add_theme_constant_override("h_separation", 6)
@@ -272,15 +277,12 @@ func _name_row(before: String, pid: String, after: String, size := 24) -> void:
 	if before != "":
 		var lb := Label.new()
 		lb.text = before
-		lb.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		lb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		lb.add_theme_font_size_override("font_size", size)
 		flow.add_child(lb)
 
 	var known: bool = pid != "" and Game.state.players.has(pid)
 	var name_lbl := Label.new()
 	name_lbl.text = str(Game.state.players[pid].name) if known else "?"
-	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	name_lbl.add_theme_font_size_override("font_size", size)
 	if known:
 		name_lbl.add_theme_color_override("font_color", Color(0.55, 0.82, 1.0))
@@ -289,8 +291,6 @@ func _name_row(before: String, pid: String, after: String, size := 24) -> void:
 	if after != "":
 		var la := Label.new()
 		la.text = after
-		la.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-		la.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		la.add_theme_font_size_override("font_size", size)
 		flow.add_child(la)
 
