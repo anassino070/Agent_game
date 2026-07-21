@@ -8,3 +8,8 @@ To do list:
 -maak van anagram dat je moet typen uit een toetsenbord wat tevoorschijn komt. zet een timer van 25 seconde per woord
 -maak van speed daten dat bij een fout aanbod voor een talent, dat de scout niet meer beschikbaar is. Laat sommige scouts geïnteresseerd zijn in meer dan 1 talent.
 -laat het aantal opties met woorden in simon_media de volgende formule zijn =round(4+0.4*season)
+
+
+Events:
+-onder druk gezet: geen incentive om zelf te regelen
+-de petitie  heeft alleen positieve eerste keuze, geen nadelen

@@ -484,10 +484,13 @@ static func get_events() -> Array:
 			"id": "fanpetitie", "title": "De petitie", "needs_client": true,
 			"text": "Duizenden fans tekenen een petitie om {client} langer te houden. De club voelt de druk — en jij kunt hem gebruiken.",
 			"options": [
-				{"label": "Publiekelijk inzetten bij de onderhandeling", "effects": {"rep": 5, "trust": 6},
-					"txt": "De club buigt lichtjes mee. Sterk statement."},
-				{"label": "Negeren, zelf onderhandelen", "effects": {},
-					"txt": "Je houdt het zakelijk. Soms is dat gewoon beter."},
+				{"label": "Publiekelijk inzetten bij de onderhandeling", "chance": 0.6,
+					"success": {"rep": 6, "trust": 6},
+					"success_txt": "De club buigt zichtbaar mee. Sterk statement — en de fans zien het.",
+					"fail": {"scandal": 6, "trust": -4},
+					"fail_txt": "De club voelt zich openlijk onder druk gezet en graaft zich juist in. 'Zo werkt dat niet,' klinkt het nors."},
+				{"label": "Negeren, zelf onderhandelen", "effects": {"trust": 2},
+					"txt": "Je houdt het zakelijk, zonder poespas. Hij waardeert de rust."},
 			],
 		},
 		{
@@ -495,11 +498,12 @@ static func get_events() -> Array:
 			"text": "Een gokkartel benadert {client} rechtstreeks om 'iets minder scherp' te spelen. Hij belt jou in paniek.",
 			"options": [
 				{"label": "Direct melden bij de bond", "effects": {"rep": 10, "scandal": -8, "trust": 6},
-					"txt": "De bond grijpt in. Hij voelt zich beschermd."},
+					"txt": "De bond grijpt in. Hij voelt zich beschermd — maar het wordt een dossier, geen geheim."},
 				{"label": "Zelf regelen, geen ruchtbaarheid", "chance": 0.5,
-					"success": {"trust": 8}, "success_txt": "Het kartel trekt zich terug. Stille overwinning.",
+					"success": {"trust": 12, "favors": 1},
+					"success_txt": "Het kartel trekt zich terug — via een contact dat voortaan bij je in het krijt staat. Stille overwinning, en een gunst rijker.",
 					"fail": {"scandal": 14, "trust": -10},
-					"fail_txt": "Het kartel dreigt door. Het verhaal lekt alsnog uit."},
+					"fail_txt": "Het kartel dreigt door. Het verhaal lekt alsnog uit — en nu zonder de bond in je rug."},
 			],
 		},
 		{

@@ -1747,7 +1747,7 @@ func _close_nego(deal: bool) -> void:
 # altijd een uitgave (rood), "+€" of een kaal "€" (bank/tekengeld-stijl,
 # altijd inkomend in deze regels) is groen. Regels zonder bedrag (ontwikkeling,
 # vertrek, vertrouwen) blijven ongekleurd.
-func _wrapup_color(line: String):
+func _wrapup_color(line: String) -> Variant:
 	if line.find("-€") != -1:
 		return Color(1.0, 0.4, 0.4)
 	if line.find("€") != -1:
@@ -1763,9 +1763,9 @@ func _goto_wrapup() -> void:
 	lbl("SEIZOENSAFSLUITING", 34)
 	for line in report:
 		var l := lbl("· " + str(line), 23)
-		var c := _wrapup_color(str(line))
+		var c: Variant = _wrapup_color(str(line))
 		if c != null:
-			l.add_theme_color_override("font_color", c)
+			l.add_theme_color_override("font_color", c as Color)
 	sep()
 	if str(Game.state.game_over) != "":
 		btn("Bekijk het einde →", show_gameover)
