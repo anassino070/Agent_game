@@ -227,7 +227,7 @@ func _name_row(before: String, pid: String, after: String, size := 24) -> void:
 		lb.add_theme_font_size_override("font_size", size)
 		flow.add_child(lb)
 
-	var known := pid != "" and Game.state.players.has(pid)
+	var known: bool = pid != "" and Game.state.players.has(pid)
 	var name_lbl := Label.new()
 	name_lbl.text = str(Game.state.players[pid].name) if known else "?"
 	name_lbl.add_theme_font_size_override("font_size", size)
