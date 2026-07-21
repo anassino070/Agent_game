@@ -125,7 +125,7 @@ func _ready() -> void:
 	add_child(home_btn)
 
 	# ∞-upgrade: klein vierkantje rechtsboven, alleen zichtbaar op het
-	# perkscherm. Vaste prijs, oneindig te kopen, +0,01% punten per niveau.
+	# perkscherm. Vaste prijs, oneindig te kopen, +0,1% punten per niveau.
 	inf_btn = Button.new()
 	inf_btn.add_theme_font_size_override("font_size", 18)
 	inf_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
@@ -191,6 +191,42 @@ func eur(n) -> String:
 		s = s.substr(0, s.length() - 3)
 	out = s + out
 	return ("-€" if v < 0 else "€") + out
+
+
+# ---------------------------------------------------------------- speler-tooltip
+# Je hoeft niet te onthouden welke speler welke stats heeft: bij elke naam in
+# een event/minigame kun je hoveren voor een schermpje met zijn kerngegevens
+# (Godot's ingebouwde [hint=...]-BBCode-tag toont dat automatisch).
+
+func _player_tooltip(pid: String) -> String:
+	if pid == "" or not Game.state.players.has(pid):
+		return ""
+	var p: Dictionary = Game.state.players[pid]
+	var lo := maxi(Game.estimate(pid) - int(p.unc), int(p.rating))
+	var hi := mini(Game.estimate(pid) + int(p.unc), 95)
+	return "%s — %s, %d jr\nRating %d (potentieel ca. %d–%d)\nVertrouwen %d\n%s, contract %d jr\nWaarde %s" % [
+		str(p.name), str(p.pos), int(p.age), int(p.rating), lo, hi,
+		int(p.trust), Game.club_name(str(p.club)), int(p.contract), eur(Game.value(p)),
+	]
+
+
+func _hint_name(pid: String) -> String:
+	if pid == "" or not Game.state.players.has(pid):
+		return ""
+	var p: Dictionary = Game.state.players[pid]
+	return "[hint=%s]%s[/hint]" % [_player_tooltip(pid), str(p.name)]
+
+
+func _rich_lbl(bbcode: String, size := 26) -> RichTextLabel:
+	var rtl := RichTextLabel.new()
+	rtl.bbcode_enabled = true
+	rtl.fit_content = true
+	rtl.scroll_active = false
+	rtl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	rtl.add_theme_font_size_override("normal_font_size", size)
+	rtl.text = bbcode
+	content.add_child(rtl)
+	return rtl
 
 
 func refresh_header() -> void:
@@ -453,8 +489,8 @@ func _buy_perk(id: String) -> void:
 
 
 func _refresh_inf_btn() -> void:
-	inf_btn.text = "∞ ×%s\n+0,01%%\nkoop: %d pt" % [
-		("%.4f" % Meta.inf_multiplier()).replace(".", ","), Meta.INF_COST,
+	inf_btn.text = "∞ ×%s\n+0,1%%\nkoop: %d pt" % [
+		("%.3f" % Meta.inf_multiplier()).replace(".", ","), Meta.INF_COST,
 	]
 	inf_btn.disabled = int(Meta.state.legacy_points) < Meta.INF_COST
 
@@ -679,7 +715,10 @@ func show_event(ev: Dictionary) -> void:
 	if str(ev.client_id) != "":
 		cname = str(Game.state.players[ev.client_id].name)
 	lbl("EVENT: %s" % str(ev.title), 32)
-	lbl(str(ev.text).replace("{client}", cname), 26)
+	if str(ev.client_id) != "":
+		_rich_lbl(str(ev.text).replace("{client}", _hint_name(str(ev.client_id))), 26)
+	else:
+		lbl(str(ev.text), 26)
 	sep()
 	if ev.has("minigame"):
 		btn("Beginnen →", func(): _start_minigame(ev))
@@ -940,7 +979,7 @@ func show_bidding() -> void:
 	clear()
 	_dev_test_banner()
 	lbl("BIEDINGSOORLOG", 32)
-	lbl("Cliënt: %s   |   Rondes over: %d" % [str(Game.state.players[bidding.client_id].name), bidding.rounds_left], 24)
+	_rich_lbl("Cliënt: %s   |   Rondes over: %d" % [_hint_name(bidding.client_id), bidding.rounds_left], 24)
 	sep()
 	for c in bidding.clubs:
 		var status := "actief" if c.active else "afgehaakt"
@@ -1001,8 +1040,8 @@ func show_press() -> void:
 	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
 	lbl("PERSCONFERENTIE", 32)
-	lbl("%s   |   Spanning: %d/100   |   Vragen over: %d" % [
-		str(Game.state.players[cid].name), int(press.tension), press.questions_left,
+	_rich_lbl("%s   |   Spanning: %d/100   |   Vragen over: %d" % [
+		_hint_name(cid), int(press.tension), press.questions_left,
 	], 24)
 	if not press.log.is_empty():
 		sep()
@@ -1042,7 +1081,7 @@ func show_sponsor() -> void:
 	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
 	lbl("SPONSORPITCH", 32)
-	lbl("Cliënt: %s" % str(Game.state.players[cid].name), 24)
+	_rich_lbl("Cliënt: %s" % _hint_name(cid), 24)
 	lbl("Terughoudendheid merk: %d   |   Rondes over: %d" % [int(sponsor.reluctance), sponsor.rounds_left], 26)
 	if not sponsor.log.is_empty():
 		sep()
@@ -1417,7 +1456,7 @@ func show_simon() -> void:
 	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
 	lbl("MEDIATRAINING: SIMON SAYS", 32)
-	lbl("%s   |   Reeks %d/%d" % [str(Game.state.players[cid].name), simon.round_num, SimonMedia.TARGET_ROUNDS], 24)
+	_rich_lbl("%s   |   Reeks %d/%d" % [_hint_name(cid), simon.round_num, SimonMedia.TARGET_ROUNDS], 24)
 	sep()
 	if simon.finished:
 		var o := simon.outcome()
@@ -1758,6 +1797,34 @@ func _wrapup_color(line: String) -> Variant:
 func _goto_wrapup() -> void:
 	var report: Array = Game.end_of_season()
 	Game.save_game()
+	var prepped: Array = Game.state.get("last_prepared_results", []).duplicate()
+	Game.state["last_prepared_results"] = []
+	if not prepped.is_empty():
+		show_prepared_transfer_result(prepped, report)
+	else:
+		_show_wrapup_report(report)
+
+
+func show_prepared_transfer_result(results: Array, report: Array) -> void:
+	refresh_header()
+	clear()
+	lbl("VOORBEREIDE TRANSFER", 34)
+	lbl("Dit is het gevolg van de medische info die je eerder off-the-record kreeg en waarop je een transfer voorbereidde.", 22)
+	for r in results:
+		sep()
+		if bool(r.success):
+			lbl("%s is verkocht aan een mysterieuze buitenlandse club." % str(r.name), 26)
+			lbl("Transfersom: %s" % eur(int(r.transfer_sum)), 24)
+			var l := lbl("Jouw fee: %s" % eur(int(r.income)), 26)
+			l.add_theme_color_override("font_color", Color(0.4, 0.9, 0.45))
+		else:
+			var l := lbl("De transfer van %s ging niet door — de prognose bleek onjuist." % str(r.name), 24)
+			l.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
+	sep()
+	btn("Verder →", func(): _show_wrapup_report(report))
+
+
+func _show_wrapup_report(report: Array) -> void:
 	refresh_header()
 	clear()
 	lbl("SEIZOENSAFSLUITING", 34)

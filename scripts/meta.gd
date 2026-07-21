@@ -17,9 +17,9 @@ const REWARD_BASE := 1.45
 const WIN_REWARD_PCT := 1.0
 
 # De ∞-upgrade: vaste (nooit stijgende) prijs, oneindig te kopen, elk niveau
-# geeft +0,01% op alle verdiende legacy points.
+# geeft +0,1% op alle verdiende legacy points.
 const INF_COST := 200
-const INF_STEP := 0.0001
+const INF_STEP := 0.001
 
 # De OVERPOWERED extra's: peperduur (30–50% van de boomkosten), tellen NIET
 # mee voor de 100%-voortgang.

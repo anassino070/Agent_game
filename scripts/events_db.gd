@@ -689,8 +689,8 @@ static func get_events() -> Array:
 			"id": "clubarts_geheim", "title": "Het geheim van de clubarts", "needs_client": true,
 			"text": "De clubarts vertrouwt je off-the-record een onzekere prognose over {client} toe, nog voor de club het zelf weet.",
 			"options": [
-				{"label": "Alvast een transfer voorbereiden", "effects": {"money": -2000, "rep": -2},
-					"txt": "Je speelt slim vooruit. Als dit uitkomt, is het einde van deze bron."},
+				{"label": "Alvast een transfer voorbereiden", "effects": {"money": -2000, "rep": -2, "prepare_transfer": true},
+					"txt": "Je speelt slim vooruit. Als dit uitkomt, is het einde van deze bron. Aan het eind van het seizoen blijkt of de mysterieuze koper toehapt — of dat de prognose toch onjuist was."},
 				{"label": "Rustig afwachten", "effects": {"trust": 3},
 					"txt": "Je wacht het officiële nieuws af. Integer, misschien te laat."},
 			],

@@ -70,6 +70,12 @@ func _make_client(pid: String, trust: int) -> void:
 const BANK_MATURITY_SEASONS := 2
 const BANK_MULTIPLIER := 2.0
 
+# Voorbereide transfer (event 'clubarts_geheim'): 65% kans dat de insider-
+# info klopt en de mysterieuze koper toehapt; als het lukt betaalt hij 80%
+# van de reguliere marktwaarde (een snelle, schimmige deal onder de prijs).
+const PREPARED_TRANSFER_CHANCE := 0.65
+const PREPARED_TRANSFER_VALUE_PCT := 0.80
+
 
 func bank_deposit(amount: int) -> bool:
 	if amount <= 0 or amount > int(state.money):
@@ -270,7 +276,12 @@ func release_client(cid: String) -> void:
 		p["trust"] = clampi(int(p.trust) - 2, 0, 100)
 
 
+const MYSTERY_CLUB_ID := "__mystery__"
+
+
 func club_name(club_id: String) -> String:
+	if club_id == MYSTERY_CLUB_ID:
+		return "Mysterieuze buitenlandse club"
 	if club_id == "" or not state.clubs.has(club_id):
 		return "clubloos"
 	return str(state.clubs[club_id]["name"])
@@ -336,6 +347,11 @@ func apply_effects(effects: Dictionary, client_id: String = "") -> Array:
 				var nmt := _sign_top_talent()
 				if nmt != "":
 					notes.append("%s (topspeler) sluit zich aan bij jouw stal." % nmt)
+			"prepare_transfer":
+				if client_id != "" and state.players.has(client_id):
+					if not state.has("prepared_transfers"):
+						state.prepared_transfers = []
+					state.prepared_transfers.append({"client_id": client_id})
 	return notes
 
 
@@ -646,6 +662,30 @@ func end_of_season() -> Array:
 		else:
 			still_pending.append({"amount": int(d.amount), "seasons_left": seasons_left})
 	state.bank_deposits = still_pending
+
+	# Voorbereide transfers (event 'clubarts_geheim'): de insider-info kan
+	# achteraf toch onjuist blijken — dan gaat de transfer niet door.
+	var prepared_results: Array = []
+	for pt in state.get("prepared_transfers", []):
+		var cid: String = str(pt.client_id)
+		if not state.players.has(cid) or not (cid in state.clients):
+			continue  # cliënt is intussen weg; niets te resolveren
+		var pp: Dictionary = state.players[cid]
+		if rng.randf() < PREPARED_TRANSFER_CHANCE:
+			var transfer_sum := int(value(pp) * PREPARED_TRANSFER_VALUE_PCT)
+			var income := int(transfer_sum * fee_cut())
+			state.money = int(state.money) + income
+			state.total_fees = int(state.total_fees) + income
+			pp["club"] = MYSTERY_CLUB_ID
+			pp["contract"] = 3
+			pp["trust"] = clampi(int(pp.trust) + 6, 0, 100)
+			lines.append("Voorbereide transfer: %s naar een mysterieuze buitenlandse club — jouw fee €%d." % [pp.name, income])
+			prepared_results.append({"name": str(pp.name), "success": true, "transfer_sum": transfer_sum, "income": income})
+		else:
+			lines.append("Voorbereide transfer van %s ging niet door — de prognose bleek onjuist." % pp.name)
+			prepared_results.append({"name": str(pp.name), "success": false})
+	state.prepared_transfers = []
+	state["last_prepared_results"] = prepared_results
 
 	var leavers: Array = []
 	for cid in state.clients:
