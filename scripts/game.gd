@@ -76,6 +76,12 @@ const BANK_MULTIPLIER := 2.0
 const PREPARED_TRANSFER_CHANCE := 0.65
 const PREPARED_TRANSFER_VALUE_PCT := 0.80
 
+# Clubbudgetten groeien dit percentage per seizoen (tv-gelden/sponsoring),
+# zodat ze de stijgende spelerswaarde (rating-ontwikkeling × value()) kunnen
+# bijbenen. Zonder groei bevriezen budgetten op hun seizoen-1-waarde terwijl
+# spelers duurder worden — met een harde muur van "nul interesse" tot gevolg.
+const CLUB_BUDGET_GROWTH := 0.12
+
 
 func bank_deposit(amount: int) -> bool:
 	if amount <= 0 or amount > int(state.money):
@@ -416,10 +422,20 @@ func rating_cap_older() -> int:
 	return 55 + int(state.rep) / 3 + int(state.season) * 2 + Meta.perk_bonus("grote_naam") + (3 if has_shop("kantoorrenovatie") else 0)
 
 
+const CANDIDATE_WINDOW := 20  # breedte van de kandidatenband; schuift mee met het plafond
+
+
 func gen_candidates() -> Array:
 	# 4 doelen om te scouten/benaderen: 2 jonge beloftes en 2 gevestigde
-	# namen (23+, hogere rating maar weinig rek). Hoe hoger je reputatie,
-	# hoe beter de spelers die met je willen praten.
+	# namen (23+, hogere rating maar weinig rek). Het venster SCHUIFT mee
+	# met het rating-plafond (i.p.v. alleen te verbreden vanaf een vaste
+	# ondergrens) — anders blijft de kandidatenpool numeriek gedomineerd
+	# door de vele laag-gerateerde spelers en verandert het gemiddelde
+	# nauwelijks, ook al stijgt het plafond zelf wel degelijk.
+	var y_cap := rating_cap_young()
+	var y_floor := maxi(45, y_cap - CANDIDATE_WINDOW)
+	var o_cap := rating_cap_older()
+	var o_floor := maxi(50, o_cap - CANDIDATE_WINDOW)
 	var young: Array = []
 	var older: Array = []
 	for pid in state.players:
@@ -427,9 +443,9 @@ func gen_candidates() -> Array:
 			continue
 		var p: Dictionary = state.players[pid]
 		var r := int(p.rating)
-		if int(p.age) <= 22 and r >= 45 and r <= rating_cap_young():
+		if int(p.age) <= 22 and r >= y_floor and r <= y_cap:
 			young.append(pid)
-		elif int(p.age) >= 23 and int(p.age) <= 30 and r >= 50 and r <= rating_cap_older():
+		elif int(p.age) >= 23 and int(p.age) <= 30 and r >= o_floor and r <= o_cap:
 			older.append(pid)
 	var count := 4 + Meta.perk_level("extra_kandidaat")
 	var out: Array = []
@@ -527,6 +543,23 @@ func gen_events() -> Array:
 
 
 # ---------------------------------------------------------------- transfers
+
+func richest_club_budget() -> int:
+	var best := 0
+	for cid in state.clubs:
+		best = maxi(best, int(state.clubs[cid].budget))
+	return best
+
+
+func any_club_can_afford(client_id: String) -> bool:
+	var v := value(state.players[client_id])
+	for cid in state.clubs:
+		if cid == str(state.players[client_id].club):
+			continue
+		if int(state.clubs[cid].budget) >= v:
+			return true
+	return false
+
 
 func gen_interest(client_id: String) -> Array:
 	# 0–2 geïnteresseerde clubs, afhankelijk van rating, budget en ambitie.
@@ -649,6 +682,15 @@ func end_of_season() -> Array:
 	costs = maxi(costs - Meta.perk_bonus("schuldpapier"), 0)
 	state.money = int(state.money) - costs
 	lines.append("Kantoorkosten: -€%d" % costs)
+
+	# Clubbudgetten groeien elk seizoen mee (tv-gelden, sponsoring) — anders
+	# blijven ze voor altijd vastzitten op hun startwaarde uit seizoen 1,
+	# terwijl spelerswaarde via ontwikkeling en value() flink doorgroeit.
+	# Zonder dit kan een goed ontwikkelde cliënt tegen seizoen 10-12 letterlijk
+	# duurder zijn dan élke club zich kan veroorloven — nul interesse, altijd.
+	for cid in state.clubs:
+		var cl: Dictionary = state.clubs[cid]
+		cl["budget"] = int(float(cl.budget) * (1.0 + CLUB_BUDGET_GROWTH))
 
 	# De bank: rijpe stortingen keren verdubbeld uit; de rest tikt een jaar af.
 	# (get() met fallback: oudere saves van vóór De Bank kennen dit veld nog niet.)

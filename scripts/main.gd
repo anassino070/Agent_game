@@ -195,8 +195,10 @@ func eur(n) -> String:
 
 # ---------------------------------------------------------------- speler-tooltip
 # Je hoeft niet te onthouden welke speler welke stats heeft: bij elke naam in
-# een event/minigame kun je hoveren voor een schermpje met zijn kerngegevens
-# (Godot's ingebouwde [hint=...]-BBCode-tag toont dat automatisch).
+# een event/minigame kun je hoveren voor een schermpje met zijn kerngegevens.
+# Gebruikt Control.tooltip_text op een los Label i.p.v. een BBCode-hint-tag
+# (die bleek niet betrouwbaar op hover te reageren) — tooltip_text is een
+# kernfunctie van elke Control en werkt dus altijd.
 
 func _player_tooltip(pid: String) -> String:
 	if pid == "" or not Game.state.players.has(pid):
@@ -210,23 +212,36 @@ func _player_tooltip(pid: String) -> String:
 	]
 
 
-func _hint_name(pid: String) -> String:
-	if pid == "" or not Game.state.players.has(pid):
-		return ""
-	var p: Dictionary = Game.state.players[pid]
-	return "[hint=%s]%s[/hint]" % [_player_tooltip(pid), str(p.name)]
+# Rij tekst met de spelernaam als apart, hoverbaar Label (lichtblauw, met
+# tooltip) tussen een voor- en nastuk platte tekst. In een HFlowContainer
+# zodat het als lopende zin blijft aanvoelen, ook als het moet omwikkelen.
+func _name_row(before: String, pid: String, after: String, size := 24) -> void:
+	var flow := HFlowContainer.new()
+	flow.add_theme_constant_override("h_separation", 6)
+	flow.add_theme_constant_override("v_separation", 4)
+	content.add_child(flow)
 
+	if before != "":
+		var lb := Label.new()
+		lb.text = before
+		lb.add_theme_font_size_override("font_size", size)
+		flow.add_child(lb)
 
-func _rich_lbl(bbcode: String, size := 26) -> RichTextLabel:
-	var rtl := RichTextLabel.new()
-	rtl.bbcode_enabled = true
-	rtl.fit_content = true
-	rtl.scroll_active = false
-	rtl.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	rtl.add_theme_font_size_override("normal_font_size", size)
-	rtl.text = bbcode
-	content.add_child(rtl)
-	return rtl
+	var known := pid != "" and Game.state.players.has(pid)
+	var name_lbl := Label.new()
+	name_lbl.text = str(Game.state.players[pid].name) if known else "?"
+	name_lbl.add_theme_font_size_override("font_size", size)
+	if known:
+		name_lbl.add_theme_color_override("font_color", Color(0.55, 0.82, 1.0))
+		name_lbl.tooltip_text = _player_tooltip(pid)
+		name_lbl.mouse_filter = Control.MOUSE_FILTER_STOP
+	flow.add_child(name_lbl)
+
+	if after != "":
+		var la := Label.new()
+		la.text = after
+		la.add_theme_font_size_override("font_size", size)
+		flow.add_child(la)
 
 
 func refresh_header() -> void:
@@ -716,7 +731,12 @@ func show_event(ev: Dictionary) -> void:
 		cname = str(Game.state.players[ev.client_id].name)
 	lbl("EVENT: %s" % str(ev.title), 32)
 	if str(ev.client_id) != "":
-		_rich_lbl(str(ev.text).replace("{client}", _hint_name(str(ev.client_id))), 26)
+		var full := str(ev.text)
+		var idx := full.find("{client}")
+		if idx != -1:
+			_name_row(full.substr(0, idx), str(ev.client_id), full.substr(idx + 8), 26)
+		else:
+			lbl(full, 26)
 	else:
 		lbl(str(ev.text), 26)
 	sep()
@@ -979,7 +999,7 @@ func show_bidding() -> void:
 	clear()
 	_dev_test_banner()
 	lbl("BIEDINGSOORLOG", 32)
-	_rich_lbl("Cliënt: %s   |   Rondes over: %d" % [_hint_name(bidding.client_id), bidding.rounds_left], 24)
+	_name_row("Cliënt: ", bidding.client_id, "   |   Rondes over: %d" % bidding.rounds_left, 24)
 	sep()
 	for c in bidding.clubs:
 		var status := "actief" if c.active else "afgehaakt"
@@ -1040,9 +1060,7 @@ func show_press() -> void:
 	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
 	lbl("PERSCONFERENTIE", 32)
-	_rich_lbl("%s   |   Spanning: %d/100   |   Vragen over: %d" % [
-		_hint_name(cid), int(press.tension), press.questions_left,
-	], 24)
+	_name_row("", cid, "   |   Spanning: %d/100   |   Vragen over: %d" % [int(press.tension), press.questions_left], 24)
 	if not press.log.is_empty():
 		sep()
 		for line in press.log:
@@ -1081,7 +1099,7 @@ func show_sponsor() -> void:
 	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
 	lbl("SPONSORPITCH", 32)
-	_rich_lbl("Cliënt: %s" % _hint_name(cid), 24)
+	_name_row("Cliënt: ", cid, "", 24)
 	lbl("Terughoudendheid merk: %d   |   Rondes over: %d" % [int(sponsor.reluctance), sponsor.rounds_left], 26)
 	if not sponsor.log.is_empty():
 		sep()
@@ -1456,7 +1474,7 @@ func show_simon() -> void:
 	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
 	lbl("MEDIATRAINING: SIMON SAYS", 32)
-	_rich_lbl("%s   |   Reeks %d/%d" % [_hint_name(cid), simon.round_num, SimonMedia.TARGET_ROUNDS], 24)
+	_name_row("", cid, "   |   Reeks %d/%d" % [simon.round_num, SimonMedia.TARGET_ROUNDS], 24)
 	sep()
 	if simon.finished:
 		var o := simon.outcome()
@@ -1521,7 +1539,13 @@ func show_window() -> void:
 		], 26)
 		var ints: Array = interest.get(cid, [])
 		if ints.is_empty():
-			lbl("Geen interesse van clubs dit seizoen.", 22)
+			if not Game.any_club_can_afford(cid):
+				var l := lbl("Geen enkele club kan hem betalen (waarde %s, rijkste club heeft %s over)." % [
+					eur(Game.value(p)), eur(Game.richest_club_budget()),
+				], 20)
+				l.add_theme_color_override("font_color", Color(1.0, 0.6, 0.3))
+			else:
+				lbl("Geen interesse van clubs dit seizoen.", 22)
 
 		# Drie mogelijke opties per cliënt: onderhandelen met elke
 		# geïnteresseerde club plus contract verlengen. Normaal mag je er
