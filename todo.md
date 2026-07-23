@@ -31,3 +31,9 @@ Events:
 
 
 -Vanaf dag 1 heb je elk seizoen 20 spelers te zien van allerlei nieveaus(van amateur tot best mogelijk van kantoor), maar kans van tekenen is gebonden aan reputatie. Elk seizoen kan je je kantoor upgraden, met een vast bedrag van 100.000*({niveau}^2). je bent bij niveau 1 en beste is 5. gemiddelde spelerniveaus per niveau is 45, 57, 69, 78, 86. Geef elk niveau een leuke naam. Dus niet "Kantoor niveau 1", maar "Home Office" ofzo, geef voor andere niveaus suggesties. Ik ga er art voor maken, zodat de hele achterggrond art veranderd per niveau, dus let op dat de namen een bepaalde vibe/beeld hebben wat ik kan visualiseren
+
+-event: Onder druk gezet lijkt onzin. ene optie heeeft alleen positief en de andere kans op negatief
+-laat in stalbeheer zien wat potentieel is, naast andere al zichtbare stats
+-geef in shop 3 opties te zien en een knop waarin je kan betalen om te rerollen voor andere upgrades. Maak alle upgrades ook duidelijk. Nu staat er bijv. de bank keert BETER uit of budget groeit SNELLER. Wat wordt daarmee bedoeld precies.
+-ontwikkeling gaat iets te langzaam voor spelers, mag 30% sneller gaan.
+-maak alle upgrades

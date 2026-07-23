@@ -6,6 +6,22 @@ extends Control
 var header: Label
 var content: VBoxContainer
 
+# Achtergrond die per kantoorniveau wisselt. De art maak je zelf: leg
+# office_1.png t/m office_5.png in res://art/ en ze worden automatisch geladen.
+# Zolang die er niet zijn, valt hij terug op een effen sfeerkleur per niveau.
+# Een halfdoorzichtige scrim eroverheen houdt de tekst altijd leesbaar.
+var office_bg: TextureRect
+var office_bg_fallback: ColorRect
+var office_scrim: ColorRect
+var _bg_level := -1
+const OFFICE_BG_COLORS := [
+	Color(0.15, 0.09, 0.07),   # 1 Boven de Snackbar — warm bruin/patatneon
+	Color(0.10, 0.12, 0.11),   # 2 De Portacabin — tl-grijsgroen
+	Color(0.09, 0.13, 0.11),   # 3 Het Grachtenpand — hout/grachtgroen
+	Color(0.07, 0.10, 0.16),   # 4 De Glazen Toren — koel glasblauw
+	Color(0.06, 0.13, 0.15),   # 5 Monaco — turquoise Middellandse Zee
+]
+
 var event_queue: Array = []
 var interest: Dictionary = {}      # client_id -> Array van (nog niet gebruikte) club_ids
 var interest_total: Dictionary = {} # client_id -> oorspronkelijk aantal geïnteresseerde clubs
@@ -90,6 +106,26 @@ func _ready() -> void:
 	var th := Theme.new()
 	th.default_font_size = 30
 	theme = th
+
+	# Achtergrondlagen, helemaal achteraan (vóór de margin/inhoud toegevoegd):
+	# effen sfeerkleur → optionele art-texture → donkere scrim voor leesbaarheid.
+	office_bg_fallback = ColorRect.new()
+	office_bg_fallback.set_anchors_preset(Control.PRESET_FULL_RECT)
+	office_bg_fallback.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	office_bg_fallback.color = OFFICE_BG_COLORS[0]
+	add_child(office_bg_fallback)
+	office_bg = TextureRect.new()
+	office_bg.set_anchors_preset(Control.PRESET_FULL_RECT)
+	office_bg.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	office_bg.expand_mode = TextureRect.EXPAND_IGNORE_SIZE
+	office_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
+	office_bg.visible = false
+	add_child(office_bg)
+	office_scrim = ColorRect.new()
+	office_scrim.set_anchors_preset(Control.PRESET_FULL_RECT)
+	office_scrim.mouse_filter = Control.MOUSE_FILTER_IGNORE
+	office_scrim.color = Color(0.0, 0.0, 0.0, 0.45)
+	add_child(office_scrim)
 
 	var margin := MarginContainer.new()
 	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
@@ -297,10 +333,31 @@ func _name_row(before: String, pid: String, after: String, size := 24) -> void:
 
 func refresh_header() -> void:
 	var s: Dictionary = Game.state
-	header.text = "Seizoen %d/%d  |  %s  |  Rep %d  |  Schandaal %d  |  Gunsten %d" % [
-		int(s.season), Game.MAX_SEASONS, eur(s.money),
+	header.text = "Seizoen %d/%d  |  %s  |  🏢 %s  |  Rep %d  |  Schandaal %d  |  Gunsten %d" % [
+		int(s.season), Game.MAX_SEASONS, eur(s.money), Game.office_name(),
 		int(s.rep), int(s.scandal), int(s.favors),
 	]
+	_update_office_background()
+
+
+func _update_office_background() -> void:
+	# Wisselt de achtergrond bij een niveauwissel (en niet vaker — texture
+	# laden is niet gratis). Laadt res://art/office_<niveau>.png als die bestaat,
+	# anders de effen sfeerkleur van dat niveau.
+	if office_bg == null:
+		return
+	var lvl := Game.office_level()
+	if lvl == _bg_level:
+		return
+	_bg_level = lvl
+	office_bg_fallback.color = OFFICE_BG_COLORS[lvl - 1]
+	var path := "res://art/office_%d.png" % lvl
+	if ResourceLoader.exists(path):
+		office_bg.texture = load(path)
+		office_bg.visible = true
+	else:
+		office_bg.texture = null
+		office_bg.visible = false
 
 
 func show_flash() -> void:
@@ -611,6 +668,23 @@ func show_prep() -> void:
 			Game.club_name(str(p.club)), int(p.contract), eur(Game.value(p)),
 		], 23)
 	sep()
+	# ---- Het kantoor: niveau, band en upgrade ----
+	var band: Dictionary = Game.office_band()
+	lbl("🏢 KANTOOR — niveau %d/%d: %s" % [Game.office_level(), Game.OFFICE_MAX_LEVEL, Game.office_name()], 28)
+	lbl("Je ziet elk seizoen %d spelers, rating %d–%d (gemiddeld ~%d). Hoger niveau = betere spelers binnen bereik." % [
+		Game.candidate_count(), Game.candidate_floor(), Game.candidate_ceiling(), int(band.avg),
+	], 20)
+	if Game.office_level() < Game.OFFICE_MAX_LEVEL:
+		var next_band: Dictionary = Game.OFFICE_LEVELS[Game.office_level()]
+		var cost := Game.office_upgrade_cost()
+		var l := lbl("Upgraden tilt je naar niveau %d: %s (spelers tot ~%d)." % [
+			Game.office_level() + 1, str(next_band.name), int(next_band.ceiling),
+		], 19)
+		l.add_theme_color_override("font_color", Color(0.8, 0.8, 0.85))
+		btn("Kantoor upgraden — %s (%s)" % [str(next_band.name), eur(cost)], _upgrade_office, Game.can_upgrade_office())
+	else:
+		lbl("Hoogste niveau bereikt. Je onderhandelt tussen de miljardairs.", 20)
+	sep()
 	lbl("DE BANK — stort geld weg, krijg het na %d seizoenen verdubbeld terug." % Game.BANK_MATURITY_SEASONS, 20)
 	if Game.bank_deposit_count() > 0:
 		# Elke storting loopt onafhankelijk af — dus ook los getoond, niet
@@ -623,7 +697,7 @@ func show_prep() -> void:
 	bank_row.add_theme_constant_override("separation", 10)
 	content.add_child(bank_row)
 	bank_deposit_input = LineEdit.new()
-	bank_deposit_input.placeholder_text = "bedrag"
+	bank_deposit_input.placeholder_text = "x1000"
 	bank_deposit_input.custom_minimum_size = Vector2(140, 48)
 	bank_row.add_child(bank_deposit_input)
 	var deposit_btn := Button.new()
@@ -635,12 +709,21 @@ func show_prep() -> void:
 	btn("Naar scouting →" if Meta.perk_level("vaste_kern") > 0 else "Naar stalbeheer →", _goto_release)
 
 
+func _upgrade_office() -> void:
+	if Game.upgrade_office():
+		flash = "Kantoor geüpgraded naar %s! De hele tent verandert." % Game.office_name()
+		_update_office_background()
+	else:
+		flash = "Upgrade mislukt — niet genoeg geld."
+	show_prep()
+
+
 func _do_bank_deposit() -> void:
 	if bank_deposit_input == null:
 		return
-	var amount := int(bank_deposit_input.text)
+	var amount := int(bank_deposit_input.text)*1000
 	if Game.bank_deposit(amount):
-		var payout := int(round(float(amount) * Game.BANK_MULTIPLIER))
+		var payout := int(round(float(amount) * (BANK_MULTIPLIER + (0.3 if has_shop("investeringsfonds")))))
 		flash = "Gestort: %s. Komt over %d seizoenen terug als %s." % [eur(amount), Game.BANK_MATURITY_SEASONS, eur(payout)]
 	else:
 		flash = "Storting mislukt — vul een geldig bedrag in dat je ook echt hebt."
@@ -699,8 +782,8 @@ func show_scouting() -> void:
 	lbl("SCOUTING  (%d punten over)" % int(Game.state.scout_points), 34)
 	show_flash()
 	lbl("De potentieel-band is een schátting — die kan er flink naast zitten. Scouten trekt haar naar de waarheid én maakt tekenen makkelijker (+5% per scout, max +10%).", 22)
-	lbl("Jouw reputatie (%d) opent deuren tot rating ~%d (jong) / ~%d (gevestigd)." % [
-		int(Game.state.rep), Game.rating_cap_young(), Game.rating_cap_older(),
+	lbl("Kantoor niveau %d (%s) brengt spelers tot rating ~%d binnen bereik. Je reputatie (%d) bepaalt of ze tekenen." % [
+		Game.office_level(), Game.office_name(), Game.candidate_ceiling(), int(Game.state.rep),
 	], 20)
 	for pid in candidates:
 		sep()

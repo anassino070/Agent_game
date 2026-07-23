@@ -64,6 +64,9 @@ func new_run() -> void:
 		"bank_deposits": [],   # [{"amount": int, "seasons_left": int}] — De Bank
 		"shop_owned": [],      # ids uit SHOP_UPGRADES die je deze run al kocht
 		"noodfonds_used": false,
+		"office_level": 1,     # 1..OFFICE_MAX_LEVEL — bepaalt het spelersplafond
+		"candidate_ids": [],   # pids van de verse scoutingkandidaten dit seizoen
+		"candidate_counter": 0, # oplopende teller voor unieke kandidaat-pids
 	}
 	# Startcliënt: een jong, beloftevol maar betaalbaar talent.
 	var pool: Array = []
@@ -157,7 +160,7 @@ const SHOP_UPGRADES := {
 	},
 	"kantoorrenovatie": {
 		"name": "Kantoorrenovatie", "price": 38000,
-		"desc": "Eenmalig +8 reputatie, plus +3 op je rating-plafonds voor de rest van de run.",
+		"desc": "Eenmalig +8 reputatie, plus +3 op je scouting-plafond voor de rest van de run.",
 	},
 	"data_analytics": {
 		"name": "Data-analytics abonnement", "price": 38000,
@@ -185,7 +188,7 @@ const SHOP_UPGRADES := {
 	},
 	"breed_scoutingnetwerk": {
 		"name": "Breed scoutingnetwerk", "price": 34000,
-		"desc": "Bredere kandidatenband bij scouten, de rest van de run.",
+		"desc": "+4 op je scouting-plafond: betere spelers binnen bereik, de rest van de run.",
 	},
 	"pr_strategie": {
 		"name": "Reputatiebeheerder", "price": 34000,
@@ -555,81 +558,110 @@ func _sign_top_talent() -> String:
 	return str(state.players[pick].name)
 
 
+# ---------------------------------------------------------------- het kantoor
+# Je kantoorniveau (1..5) bepaalt WELKE spelers je elk seizoen te zien krijgt:
+# de rating-band waaruit de 20 verse kandidaten worden getrokken. Reputatie
+# bepaalt NIET meer wie je ziet (dat deed het vroeger via rating_cap_*), maar
+# alléén nog of ze bij je tekenen (zie sign_chance()). Elk niveau heeft een
+# eigen sfeer/beeld zodat de achtergrond-art per niveau kan wisselen.
+const OFFICE_MAX_LEVEL := 5
+const CANDIDATES_PER_SEASON := 20
+const OFFICE_LEVELS := [
+	{"name": "Boven de Snackbar", "avg": 45, "floor": 33, "ceiling": 57},
+	{"name": "De Portacabin",     "avg": 57, "floor": 45, "ceiling": 69},
+	{"name": "Het Grachtenpand",  "avg": 69, "floor": 57, "ceiling": 81},
+	{"name": "De Glazen Toren",   "avg": 78, "floor": 68, "ceiling": 88},
+	{"name": "Monaco",            "avg": 86, "floor": 78, "ceiling": 94},
+]
+
+
+func office_level() -> int:
+	return clampi(int(state.get("office_level", 1)), 1, OFFICE_MAX_LEVEL)
+
+
+func office_band() -> Dictionary:
+	return OFFICE_LEVELS[office_level() - 1]
+
+
+func office_name() -> String:
+	return str(office_band().name)
+
+
+func office_upgrade_cost() -> int:
+	# Vast bedrag: €100.000 × (doelniveau)². L2=€400k, L3=€900k, L4=€1,6mln,
+	# L5=€2,5mln. -1 = al op het hoogste niveau.
+	var next_lvl := office_level() + 1
+	if next_lvl > OFFICE_MAX_LEVEL:
+		return -1
+	return 100000 * next_lvl * next_lvl
+
+
+func can_upgrade_office() -> bool:
+	var cost := office_upgrade_cost()
+	return cost > 0 and int(state.money) >= cost
+
+
+func upgrade_office() -> bool:
+	if not can_upgrade_office():
+		return false
+	state.money = int(state.money) - office_upgrade_cost()
+	state.office_level = office_level() + 1
+	return true
+
+
 # ---------------------------------------------------------------- scouting
 
-func rating_cap_young() -> int:
-	# Reputatie bepaalt wie je telefoontje beantwoordt — maar naarmate de run
-	# vordert, opent de markt zich ook vanzelf (nieuwe namen, meer exposure),
-	# los van hoe snel je reputatie zelf groeit.
-	return 50 + int(state.rep) / 4 + int(state.season) * 2 + Meta.perk_bonus("talentmagneet") + (3 if has_shop("kantoorrenovatie") else 0)
+func candidate_ceiling() -> int:
+	# Het effectieve plafond van de kandidatenband. Basis komt van je kantoor;
+	# de meta-perks die vroeger de rating_cap verhoogden (Talentmagneet,
+	# Grote naam) en de shop-upgrades tillen het nog een paar punten op — zo
+	# blijven die effecten relevant nu reputatie het plafond niet meer bepaalt.
+	var c := int(office_band().ceiling)
+	c += Meta.perk_bonus("talentmagneet") + Meta.perk_bonus("grote_naam")
+	if has_shop("kantoorrenovatie"):
+		c += 3
+	if has_shop("breed_scoutingnetwerk"):
+		c += 4
+	return mini(c, 94)
 
 
-func rating_cap_older() -> int:
-	return 55 + int(state.rep) / 3 + int(state.season) * 2 + Meta.perk_bonus("grote_naam") + (3 if has_shop("kantoorrenovatie") else 0)
+func candidate_floor() -> int:
+	return mini(int(office_band().floor), candidate_ceiling())
 
 
-const CANDIDATE_WINDOW := 20  # breedte van de kandidatenband; schuift mee met het plafond
+func candidate_count() -> int:
+	return CANDIDATES_PER_SEASON + Meta.perk_level("extra_kandidaat")
+
+
+func _clear_old_candidates() -> void:
+	# Verse trekking per seizoen: ruim de ongetekende kandidaten van vorig
+	# seizoen op (getekende zijn cliënt geworden en blijven bestaan). Zo
+	# groeit state.players niet elk seizoen met 20 dode namen.
+	for pid in state.get("candidate_ids", []):
+		if not (pid in state.clients) and state.players.has(pid):
+			state.players.erase(pid)
+	state.candidate_ids = []
 
 
 func gen_candidates() -> Array:
-	# 4 doelen om te scouten/benaderen: 2 jonge beloftes en 2 gevestigde
-	# namen (23+, hogere rating maar weinig rek). Het venster SCHUIFT mee
-	# met het rating-plafond (i.p.v. alleen te verbreden vanaf een vaste
-	# ondergrens) — anders blijft de kandidatenpool numeriek gedomineerd
-	# door de vele laag-gerateerde spelers en verandert het gemiddelde
-	# nauwelijks, ook al stijgt het plafond zelf wel degelijk.
-	#
-	# Het plafond wordt hier eerst geclampt op de daadwerkelijk hoogst
-	# beschikbare rating in de leeftijdscategorie, en de vloer mag het
-	# (geclampte) plafond nooit overschrijden — bij hoge reputatie/seizoen
-	# schoof de vloer anders de lucht in tot ver boven wat er in de wereld
-	# bestaat, met een lege band (en dus 0 kandidaten) als gevolg. Zo mag de
-	# poolgrootte nog steeds variëren, maar loopt hij nooit meer vast op 0.
-	var window := CANDIDATE_WINDOW + (8 if has_shop("breed_scoutingnetwerk") else 0)
-	var young_pool: Array = []
-	var older_pool: Array = []
-	var young_max := 0
-	var older_max := 0
-	for pid in state.players:
-		if pid in state.clients:
-			continue
-		var p: Dictionary = state.players[pid]
-		var r := int(p.rating)
-		if int(p.age) <= 22:
-			young_pool.append(pid)
-			young_max = maxi(young_max, r)
-		elif int(p.age) >= 23 and int(p.age) <= 30:
-			older_pool.append(pid)
-			older_max = maxi(older_max, r)
-	var y_cap := mini(rating_cap_young(), young_max)
-	var y_floor := mini(maxi(45, y_cap - window), y_cap)
-	var o_cap := mini(rating_cap_older(), older_max)
-	var o_floor := mini(maxi(50, o_cap - window), o_cap)
-	var young: Array = []
-	var older: Array = []
-	for pid in young_pool:
-		var r := int(state.players[pid].rating)
-		if r >= y_floor and r <= y_cap:
-			young.append(pid)
-	for pid in older_pool:
-		var r := int(state.players[pid].rating)
-		if r >= o_floor and r <= o_cap:
-			older.append(pid)
-	var count := 4 + Meta.perk_level("extra_kandidaat")
+	# Trekt 20 (of meer, met Breed netwerk-perk) VERSE spelers voor dit seizoen
+	# binnen de rating-band van je kantoorniveau, van amateur tot het beste dat
+	# je kantoor kan aantrekken. Ze worden aan state.players toegevoegd zodat
+	# alle bestaande logica (estimate/scout/value/tooltip) er ongewijzigd mee
+	# werkt; ongetekende exemplaren worden volgend seizoen weer opgeruimd.
+	_clear_old_candidates()
+	var lo := candidate_floor()
+	var hi := candidate_ceiling()
 	var out: Array = []
-	_take_random(young, 2, out)
-	_take_random(older, 2, out)
-	# Vul aan als een pool (bijna) leeg was of het Brede netwerk-perk actief is.
-	var rest: Array = young + older
-	_take_random(rest, count - out.size(), out)
-	if out.is_empty():
-		# Absolute laatste redmiddel (extreem kleine of uitgeputte wereld):
-		# pak gewoon wie er nog vrij is, in plaats van niemand.
-		var any_free: Array = []
-		for pid in state.players:
-			if not (pid in state.clients):
-				any_free.append(pid)
-		_take_random(any_free, count, out)
+	var counter := int(state.get("candidate_counter", 0))
+	for i in range(candidate_count()):
+		var pid := "cand%d" % counter
+		counter += 1
+		var rating := rng.randi_range(lo, hi)
+		state.players[pid] = WorldGen.make_candidate(rng, pid, rating)
+		out.append(pid)
+	state.candidate_counter = counter
+	state.candidate_ids = out
 	return out
 
 

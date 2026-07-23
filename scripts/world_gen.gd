@@ -82,6 +82,39 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 	return {"players": players, "clubs": clubs}
 
 
+static func make_candidate(rng: RandomNumberGenerator, pid: String, rating: int) -> Dictionary:
+	# Eén verse scoutingkandidaat met een OPGELEGDE rating (uit de band van je
+	# kantoorniveau). Leeftijd bepaalt de potentieel-marge en onzekerheid net
+	# als in generate(): jonge spelers hebben meer rek én meer ruis, oudere
+	# zijn "af". Zo blijft het scout-/potentieelspel intact op de nieuwe pool.
+	var age := rng.randi_range(16, 30)
+	var headroom := maxi(27 - age, 0) * 2
+	var pot := rating
+	if headroom > 0:
+		pot = mini(rating + rng.randi_range(2, headroom + 2), 94)
+	var club_id := ""
+	if rng.randf() > 0.5:
+		club_id = "c%d" % rng.randi_range(0, 9)
+	var unc := 12 if age <= 23 else 6
+	var spread := int(float(unc) * 0.75)
+	var est := clampi(pot + rng.randi_range(-spread, spread), rating, 94)
+	return {
+		"id": pid,
+		"name": _rand_name(rng),
+		"age": age,
+		"pos": POS[rng.randi_range(0, 3)],
+		"rating": rating,
+		"pot": pot,
+		"est": est,
+		"unc": unc,
+		"scouted": 0,
+		"club": club_id,
+		"contract": rng.randi_range(1, 4),
+		"trust": 50,
+		"pers": PERS[rng.randi_range(0, 3)],
+	}
+
+
 static func _rand_name(rng: RandomNumberGenerator) -> String:
 	return "%s %s" % [
 		FIRST[rng.randi_range(0, FIRST.size() - 1)],
