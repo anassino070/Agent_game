@@ -723,7 +723,7 @@ func _do_bank_deposit() -> void:
 		return
 	var amount := int(bank_deposit_input.text)*1000
 	if Game.bank_deposit(amount):
-		var payout := int(round(float(amount) * (BANK_MULTIPLIER + (0.3 if has_shop("investeringsfonds")))))
+		var payout := int(round(float(amount) * (Game.BANK_MULTIPLIER + (0.3 if Game.has_shop("investeringsfonds") else 0.0))))
 		flash = "Gestort: %s. Komt over %d seizoenen terug als %s." % [eur(amount), Game.BANK_MATURITY_SEASONS, eur(payout)]
 	else:
 		flash = "Storting mislukt — vul een geldig bedrag in dat je ook echt hebt."
