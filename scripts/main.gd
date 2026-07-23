@@ -805,7 +805,7 @@ func show_release() -> void:
 		var info := _stat_card(cid, sub, selected)
 		info.add_child(_mini_btn("✗ Wegsturen" if not selected else "✔ Blijft toch (ongedaan maken)", func(): _toggle_release(cid)))
 	sep()
-	var remaining := Game.state.clients.size() - release_selection.size()
+	var remaining: int = Game.state.clients.size() - release_selection.size()
 	var confirm_txt := ("Bevestig: stuur %d weg (%d blijft over)" % [release_selection.size(), remaining]) if not release_selection.is_empty() else "Niemand geselecteerd"
 	btn(confirm_txt, _confirm_release, not release_selection.is_empty() and remaining >= 1)
 
