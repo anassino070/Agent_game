@@ -27,6 +27,7 @@ var interest: Dictionary = {}      # client_id -> Array van (nog niet gebruikte)
 var interest_total: Dictionary = {} # client_id -> oorspronkelijk aantal geïnteresseerde clubs
 var candidates: Array = []         # scouting/tekendoelen dit seizoen
 var approached: Array = []         # al benaderd dit seizoen (één poging p.p.)
+var release_selection: Array = []  # cid's die je in stalbeheer hebt geselecteerd om weg te sturen
 var extended: Array = []           # contract al verlengd dit window
 var flash := ""                    # korte statusmelding bovenin een scherm
 var flash_color = null             # optionele kleur voor de flash (Color of null)
@@ -68,6 +69,7 @@ var confirm_reset := false         # tweestaps-bevestiging voor de perk-reset
 # cliënt zodra een event/minigame een speler noemt.
 var player_info_panel: PanelContainer
 var player_info_label: Label
+var player_info_badges: HBoxContainer
 
 # ---- Developer-only puntenreset: verborgen achter een tik-sequentie + wachtwoord.
 # Geen echte beveiliging (GDScript-bronnen zijn leesbaar), maar voorkomt dat
@@ -189,10 +191,23 @@ func _ready() -> void:
 	player_info_panel.add_theme_stylebox_override("panel", info_style)
 	add_child(player_info_panel)
 
+	# Tekst links, rating/potentieel-badges rechts — dezelfde weergave als in
+	# de scoutinglijst, zodat je overal dezelfde stat-blokjes herkent.
+	var info_hb := HBoxContainer.new()
+	info_hb.add_theme_constant_override("separation", 10)
+	player_info_panel.add_child(info_hb)
+
 	player_info_label = Label.new()
 	player_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	player_info_label.add_theme_font_size_override("font_size", 19)
-	player_info_panel.add_child(player_info_label)
+	player_info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	player_info_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	info_hb.add_child(player_info_label)
+
+	player_info_badges = HBoxContainer.new()
+	player_info_badges.add_theme_constant_override("separation", 6)
+	player_info_badges.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+	info_hb.add_child(player_info_badges)
 
 	# ∞-upgrade: klein vierkantje rechtsboven, alleen zichtbaar op het
 	# perkscherm. Vaste prijs, oneindig te kopen, +0,1% punten per niveau.
@@ -304,6 +319,13 @@ func _show_player_info(pid: String) -> void:
 		return
 	player_info_panel.visible = true
 	player_info_label.text = _player_tooltip(pid).replace("\n", "   ·   ")
+	# Rating/potentieel-badges rechts in het balkje (opnieuw opbouwen).
+	if player_info_badges != null:
+		for c in player_info_badges.get_children():
+			c.queue_free()
+		var p: Dictionary = Game.state.players[pid]
+		player_info_badges.add_child(_stat_badge("RAT", str(int(p.rating)), Color(0.18, 0.42, 0.78), Vector2(52, 50)))
+		player_info_badges.add_child(_stat_badge("POT", _pot_badge_text(pid), Color(0.16, 0.55, 0.28), Vector2(72, 50)))
 
 
 # Rij tekst met de spelernaam als apart, gekleurd Label tussen een voor- en
@@ -763,6 +785,7 @@ func _goto_release() -> void:
 	if Game.state.clients.size() <= 1:
 		_goto_scouting()
 		return
+	release_selection = []
 	show_release()
 
 
@@ -770,21 +793,45 @@ func show_release() -> void:
 	refresh_header()
 	clear()
 	lbl("STALBEHEER — VERPLICHT ONTSLAG", 34)
-	lbl("Een makelaar zonder ruimte mist het volgende toptalent. Stuur één cliënt weg om plek te maken. De rest van je stal verliest er 2 vertrouwen door.", 24)
+	lbl("Selecteer wie je wegstuurt (je mag er zoveel kwijt als je wilt, zolang er minstens 1 overblijft — handig als je meteen plek wilt maken voor een kantoorupgrade) en bevestig onderaan. De rest van je stal verliest 2 vertrouwen per weggestuurde cliënt.", 22)
+	show_flash()
 	sep()
 	for cid in Game.state.clients:
 		var p: Dictionary = Game.state.players[cid]
-		lbl("%s (%s, %d jr) — rating %d, potentieel %d, vertrouwen %d, waarde %s" % [
-			p.name, p.pos, int(p.age), int(p.rating), int(p.pot), int(p.trust), eur(Game.value(p)),
-		], 23)
-		btn("Stuur %s weg" % p.name, func(): _release(cid))
-		sep()
+		var selected: bool = cid in release_selection
+		var sub := "%s, %d jr · vertrouwen %d · waarde %s" % [
+			str(p.pos), int(p.age), int(p.trust), eur(Game.value(p)),
+		]
+		var info := _stat_card(cid, sub, selected)
+		info.add_child(_mini_btn("✗ Wegsturen" if not selected else "✔ Blijft toch (ongedaan maken)", func(): _toggle_release(cid)))
+	sep()
+	var remaining := Game.state.clients.size() - release_selection.size()
+	var confirm_txt := ("Bevestig: stuur %d weg (%d blijft over)" % [release_selection.size(), remaining]) if not release_selection.is_empty() else "Niemand geselecteerd"
+	btn(confirm_txt, _confirm_release, not release_selection.is_empty() and remaining >= 1)
 
 
-func _release(cid: String) -> void:
-	var p: Dictionary = Game.state.players[cid]
-	Game.release_client(cid)
-	flash = "%s pakt zijn spullen. 'Ik dacht dat we een team waren.'" % p.name
+func _toggle_release(cid: String) -> void:
+	if cid in release_selection:
+		release_selection.erase(cid)
+	else:
+		# Je moet er minstens 1 overhouden — de laatste kan niet geselecteerd worden.
+		if Game.state.clients.size() - release_selection.size() > 1:
+			release_selection.append(cid)
+		else:
+			flash = "Je moet minstens 1 cliënt overhouden."
+	show_release()
+
+
+func _confirm_release() -> void:
+	var names: Array = []
+	for cid in release_selection:
+		names.append(str(Game.state.players[cid].name))
+		Game.release_client(cid)
+	release_selection = []
+	if names.size() == 1:
+		flash = "%s pakt zijn spullen. 'Ik dacht dat we een team waren.'" % str(names[0])
+	else:
+		flash = "%d cliënten pakken hun spullen: %s." % [names.size(), ", ".join(names)]
 	_goto_scouting()
 
 
@@ -828,15 +875,7 @@ func _candidate_card(pid: String) -> Control:
 	var p: Dictionary = Game.state.players[pid]
 	var is_client: bool = pid in Game.state.clients
 	var rating := int(p.rating)
-	# Potentieel: bekende exacte waarde voor cliënten, anders de geschatte band.
-	var pot_text := ""
-	if is_client:
-		pot_text = str(int(p.pot))
-	else:
-		var est := Game.estimate(pid)
-		var lo := maxi(est - int(p.unc), rating)
-		var hi := mini(est + int(p.unc), 95)
-		pot_text = "%d–%d" % [lo, hi]
+	var pot_text := _pot_badge_text(pid)
 
 	var card := PanelContainer.new()
 	var card_style := StyleBoxFlat.new()
@@ -905,6 +944,64 @@ func _candidate_card(pid: String) -> Control:
 	badges.add_child(_stat_badge("RAT", str(rating), Color(0.18, 0.42, 0.78), Vector2(64, 64), Control.SIZE_SHRINK_END))
 
 	return card
+
+
+func _stat_card(pid: String, sub_text: String, highlighted := false) -> VBoxContainer:
+	# Gedeeld kaartje: naam + subregel links, rating/potentieel-badges rechts
+	# (zelfde POT-boven/RAT-onder layout als de scoutinglijst). Geeft de info-
+	# kolom terug, zodat de aanroeper er nog een knop aan kan hangen.
+	# `highlighted` kleurt de kaart (bijv. rood-ish) om een selectie te tonen.
+	var p: Dictionary = Game.state.players[pid]
+	var card := PanelContainer.new()
+	var st := StyleBoxFlat.new()
+	st.bg_color = Color(0.45, 0.15, 0.15, 0.85) if highlighted else Color(0.13, 0.13, 0.17, 0.85)
+	st.set_corner_radius_all(10)
+	st.content_margin_left = 12
+	st.content_margin_right = 10
+	st.content_margin_top = 8
+	st.content_margin_bottom = 8
+	card.add_theme_stylebox_override("panel", st)
+	content.add_child(card)
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 10)
+	card.add_child(hb)
+	var info := VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.add_theme_constant_override("separation", 4)
+	hb.add_child(info)
+	var name_lbl := Label.new()
+	name_lbl.text = str(p.name)
+	name_lbl.add_theme_font_size_override("font_size", 24)
+	info.add_child(name_lbl)
+	if sub_text != "":
+		var sub := Label.new()
+		sub.text = sub_text
+		sub.add_theme_font_size_override("font_size", 18)
+		sub.add_theme_color_override("font_color", Color(0.75, 0.75, 0.78))
+		info.add_child(sub)
+	var badges := VBoxContainer.new()
+	badges.custom_minimum_size = Vector2(96, 0)
+	badges.add_theme_constant_override("separation", 6)
+	hb.add_child(badges)
+	badges.add_child(_stat_badge("POT", _pot_badge_text(pid), Color(0.16, 0.55, 0.28), Vector2(96, 52), Control.SIZE_SHRINK_END))
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	badges.add_child(spacer)
+	badges.add_child(_stat_badge("RAT", str(int(p.rating)), Color(0.18, 0.42, 0.78), Vector2(64, 64), Control.SIZE_SHRINK_END))
+	return info
+
+
+func _pot_badge_text(pid: String) -> String:
+	# Potentieel voor de badge: exact bekend zodra iemand in je stal zit, anders
+	# de geschatte band (est ± onzekerheid). Gedeeld door scoutingkaart,
+	# stalbeheer en het infobalkje, zodat de weergave overal identiek is.
+	var p: Dictionary = Game.state.players[pid]
+	if pid in Game.state.clients:
+		return str(int(p.pot))
+	var est := Game.estimate(pid)
+	var lo := maxi(est - int(p.unc), int(p.rating))
+	var hi := mini(est + int(p.unc), 95)
+	return "%d–%d" % [lo, hi]
 
 
 func _stat_badge(caption: String, value: String, bg: Color, min_size: Vector2, halign := Control.SIZE_SHRINK_CENTER) -> PanelContainer:
@@ -2004,7 +2101,10 @@ func show_nego() -> void:
 			if str(t.id) == "aftasten":
 				btn("%s  [kost %d ronde%s]" % [str(t.label), nego.aftast_cost, "" if nego.aftast_cost == 1 else "s"], func(): _play_tactic(t))
 			else:
-				btn("%s  [%d%%, weerstand -%d]" % [str(t.label), int(round(float(t.chance) * 100)), int(t.drop)], func(): _play_tactic(t))
+				# De slagingskans blijft verborgen tot je de TD kent (aftasten of
+				# een type-combo). Tot dan zie je alleen de weerstandswinst.
+				var chance_txt := ("%d%%" % int(round(float(t.chance) * 100))) if nego.pers_known else "kans ?"
+				btn("%s  [%s, weerstand -%d]" % [str(t.label), chance_txt, int(t.drop)], func(): _play_tactic(t))
 		btn("Percentage verhogen (+%d%%, raakt weerstand/flow niet)" % int(round(Negotiation.RAISE_FEE_STEP * 100)), _raise_fee, nego.cut < Negotiation.MAX_CUT)
 
 		var favor_btn := Button.new()
@@ -2037,7 +2137,7 @@ func show_nego() -> void:
 			var reached: int = combo.pattern.size() if done else progress
 			var req := ""
 			if combo.has("req_pers"):
-				req = "  [vereist bekende %s]" % str(combo.req_pers)
+				req = "  [alleen tegen een %s TD]" % str(combo.req_pers)
 			var mark := "✔" if done else ("▸" if progress > 0 else "·")
 			var header_color := Color(0.35, 0.9, 0.4) if done else (Color(1.0, 0.78, 0.15) if progress > 0 else Color(0.75, 0.75, 0.75))
 			var header := lbl("%s %s (+%d)%s" % [mark, str(combo.name), int(combo.bonus), req], 19)

@@ -120,6 +120,7 @@ func tactics(rep: int) -> Array:
 	elif pers == "rekenmeester":
 		t_ch.drop = 0
 		t_ch.mood_ok = 0
+		t_ch["no_combo"] = true   # charme doet niets → telt ook niet voor een combo
 		t_ch.ok_txt = "De TD kijkt op zijn horloge. Charme glijdt van hem af."
 	out.append(t_ch)
 
@@ -206,7 +207,12 @@ func play(t: Dictionary, rng: RandomNumberGenerator) -> void:
 	if rng.randf() < float(t.chance):
 		resistance -= drop
 		streak += 1
-		success_run.append(str(t.id))
+		# Een zet die door de persoonlijkheid volledig wordt geneutraliseerd
+		# (charme tegen een Rekenmeester) telt NIET mee voor een combo — hij
+		# doet immers niets, dus voegt hij ook geen stap aan een patroon toe.
+		var counts_for_combo := not bool(t.get("no_combo", false))
+		if counts_for_combo:
+			success_run.append(str(t.id))
 		_shift_mood(int(t.get("mood_ok", 0)))
 		if t.has("cut_cost"):
 			cut = maxf(cut - float(t.cut_cost), 0.04)
@@ -216,7 +222,8 @@ func play(t: Dictionary, rng: RandomNumberGenerator) -> void:
 			log.append("%s Weerstand -%d.%s" % [
 				str(t.get("ok_txt", "Het werkt.")), int(drop),
 				("  (FLOW +%d%%)" % int(round((flow_mult - 1.0) * 100))) if flow else ""])
-		_check_combos()
+		if counts_for_combo:
+			_check_combos()
 	else:
 		streak = 0
 		success_run.clear()
@@ -235,7 +242,11 @@ func _check_combos() -> void:
 	for combo in COMBOS:
 		if str(combo.id) in combos_done:
 			continue
-		if combo.has("req_pers") and (pers != str(combo.req_pers) or not pers_known):
+		# Een type-gebonden combo werkt zodra de TD ÉCHT dat type is — je hoeft
+		# het niet vooraf te weten (aftasten). Sterker nog: hem afronden ONTHULT
+		# het type, net als aftasten. Zo is druk→druk tegen een (nog onbekende)
+		# nerveuze TD een geldige route die 'm meteen verklapt.
+		if combo.has("req_pers") and pers != str(combo.req_pers):
 			continue
 		var pat: Array = combo.pattern
 		if success_run.size() < pat.size():
@@ -245,6 +256,9 @@ func _check_combos() -> void:
 			resistance -= float(combo.bonus)
 			last_combo = str(combo.name)
 			log.append("COMBO — %s! Extra weerstand -%d." % [str(combo.name), int(combo.bonus)])
+			if combo.has("req_pers") and not pers_known:
+				pers_known = true
+				log.append("…en nu weet je het zeker: %s" % str(PERS_INFO[pers]))
 
 
 # Hoeveel stappen van dit patroon je al hebt gezet, met de LOPENDE reeks als
@@ -254,7 +268,9 @@ func combo_progress(combo: Dictionary) -> int:
 	var pat: Array = combo.pattern
 	if str(combo.id) in combos_done:
 		return pat.size()
-	if combo.has("req_pers") and (pers != str(combo.req_pers) or not pers_known):
+	# Licht óók op vóór het aftasten, mits de TD daadwerkelijk het vereiste type
+	# is — zo zie je "op koers" terwijl je druk→druk speelt tegen een nerveuze TD.
+	if combo.has("req_pers") and pers != str(combo.req_pers):
 		return 0
 	for k in range(mini(success_run.size(), pat.size() - 1), 0, -1):
 		if success_run.slice(success_run.size() - k) == pat.slice(0, k):

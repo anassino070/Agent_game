@@ -42,25 +42,30 @@ func resolve(rng: RandomNumberGenerator, money_scale: float = 1.0) -> void:
 		var r: Dictionary
 		match int(choices[i]):
 			0:
-				var m := -int(amount * 0.35)
+				# Veilig maar duur: je betaalt fors, maar nul risico/schandaal.
+				var m := -int(amount * 0.40)
 				r = {"post": name, "money": m, "scandal": 0,
 					"txt": "%s: netjes opgegeven. %s belasting." % [name, _eur(m)]}
 			1:
-				if rng.randf() < 0.70:
-					var m := -int(amount * 0.15)
+				# Slimme geld-keuze: laagste verwachte kosten (~-24,5%), maar
+				# 35% kans op een naheffing + wat schandaal.
+				if rng.randf() < 0.65:
+					var m := -int(amount * 0.08)
 					r = {"post": name, "money": m, "scandal": 0,
-						"txt": "%s: deels verhuld, niet opgemerkt. %s." % [name, _eur(m)]}
+						"txt": "%s: deels verhuld, niet opgemerkt. Slechts %s." % [name, _eur(m)]}
 				else:
-					var m := -int(amount * 0.6)
-					r = {"post": name, "money": m, "scandal": 5,
+					var m := -int(amount * 0.55)
+					r = {"post": name, "money": m, "scandal": 6,
 						"txt": "%s: deels verhuld — ontdekt. Naheffing %s." % [name, _eur(m)]}
 			_:
-				if rng.randf() < 0.45:
+				# Pure gok: 50% helemaal gratis, 50% méér dan de belasting zelf
+				# (boete bovenop) plus flink schandaal. Hoge variantie.
+				if rng.randf() < 0.50:
 					r = {"post": name, "money": 0, "scandal": 0,
 						"txt": "%s: volledig verhuld, niemand die het ziet." % name}
 				else:
-					var m := -amount
-					r = {"post": name, "money": m, "scandal": 12,
+					var m := -int(amount * 1.1)
+					r = {"post": name, "money": m, "scandal": 14,
 						"txt": "%s: volledig verhuld — grondig ontdekt. Fikse boete %s." % [name, _eur(m)]}
 		results.append(r)
 		total_money += int(r.money)

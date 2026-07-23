@@ -243,9 +243,9 @@ func has_shop(id: String) -> bool:
 	return id in shop_owned()
 
 
-# Generieke korting op alle shop-prijzen (0,75 = 25% goedkoper dan de
+# Generieke korting op alle shop-prijzen (0,55 = 45% goedkoper dan de
 # basisprijzen in SHOP_UPGRADES). Eén knop om de hele shop-economie te tunen.
-const SHOP_PRICE_MULT := 0.75
+const SHOP_PRICE_MULT := 0.55
 
 
 func shop_price(id: String) -> int:
