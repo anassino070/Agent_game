@@ -37,3 +37,13 @@ Events:
 -geef in shop 3 opties te zien en een knop waarin je kan betalen om te rerollen voor andere upgrades. Maak alle upgrades ook duidelijk. Nu staat er bijv. de bank keert BETER uit of budget groeit SNELLER. Wat wordt daarmee bedoeld precies.
 -ontwikkeling gaat iets te langzaam voor spelers, mag 30% sneller gaan.
 -maak alle upgrades
+
+
+-sponsorpitch is bs. Geen tactiek duidelijk.
+-contract verlengen geeft geen geld. laat het 7% zijn van de waarde die je zou krijgen.
+-in sudoku. laat na 5 een leegte komen, zodat je een vakje kan wissen voor overzicht. Laat de check bij sudoku zijn of het een geldige is. Er is niet maar 1 juiste oplossing. Als het logisch klopt, is het goed
+-Dobbelen bij bookmaker. laat 'Nu stoppen, uitbetalen' een multiplyer hebben
+-laat spelers altijd te koop zijn. Budget van clubs is een irritante bottleneck
+-laat spelers pas weggekaapt kunnen wordne vanaf hun 3e seizoen bij je
+-poker om talent. Als je verhoogt lijkt het alsof je sws wint omdat tegenstander fold.
+-verzin gekke rewards voor als je 

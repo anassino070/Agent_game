@@ -245,11 +245,11 @@ func has_shop(id: String) -> bool:
 
 # Generieke korting op alle shop-prijzen (0,55 = 45% goedkoper dan de
 # basisprijzen in SHOP_UPGRADES). Eén knop om de hele shop-economie te tunen.
-const SHOP_PRICE_MULT := 0.55
+const SHOP_PRICE_MULT := 0.5
 
 
 func shop_price(id: String) -> int:
-	return int(round(float(SHOP_UPGRADES[id].price) * SHOP_PRICE_MULT * event_money_scale()))
+	return int(round(float(SHOP_UPGRADES[id].price) * (SHOP_PRICE_MULT * event_money_scale())^2))
 
 
 func can_buy_shop(id: String) -> bool:
