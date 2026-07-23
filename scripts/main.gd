@@ -916,6 +916,13 @@ func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: b
 		var v := int(effects.all_trust)
 		var text := ("Vertrouwen (hele stal): %s" % _fmt_delta(v)) if show_numbers else ("%s Vertrouwen (hele stal)" % _emphasis_symbol("all_trust", emphasize, v))
 		rows.append({"text": text, "good": v > 0})
+	# new_client/new_top_client zijn geen getal maar wél de belangrijkste
+	# uitkomst van een optie — anders lees je alleen "Reputatie -5" en mis
+	# je dat je hier een HELE NIEUWE CLIËNT kunt winnen.
+	if bool(effects.get("new_client", false)):
+		rows.append({"text": "★ Kans op een NIEUWE CLIËNT", "good": true})
+	if bool(effects.get("new_top_client", false)):
+		rows.append({"text": "★ Kans op een NIEUWE TOPSPELER als cliënt", "good": true})
 	return rows
 
 
@@ -1050,7 +1057,9 @@ func show_bidding() -> void:
 	sep()
 	for c in bidding.clubs:
 		var status := "actief" if c.active else "afgehaakt"
-		lbl("%s — bod %s (%s)" % [str(c.name), eur(int(c.bid)), status], 24)
+		var annoyed_txt := "  ⚠ geïrriteerd" if bool(c.get("annoyed", false)) else ""
+		lbl("%s — bod %s (%s)%s" % [str(c.name), eur(int(c.bid)), status, annoyed_txt], 24)
+		lbl("   %s" % bidding.ambition_label(c), 19)
 	if not bidding.log.is_empty():
 		sep()
 		for line in bidding.log:
@@ -1069,11 +1078,15 @@ func show_bidding() -> void:
 		btn("Verder →", _finish_bidding)
 	else:
 		for c in bidding.active_clubs():
-			btn("Bluffen richting %s" % str(c.name), func(): _play_bidding("bluf", str(c.id)))
+			var target_id := str(c.id)
+			var club_name := str(c.name)
+			var bluffed := int(c.get("bluffed", 0))
+			var fatigue_txt := "  (al %d× geprobeerd — trapt er minder snel meer in)" % bluffed if bluffed > 0 else ""
+			btn("Bluffen richting %s%s" % [club_name, fatigue_txt], func(): _play_bidding("bluf", target_id))
 		if not bidding.top_club().is_empty():
 			btn("Deadline-druk op de leider (%s)" % str(bidding.top_club().name), func(): _play_bidding("druk", ""))
 		if bidding.active_clubs().size() >= 2:
-			btn("Vergelijken (alle clubs)", func(): _play_bidding("vergelijk", ""))
+			btn("Vergelijken (alle clubs) — risico: koploper kan geïrriteerd raken", func(): _play_bidding("vergelijk", ""))
 		if not bidding.top_club().is_empty():
 			btn("Bod aannemen nu", func(): _play_bidding("aannemen", ""))
 
@@ -1194,7 +1207,9 @@ func show_tax() -> void:
 				labels[chosen] if chosen >= 0 else "nog niet gekozen"], 24)
 			for opt_i in range(3):
 				if opt_i != chosen:
-					btn(labels[opt_i], func(): _choose_tax(i, opt_i))
+					var post_idx := i
+					var option_idx := opt_i
+					btn(labels[opt_i], func(): _choose_tax(post_idx, option_idx))
 		sep()
 		btn("Regelen →", _resolve_tax, tax.all_chosen())
 	else:

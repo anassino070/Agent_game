@@ -1,11 +1,18 @@
 # bidding_war.gd — minigame "Biedingsoorlog" (event: overboden).
-# Drie clubs denken dat er een concurrerend bod ligt op je cliënt. Jij stookt
-# het vuur op met drie tactieken tot iemand tekent, wandelt weg of de tijd om is.
+# Drie clubs denken dat er een concurrerend bod ligt op je cliënt. Echte
+# tactiek zit 'm in drie dingen:
+# 1. Clubambitie is zichtbaar en bepaalt hun gedrag — ambitieuze clubs zijn
+#    happiger (grotere sprongen bij een geslaagde bluf) maar ook
+#    prikkelbaarder (stappen sneller uit bij een mislukte bluf/druk).
+# 2. Bluffen tegen dezelfde club raakt "verbrand": elke herhaling verlaagt
+#    de slagingskans van die specifieke bluf — wissel dus van doelwit.
+# 3. "Vergelijken" is niet gratis: de koploper kan zich ondermijnd voelen
+#    (annoyed) en wordt daardoor prikkelbaarder bij een latere druk-actie.
 class_name BiddingWar
 extends RefCounted
 
 var client_id := ""
-var clubs: Array = []      # [{id, name, bid, budget, active}]
+var clubs: Array = []      # [{id, name, ambition, bid, budget, active, bluffed, annoyed}]
 var rounds_left := 4
 var finished := false
 var deal := false
@@ -19,10 +26,10 @@ func setup(client_id_: String, candidate_ids: Array, base_value: int, all_clubs:
 	for cid in candidate_ids:
 		var c: Dictionary = all_clubs[cid]
 		clubs.append({
-			"id": cid, "name": str(c.name),
+			"id": cid, "name": str(c.name), "ambition": int(c.ambition),
 			"bid": int(float(base_value) * rng.randf_range(0.55, 0.75)),
 			"budget": int(c.budget),
-			"active": true,
+			"active": true, "bluffed": 0, "annoyed": false,
 		})
 	if clubs.is_empty():
 		# Geen enkele club had het budget om mee te doen — loos alarm.
@@ -54,17 +61,39 @@ func find_club(cid: String) -> Dictionary:
 	return {}
 
 
+func ambition_label(c: Dictionary) -> String:
+	var a := int(c.ambition)
+	if a >= 5:
+		return "torenhoge ambitie — happig, maar ook prikkelbaar"
+	if a >= 4:
+		return "hoge ambitie — wil graag winnen"
+	if a >= 2:
+		return "gematigde ambitie"
+	return "lage ambitie — kalm, moeilijk op te jagen"
+
+
 func play_bluf(target_id: String, rng: RandomNumberGenerator) -> void:
 	rounds_left -= 1
 	var c := find_club(target_id)
-	if rng.randf() < 0.6:
-		var raise := int(float(c.bid) * rng.randf_range(0.15, 0.25))
+	var bluffed := int(c.bluffed)
+	var ambition_bonus := (float(c.ambition) - 3.0) * 0.03
+	var fatigue := float(bluffed) * 0.12
+	var chance := clampf(0.6 + ambition_bonus - fatigue, 0.1, 0.85)
+	c["bluffed"] = bluffed + 1
+	if rng.randf() < chance:
+		var raise_pct := rng.randf_range(0.12, 0.22) + float(c.ambition) * 0.015
+		var raise := int(float(c.bid) * raise_pct)
 		c["bid"] = mini(int(c.bid) + raise, int(c.budget))
 		log.append("%s slikt het: bod stijgt naar %s." % [str(c.name), _eur(int(c.bid))])
 	else:
-		if rng.randf() < 0.3:
+		var walk_base := 0.3 + (float(c.ambition) - 3.0) * 0.05
+		if bluffed > 0:
+			walk_base += 0.15   # al eerder geblufd — hij is nu op zijn hoede
+		if rng.randf() < walk_base:
 			c["active"] = false
 			log.append("%s ruikt onraad en trekt zich volledig terug." % str(c.name))
+		elif bluffed > 0:
+			log.append("%s heeft dit smoesje al eerder gehoord en trapt er niet meer in." % str(c.name))
 		else:
 			log.append("%s trapt er niet in, maar blijft in de race." % str(c.name))
 	_check_end()
@@ -76,19 +105,26 @@ func play_pressure(rng: RandomNumberGenerator) -> void:
 	if top.is_empty():
 		_check_end()
 		return
-	if rng.randf() < 0.5:
+	var annoyed_penalty := 0.15 if bool(top.annoyed) else 0.0
+	var raise_chance := clampf(0.5 - annoyed_penalty, 0.1, 0.9)
+	if rng.randf() < raise_chance:
 		var raise := int(float(top.bid) * rng.randf_range(0.08, 0.14))
 		top["bid"] = mini(int(top.bid) + raise, int(top.budget))
 		log.append("%s voelt de klok tikken en verhoogt naar %s." % [str(top.name), _eur(int(top.bid))])
-	elif rng.randf() < 0.5:
-		finished = true
-		deal = true
-		winner_id = str(top.id)
-		final_bid = int(top.bid)
-		log.append("%s heeft er genoeg van en tekent NU voor %s." % [str(top.name), _eur(final_bid)])
 	else:
-		top["active"] = false
-		log.append("%s voelt zich gehaast en stapt uit de onderhandeling." % str(top.name))
+		# Mislukt: hij tekent NU (mooi) of stapt uit (pijnlijk) — een
+		# ambitieuze club is ongeduldiger en stapt sneller uit dan een kalme.
+		var walk_chance := clampf(0.5 + (float(top.ambition) - 3.0) * 0.06 + annoyed_penalty, 0.15, 0.85)
+		if rng.randf() < walk_chance:
+			top["active"] = false
+			var reason := " — hij was toch al geïrriteerd" if annoyed_penalty > 0 else ""
+			log.append("%s voelt zich gehaast%s en stapt uit de onderhandeling." % [str(top.name), reason])
+		else:
+			finished = true
+			deal = true
+			winner_id = str(top.id)
+			final_bid = int(top.bid)
+			log.append("%s heeft er genoeg van en tekent NU voor %s." % [str(top.name), _eur(final_bid)])
 	_check_end()
 
 
@@ -108,6 +144,11 @@ func play_compare(rng: RandomNumberGenerator) -> void:
 				c["bid"] = new_bid
 				any = true
 				log.append("%s overtreft het bod: %s." % [str(c.name), _eur(new_bid)])
+	# Risico: de koploper voelt zich soms ondermijnd doordat zijn bod
+	# rondgaat — dat maakt hem prikkelbaarder bij een latere druk-actie.
+	if rng.randf() < 0.3 and not bool(top.annoyed):
+		top["annoyed"] = true
+		log.append("%s is not amused dat zijn bod ineens bij iedereen bekend is." % str(top.name))
 	if not any:
 		log.append("Niemand hapt — de clubs kennen elkaars grens.")
 	_check_end()

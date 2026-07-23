@@ -13,8 +13,23 @@ const SCOUT_POINTS := 3
 const BASE_COSTS := 10000     # kantoorkosten seizoen 1
 const COSTS_MULT := 1.8       # kosten vermenigvuldigen elk seizoen met deze factor
 const FEE_CUT := 0.10         # standaard fee-percentage
-const LEAVE_TRUST := 30       # onder dit vertrouwen kan een cliënt vertrekken
-const LEAVE_CHANCE := 0.5
+
+# Vertrekkans is een DOORLOPENDE curve i.p.v. een harde knip bij één
+# drempel — anders maakt elk punt vertrouwen bóven of onder die ene grens
+# he-le-maal niets uit, en dat is precies waarom vertrouwen weinig impact
+# voelde. Onder LEAVE_SAFE_TRUST loopt het risico lineair op.
+const LEAVE_SAFE_TRUST := 60.0
+const LEAVE_SLOPE := 0.016
+const LEAVE_CHANCE_MAX := 0.85
+
+# Reputatie/vertrouwen zijn te makkelijk te winnen: positieve mutaties tellen
+# maar voor een deel, negatieve tellen volledig — netto duw je dus actief
+# moeite in moeten blijven steken i.p.v. eenmalig naar 100 te groeien en daar
+# te blijven hangen.
+const REP_GAIN_MULT := 0.6
+const TRUST_GAIN_MULT := 0.6
+const REP_DECAY_ABOVE_BASELINE := 3   # rep zakt licht terug richting 50 als je stilzit
+const REP_BASELINE := 50
 const RIVAL_NAMES := ["Bureau Marchetti", "Star XI Management", "Agentschap De Wolf", "GoalGetters Int."]
 
 var rng := RandomNumberGenerator.new()
@@ -253,12 +268,21 @@ func fee_cut() -> float:
 
 func poach_chance(p: Dictionary) -> float:
 	# Rivalen kapen ook cliënten met redelijk vertrouwen weg: hoe hoger de
-	# rating, hoe aantrekkelijker; hoog vertrouwen beschermt.
+	# rating, hoe aantrekkelijker; hoog vertrouwen beschermt — sterker dan
+	# voorheen, zodat vertrouwen hier ook echt voor elk punt iets doet.
 	if Meta.perk_level("ijzeren_stal") > 0:
 		return 0.0
-	var c := 0.03 + (float(p.rating) - 50.0) * 0.005 - (float(p.trust) - 50.0) * 0.004
+	var c := 0.03 + (float(p.rating) - 50.0) * 0.005 - (float(p.trust) - 50.0) * 0.006
 	c -= float(Meta.perk_bonus("binding")) * 0.01
 	return clampf(c, 0.0, 0.35)
+
+
+func leave_chance(p: Dictionary) -> float:
+	# Doorlopende curve i.p.v. een harde knip: onder LEAVE_SAFE_TRUST loopt
+	# het vertrekrisico lineair op naarmate vertrouwen lager wordt.
+	var trust := float(p.trust) + float(Meta.perk_bonus("empathie"))
+	var c := (LEAVE_SAFE_TRUST - trust) * LEAVE_SLOPE
+	return clampf(c, 0.0, LEAVE_CHANCE_MAX)
 
 
 func try_bailout() -> bool:
@@ -293,13 +317,12 @@ func club_name(club_id: String) -> String:
 	return str(state.clubs[club_id]["name"])
 
 
-const EVENT_MONEY_GROWTH := 0.20   # event-geldbedragen groeien 20%/seizoen mee met de economie
-
-
 func event_money_scale() -> float:
-	# Vaste event-bedragen (€8.000 hier, €5.000 daar) worden anders snel
-	# betekenisloos naast de exponentieel stijgende kantoorkosten.
-	return pow(1.0 + EVENT_MONEY_GROWTH, float(state.season) - 1.0)
+	# Vaste event-/minigame-bedragen (€8.000 hier, €5.000 daar) schalen op
+	# EXACT dezelfde manier als de kantoorkosten (COSTS_MULT, ×1,8/seizoen) —
+	# anders lopen ze uit de pas met de rest van de economie en voelen ze
+	# na een paar seizoenen als zakgeld naast de exponentieel stijgende kosten.
+	return pow(COSTS_MULT, float(state.season) - 1.0)
 
 
 func scale_money_effects(effects: Dictionary) -> Dictionary:
@@ -322,7 +345,10 @@ func apply_effects(effects: Dictionary, client_id: String = "") -> Array:
 			"money":
 				state.money = int(state.money) + int(v)
 			"rep":
-				state.rep = clampi(int(state.rep) + int(v), 0, 100)
+				var rv := int(v)
+				if rv > 0:
+					rv = int(ceil(float(rv) * REP_GAIN_MULT))
+				state.rep = clampi(int(state.rep) + rv, 0, 100)
 			"scandal":
 				var sv := int(v)
 				# Crisismanagement-perk en Juridisch adviseur (shop) dempen
@@ -340,11 +366,17 @@ func apply_effects(effects: Dictionary, client_id: String = "") -> Array:
 			"trust":
 				if client_id != "" and state.players.has(client_id):
 					var p: Dictionary = state.players[client_id]
-					p["trust"] = clampi(int(p.trust) + int(v), 0, 100)
+					var tv := int(v)
+					if tv > 0:
+						tv = int(ceil(float(tv) * TRUST_GAIN_MULT))
+					p["trust"] = clampi(int(p.trust) + tv, 0, 100)
 			"all_trust":
+				var atv := int(v)
+				if atv > 0:
+					atv = int(ceil(float(atv) * TRUST_GAIN_MULT))
 				for cid in state.clients:
 					var pc: Dictionary = state.players[cid]
-					pc["trust"] = clampi(int(pc.trust) + int(v), 0, 100)
+					pc["trust"] = clampi(int(pc.trust) + atv, 0, 100)
 			"new_client":
 				var nm := _sign_event_talent()
 				if nm != "":
@@ -633,7 +665,7 @@ func complete_transfer(client_id: String, club_id: String, fee: int, cut: float)
 	var p: Dictionary = state.players[client_id]
 	p["club"] = club_id
 	p["contract"] = 3
-	p["trust"] = clampi(int(p.trust) + 8, 0, 100)
+	p["trust"] = clampi(int(p.trust) + int(ceil(8.0 * TRUST_GAIN_MULT)), 0, 100)
 	var c: Dictionary = state.clubs[club_id]
 	c["relation"] = clampi(int(c.relation) + 5, 0, 100)
 	c["budget"] = maxi(int(c.budget) - fee, 0)
@@ -667,7 +699,7 @@ func extend_contract(client_id: String) -> int:
 	state.money = int(state.money) + tekengeld
 	state.total_fees = int(state.total_fees) + tekengeld
 	p["contract"] = int(p.contract) + 2
-	p["trust"] = clampi(int(p.trust) + 5, 0, 100)
+	p["trust"] = clampi(int(p.trust) + int(ceil(5.0 * TRUST_GAIN_MULT)), 0, 100)
 	return tekengeld
 
 
@@ -720,7 +752,7 @@ func end_of_season() -> Array:
 			state.total_fees = int(state.total_fees) + income
 			pp["club"] = MYSTERY_CLUB_ID
 			pp["contract"] = 3
-			pp["trust"] = clampi(int(pp.trust) + 6, 0, 100)
+			pp["trust"] = clampi(int(pp.trust) + int(ceil(6.0 * TRUST_GAIN_MULT)), 0, 100)
 			lines.append("Voorbereide transfer: %s naar een mysterieuze buitenlandse club — jouw fee €%d." % [pp.name, income])
 			prepared_results.append({"name": str(pp.name), "success": true, "transfer_sum": transfer_sum, "income": income})
 		else:
@@ -757,7 +789,7 @@ func end_of_season() -> Array:
 			state.money = int(state.money) + tg
 			state.total_fees = int(state.total_fees) + tg
 			lines.append("%s verlengt bij zijn club; tekengeld €%d voor jou." % [p.name, tg])
-		if Meta.perk_level("ijzeren_stal") == 0 and int(p.trust) < LEAVE_TRUST - Meta.perk_bonus("empathie") and rng.randf() < LEAVE_CHANCE:
+		if Meta.perk_level("ijzeren_stal") == 0 and rng.randf() < leave_chance(p):
 			leavers.append(cid)
 			lines.append("!! %s VERTREKT naar een andere makelaar. Het vertrouwen was op (%d)." % [p.name, int(p.trust)])
 		elif rng.randf() < poach_chance(p):
@@ -772,6 +804,12 @@ func end_of_season() -> Array:
 
 	var scandal_decay := 3 + Meta.perk_bonus("mediatraining") + (2 if has_shop("pr_bureau") else 0)
 	state.scandal = maxi(int(state.scandal) - scandal_decay, 0)
+
+	# Reputatie zakt licht terug richting een neutrale basis als je boven
+	# die basis zit — anders groei je één keer naar 100 en blijft het daar
+	# hangen zonder dat je nog iets hoeft te doen om het te behouden.
+	if int(state.rep) > REP_BASELINE:
+		state.rep = maxi(int(state.rep) - REP_DECAY_ABOVE_BASELINE, REP_BASELINE)
 
 	# Oud geld-perk: rente over een positief saldo.
 	var rente_pct := Meta.perk_bonus("oud_geld")

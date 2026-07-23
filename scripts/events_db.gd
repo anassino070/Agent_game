@@ -745,7 +745,7 @@ static func get_events() -> Array:
 		{
 			"id": "rivaal_poker", "title": "Pokeravond om een talent", "needs_slot": true,
 			"minigame": "pokerbluf",
-			"text": "Een rivaliserende makelaar zit aan tafel met hetzelfde toptalent op het oog. Jullie leggen de knikkers op tafel — wie het meest overtuigend speelt, krijgt het talent.",
+			"text": "Een rivaliserende makelaar zit aan tafel met hetzelfde toptalent op het oog. Jullie leggen de knikkers op tafel — win de hand en dat talent wordt jouw NIEUWE CLIËNT, plus de pot.",
 		},
 		{
 			"id": "bookmaker_dobbelen", "title": "De achterkamer van de bookmaker",
