@@ -243,8 +243,13 @@ func has_shop(id: String) -> bool:
 	return id in shop_owned()
 
 
+# Generieke korting op alle shop-prijzen (0,75 = 25% goedkoper dan de
+# basisprijzen in SHOP_UPGRADES). Eén knop om de hele shop-economie te tunen.
+const SHOP_PRICE_MULT := 0.75
+
+
 func shop_price(id: String) -> int:
-	return int(round(float(SHOP_UPGRADES[id].price) * event_money_scale()))
+	return int(round(float(SHOP_UPGRADES[id].price) * SHOP_PRICE_MULT * event_money_scale()))
 
 
 func can_buy_shop(id: String) -> bool:
@@ -636,7 +641,7 @@ func office_upgrade_cost() -> int:
 	var next_lvl := office_level() + 1
 	if next_lvl > OFFICE_MAX_LEVEL:
 		return -1
-	return 100000 * next_lvl * next_lvl
+	return 60000 * next_lvl * next_lvl
 
 
 func can_upgrade_office() -> bool:
@@ -997,13 +1002,13 @@ func end_of_season() -> Array:
 				p["rating"] = mini(oud + growth, int(p.pot))
 				lines.append("%s ontwikkelt zich: rating %d → %d." % [p.name, oud, int(p.rating)])
 		# Vertrouwen drift op basis van het seizoen (licht negatief zonder aandacht).
+		# Het seizoensresultaat past nog wel het vertrouwen aan, maar zonder losse
+		# meldingsregel — die voegde niets toe.
 		var drift := rng.randi_range(-5, 5) + Meta.perk_bonus("spelersfluisteraar")
 		if perf >= 8:
 			drift += 3
-			lines.append("%s had een topseizoen." % p.name)
 		elif perf <= 3:
 			drift -= 3
-			lines.append("%s had een seizoen om te vergeten." % p.name)
 		p["trust"] = clampi(int(p.trust) + drift, 0, 100)
 		p["age"] = int(p.age) + 1
 		# Alleen een speler mét club heeft een (aflopend) contract dat aftikt —

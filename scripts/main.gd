@@ -346,9 +346,10 @@ func _name_row(before: String, pid: String, after: String, size := 24) -> void:
 
 func refresh_header() -> void:
 	var s: Dictionary = Game.state
-	header.text = "Seizoen %d/%d  |  %s  |  Rep %d  |  Schandaal %d  |  Gunsten %d  |  🏢 Nv.%d %s" % [
+	header.text = "Seizoen %d/%d  |  %s  |  Rep %d  |  Schandaal %d  |  Gunsten %d  |  Stal %d/%d  |  🏢 Nv.%d %s" % [
 		int(s.season), Game.MAX_SEASONS, eur(s.money),
 		int(s.rep), int(s.scandal), int(s.favors),
+		s.clients.size(), Game.client_cap(),
 		Game.office_level(), Game.office_name(),
 	]
 	_update_office_background()

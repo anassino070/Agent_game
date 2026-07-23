@@ -439,12 +439,12 @@ static func get_events() -> Array:
 		},
 		{
 			"id": "trainersverzoek", "title": "Ook de trainer?",
-			"text": "De assistent-trainer van een club vraagt of je hem ook wilt vertegenwoordigen. Ander werkveld, ander netwerk.",
+			"text": "De assistent-trainer van een club vraagt of je hem ook wilt vertegenwoordigen. Ander werkveld, ander netwerk — maar ook een tweede front dat je aandacht opeist.",
 			"options": [
-				{"label": "Erbij nemen", "effects": {"money": 3000, "rep": 3},
-					"txt": "Klein maar leuk contract. Je netwerk in de technische staf groeit."},
-				{"label": "Bedanken, je focust op spelers", "effects": {},
-					"txt": "Je blijft bij je kernbusiness."},
+				{"label": "Erbij nemen", "effects": {"money": 4000, "rep": 3, "all_trust": -4},
+					"txt": "Een tweede inkomstenbron en meer aanzien in de technische staf. Maar je spelers merken dat je aandacht zich verdeelt — ze voelen zich net iets minder je nummer één."},
+				{"label": "Bedanken, je focust op spelers", "effects": {"all_trust": 3},
+					"txt": "Je blijft bij je kernbusiness. Je spelers waarderen dat ze je volle aandacht houden."},
 			],
 		},
 		{
