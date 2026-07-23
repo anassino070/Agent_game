@@ -27,7 +27,9 @@ const LEAVE_CHANCE_MAX := 0.85
 # moeite in moeten blijven steken i.p.v. eenmalig naar 100 te groeien en daar
 # te blijven hangen.
 const REP_GAIN_MULT := 0.6
-const TRUST_GAIN_MULT := 0.6
+const TRUST_GAIN_MULT := 0.6          # basisdemping op positief vertrouwen in seizoen 1
+const TRUST_GAIN_PER_SEASON := 0.09   # …en die demping loopt elk seizoen terug (= meer gewicht)
+const TRUST_GAIN_MAX := 1.6           # plafond zodat het niet ontspoort
 const REP_DECAY_ABOVE_BASELINE := 3   # rep zakt licht terug richting 50 als je stilzit
 const REP_BASELINE := 50
 const RIVAL_NAMES := ["Bureau Marchetti", "Star XI Management", "Agentschap De Wolf", "GoalGetters Int."]
@@ -129,7 +131,7 @@ func bank_deposits_list() -> Array:
 # ---------------------------------------------------------------- de shop
 # 24 eenmalige upgrades voor déze run (géén legacy-perks — die verdwijnen
 # aan het einde van de run net als de rest van Game.state). Elk seizoen na
-# de afsluiting kies je uit 2 willekeurige, nog niet gekochte upgrades.
+# de afsluiting kies je uit 3 willekeurige, nog niet gekochte upgrades (of reroll).
 # Prijzen schalen mee met event_money_scale() zodat ze de hele run relevant
 # blijven. Fors duurder dan de oorspronkelijke 10 (en met 14 extra opties)
 # zodat je tegen het einde van de run niet allang alles hebt kunnen kopen.
@@ -176,7 +178,7 @@ const SHOP_UPGRADES := {
 	},
 	"veiligheidsnet": {
 		"name": "Veiligheidsnet", "price": 34000,
-		"desc": "Rivalen kapen je cliënten merkbaar minder vaak weg, de rest van de run.",
+		"desc": "Rivalen kapen 5 procentpunt minder vaak een cliënt weg (lagere kaapkans), de rest van de run.",
 	},
 	"psycholoog": {
 		"name": "Sportpsycholoog", "price": 30000,
@@ -192,15 +194,15 @@ const SHOP_UPGRADES := {
 	},
 	"pr_strategie": {
 		"name": "Reputatiebeheerder", "price": 34000,
-		"desc": "Je reputatie zakt niet meer vanzelf terug richting de basislijn, de rest van de run.",
+		"desc": "Je reputatie zakt niet meer vanzelf terug richting 50 (normaal -3/seizoen als je erboven zit), de rest van de run.",
 	},
 	"investeringsfonds": {
 		"name": "Investeringsfonds", "price": 30000,
-		"desc": "Stortingen bij De Bank keren nog beter uit, de rest van de run.",
+		"desc": "De Bank keert 2,3× uit i.p.v. 2× op elke storting, de rest van de run.",
 	},
 	"clubcontacten": {
 		"name": "Clubcontactenboek", "price": 40000,
-		"desc": "Clubbudgetten groeien sneller per seizoen, de rest van de run.",
+		"desc": "Clubbudgetten groeien +17%/seizoen i.p.v. +12% (meer clubs kunnen je spelers betalen), de rest van de run.",
 	},
 	"risicomanager": {
 		"name": "Risicomanager", "price": 30000,
@@ -276,17 +278,48 @@ func buy_shop_upgrade(id: String) -> bool:
 	return true
 
 
-func shop_offer(rng_src: RandomNumberGenerator, count: int = 2) -> Array:
+func shop_offer(rng_src: RandomNumberGenerator, count: int = 3, exclude: Array = []) -> Array:
+	# Trekt `count` willekeurige, nog niet gekochte upgrades. `exclude` houdt de
+	# vorige aanbieding buiten de trekking (voor de reroll) zolang er genoeg
+	# andere overblijven — anders vult hij aan met de uitgesloten ids.
 	var pool: Array = []
 	for id in SHOP_UPGRADES:
-		if not has_shop(id):
+		if not has_shop(id) and not (id in exclude):
 			pool.append(id)
+	var fallback: Array = []
+	for id in exclude:
+		if not has_shop(id):
+			fallback.append(id)
 	var out: Array = []
 	while out.size() < count and not pool.is_empty():
 		var i := rng_src.randi_range(0, pool.size() - 1)
 		out.append(pool[i])
 		pool.remove_at(i)
+	# Te weinig verse upgrades over? Vul aan met de zojuist uitgesloten set.
+	while out.size() < count and not fallback.is_empty():
+		var i := rng_src.randi_range(0, fallback.size() - 1)
+		out.append(fallback[i])
+		fallback.remove_at(i)
 	return out
+
+
+# Reroll: tegen betaling een nieuwe set upgrades in de shop.
+const SHOP_REROLL_BASE := 8000
+
+
+func shop_reroll_cost() -> int:
+	return int(round(float(SHOP_REROLL_BASE) * event_money_scale()))
+
+
+func can_reroll_shop() -> bool:
+	return int(state.money) >= shop_reroll_cost()
+
+
+func pay_shop_reroll() -> bool:
+	if not can_reroll_shop():
+		return false
+	state.money = int(state.money) - shop_reroll_cost()
+	return true
 
 
 func try_shop_bailout() -> bool:
@@ -340,6 +373,16 @@ func fee_cut() -> float:
 	if has_shop("belastingadviseur"):
 		c += 0.02
 	return c
+
+
+func trust_gain_mult() -> float:
+	# Het gewicht van OPGEBOUWD vertrouwen groeit over de seizoenen heen: in
+	# seizoen 1 valt er nog weinig op te bouwen (basisdemping 0,6), maar elk
+	# volgend seizoen telt een positieve vertrouwensmutatie zwaarder mee, tot
+	# een plafond. Zo wordt vertrouwen een investering die zich over de run
+	# opbouwt i.p.v. een stat die meteen al vaststaat. (Negatieve mutaties
+	# blijven altijd voluit tellen — die lopen hier niet langs.)
+	return minf(TRUST_GAIN_MULT + (float(state.season) - 1.0) * TRUST_GAIN_PER_SEASON, TRUST_GAIN_MAX)
 
 
 func poach_chance(p: Dictionary) -> float:
@@ -450,12 +493,12 @@ func apply_effects(effects: Dictionary, client_id: String = "") -> Array:
 					var p: Dictionary = state.players[client_id]
 					var tv := int(v)
 					if tv > 0:
-						tv = int(ceil(float(tv) * TRUST_GAIN_MULT))
+						tv = int(ceil(float(tv) * trust_gain_mult()))
 					p["trust"] = clampi(int(p.trust) + tv, 0, 100)
 			"all_trust":
 				var atv := int(v)
 				if atv > 0:
-					atv = int(ceil(float(atv) * TRUST_GAIN_MULT))
+					atv = int(ceil(float(atv) * trust_gain_mult()))
 				for cid in state.clients:
 					var pc: Dictionary = state.players[cid]
 					pc["trust"] = clampi(int(pc.trust) + atv, 0, 100)
@@ -560,12 +603,12 @@ func _sign_top_talent() -> String:
 
 # ---------------------------------------------------------------- het kantoor
 # Je kantoorniveau (1..5) bepaalt WELKE spelers je elk seizoen te zien krijgt:
-# de rating-band waaruit de 20 verse kandidaten worden getrokken. Reputatie
+# de rating-band waaruit de verse kandidaten worden getrokken. Reputatie
 # bepaalt NIET meer wie je ziet (dat deed het vroeger via rating_cap_*), maar
 # alléén nog of ze bij je tekenen (zie sign_chance()). Elk niveau heeft een
 # eigen sfeer/beeld zodat de achtergrond-art per niveau kan wisselen.
 const OFFICE_MAX_LEVEL := 5
-const CANDIDATES_PER_SEASON := 20
+const CANDIDATES_PER_SEASON := 8
 const OFFICE_LEVELS := [
 	{"name": "Boven de Snackbar", "avg": 45, "floor": 33, "ceiling": 57},
 	{"name": "De Portacabin",     "avg": 57, "floor": 45, "ceiling": 69},
@@ -841,7 +884,7 @@ func complete_transfer(client_id: String, club_id: String, fee: int, cut: float)
 	var p: Dictionary = state.players[client_id]
 	p["club"] = club_id
 	p["contract"] = 3
-	p["trust"] = clampi(int(p.trust) + int(ceil(8.0 * TRUST_GAIN_MULT)), 0, 100)
+	p["trust"] = clampi(int(p.trust) + int(ceil(8.0 * trust_gain_mult())), 0, 100)
 	var c: Dictionary = state.clubs[club_id]
 	c["relation"] = clampi(int(c.relation) + 5, 0, 100)
 	c["budget"] = maxi(int(c.budget) - fee, 0)
@@ -876,7 +919,7 @@ func extend_contract(client_id: String) -> int:
 	state.money = int(state.money) + tekengeld
 	state.total_fees = int(state.total_fees) + tekengeld
 	p["contract"] = int(p.contract) + 2
-	p["trust"] = clampi(int(p.trust) + int(ceil(5.0 * TRUST_GAIN_MULT)), 0, 100)
+	p["trust"] = clampi(int(p.trust) + int(ceil(5.0 * trust_gain_mult())), 0, 100)
 	return tekengeld
 
 
@@ -931,7 +974,7 @@ func end_of_season() -> Array:
 			state.total_fees = int(state.total_fees) + income
 			pp["club"] = MYSTERY_CLUB_ID
 			pp["contract"] = 3
-			pp["trust"] = clampi(int(pp.trust) + int(ceil(6.0 * TRUST_GAIN_MULT)), 0, 100)
+			pp["trust"] = clampi(int(pp.trust) + int(ceil(6.0 * trust_gain_mult())), 0, 100)
 			lines.append("Voorbereide transfer: %s naar een mysterieuze buitenlandse club — jouw fee €%d." % [pp.name, income])
 			prepared_results.append({"name": str(pp.name), "success": true, "transfer_sum": transfer_sum, "income": income})
 		else:
@@ -945,8 +988,10 @@ func end_of_season() -> Array:
 		var p: Dictionary = state.players[cid]
 		var perf := rng.randi_range(1, 10)
 		# Groei richting (verborgen) potentieel; vanaf 27 is de rek eruit.
+		# Ontwikkeling ~30% sneller dan voorheen (was randi 0..3): spelers
+		# groeien merkbaar vlotter naar hun potentieel toe.
 		if int(p.age) <= 26 and int(p.rating) < int(p.pot):
-			var growth := rng.randi_range(0, 3)
+			var growth := int(round(float(rng.randi_range(0, 3)) * 1.3))
 			if growth > 0:
 				var oud := int(p.rating)
 				p["rating"] = mini(oud + growth, int(p.pot))
@@ -961,13 +1006,16 @@ func end_of_season() -> Array:
 			lines.append("%s had een seizoen om te vergeten." % p.name)
 		p["trust"] = clampi(int(p.trust) + drift, 0, 100)
 		p["age"] = int(p.age) + 1
-		p["contract"] = int(p.contract) - 1
-		if int(p.contract) <= 0 and str(p.club) != "":
-			p["contract"] = 2
-			var tg := int(value(p) * 0.01 * tekengeld_mult())
-			state.money = int(state.money) + tg
-			state.total_fees = int(state.total_fees) + tg
-			lines.append("%s verlengt bij zijn club; tekengeld €%d voor jou." % [p.name, tg])
+		# Alleen een speler mét club heeft een (aflopend) contract dat aftikt —
+		# een clubloze speler kan per definitie geen aflopend contract hebben.
+		if str(p.club) != "":
+			p["contract"] = int(p.contract) - 1
+			if int(p.contract) <= 0:
+				p["contract"] = 2
+				var tg := int(value(p) * 0.01 * tekengeld_mult())
+				state.money = int(state.money) + tg
+				state.total_fees = int(state.total_fees) + tg
+				lines.append("%s verlengt bij zijn club; tekengeld €%d voor jou." % [p.name, tg])
 		if Meta.perk_level("ijzeren_stal") == 0 and rng.randf() < leave_chance(p):
 			leavers.append(cid)
 			lines.append("!! %s VERTREKT naar een andere makelaar. Het vertrouwen was op (%d)." % [p.name, int(p.trust)])

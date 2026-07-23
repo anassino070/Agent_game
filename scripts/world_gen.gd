@@ -74,7 +74,7 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 			"unc": unc,          # onzekerheid; scouting verlaagt dit
 			"scouted": 0,        # aantal keer gescout (geeft tekenkans-bonus)
 			"club": club_id,     # "" = clubloos
-			"contract": rng.randi_range(1, 4),
+			"contract": 0 if club_id == "" else rng.randi_range(1, 4),  # clubloos = geen contract
 			"trust": 50,         # alleen relevant zodra iemand cliënt is
 			"pers": PERS[rng.randi_range(0, 3)],
 		}
@@ -109,7 +109,7 @@ static func make_candidate(rng: RandomNumberGenerator, pid: String, rating: int)
 		"unc": unc,
 		"scouted": 0,
 		"club": club_id,
-		"contract": rng.randi_range(1, 4),
+		"contract": 0 if club_id == "" else rng.randi_range(1, 4),  # clubloos = geen contract
 		"trust": 50,
 		"pers": PERS[rng.randi_range(0, 3)],
 	}

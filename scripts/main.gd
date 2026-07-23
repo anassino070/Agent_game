@@ -29,6 +29,9 @@ var candidates: Array = []         # scouting/tekendoelen dit seizoen
 var approached: Array = []         # al benaderd dit seizoen (één poging p.p.)
 var extended: Array = []           # contract al verlengd dit window
 var flash := ""                    # korte statusmelding bovenin een scherm
+var flash_color = null             # optionele kleur voor de flash (Color of null)
+var scout_sort := "rating"         # sorteersleutel scoutinglijst: "rating" of "age"
+var scout_sort_desc := true        # true = hoog→laag
 
 var nego: Negotiation = null
 var nego_client := ""
@@ -272,11 +275,21 @@ func _player_tooltip(pid: String) -> String:
 	if pid == "" or not Game.state.players.has(pid):
 		return ""
 	var p: Dictionary = Game.state.players[pid]
-	var lo := maxi(Game.estimate(pid) - int(p.unc), int(p.rating))
-	var hi := mini(Game.estimate(pid) + int(p.unc), 95)
-	return "%s — %s, %d jr\nRating %d (potentieel ca. %d–%d)\nVertrouwen %d\n%s, contract %d jr\nWaarde %s" % [
-		str(p.name), str(p.pos), int(p.age), int(p.rating), lo, hi,
-		int(p.trust), Game.club_name(str(p.club)), int(p.contract), eur(Game.value(p)),
+	# Zit iemand in je stal, dan ken je zijn echte potentieel — geen schatting/band
+	# meer, gewoon de exacte waarde. Voor de rest blijft het een geschatte band.
+	var pot_str := ""
+	if pid in Game.state.clients:
+		pot_str = "potentieel %d" % int(p.pot)
+	else:
+		var lo := maxi(Game.estimate(pid) - int(p.unc), int(p.rating))
+		var hi := mini(Game.estimate(pid) + int(p.unc), 95)
+		pot_str = "potentieel ca. %d–%d" % [lo, hi]
+	var club_line := Game.club_name(str(p.club))
+	if str(p.club) != "":
+		club_line += ", contract %d jr" % int(p.contract)
+	return "%s — %s, %d jr\nRating %d (%s)\nVertrouwen %d\n%s\nWaarde %s" % [
+		str(p.name), str(p.pos), int(p.age), int(p.rating), pot_str,
+		int(p.trust), club_line, eur(Game.value(p)),
 	]
 
 
@@ -333,9 +346,10 @@ func _name_row(before: String, pid: String, after: String, size := 24) -> void:
 
 func refresh_header() -> void:
 	var s: Dictionary = Game.state
-	header.text = "Seizoen %d/%d  |  %s  |  🏢 %s  |  Rep %d  |  Schandaal %d  |  Gunsten %d" % [
-		int(s.season), Game.MAX_SEASONS, eur(s.money), Game.office_name(),
+	header.text = "Seizoen %d/%d  |  %s  |  Rep %d  |  Schandaal %d  |  Gunsten %d  |  🏢 Nv.%d %s" % [
+		int(s.season), Game.MAX_SEASONS, eur(s.money),
 		int(s.rep), int(s.scandal), int(s.favors),
+		Game.office_level(), Game.office_name(),
 	]
 	_update_office_background()
 
@@ -362,8 +376,11 @@ func _update_office_background() -> void:
 
 func show_flash() -> void:
 	if flash != "":
-		lbl(">> " + flash, 24)
+		var l := lbl(">> " + flash, 24)
+		if flash_color != null:
+			l.add_theme_color_override("font_color", flash_color as Color)
 		flash = ""
+		flash_color = null
 
 
 # ---------------------------------------------------------------- startscherm
@@ -663,9 +680,12 @@ func show_prep() -> void:
 	lbl("Jouw stal (%d/%d):" % [Game.state.clients.size(), Game.client_cap()], 28)
 	for cid in Game.state.clients:
 		var p: Dictionary = Game.state.players[cid]
-		lbl("• %s (%s, %d jr) — rating %d, vertrouwen %d, %s, contract %d jr, waarde %s" % [
-			p.name, p.pos, int(p.age), int(p.rating), int(p.trust),
-			Game.club_name(str(p.club)), int(p.contract), eur(Game.value(p)),
+		var club_str := Game.club_name(str(p.club))
+		if str(p.club) != "":
+			club_str += ", contract %d jr" % int(p.contract)
+		lbl("• %s (%s, %d jr) — rating %d, potentieel %d, vertrouwen %d, %s, waarde %s" % [
+			p.name, p.pos, int(p.age), int(p.rating), int(p.pot), int(p.trust),
+			club_str, eur(Game.value(p)),
 		], 23)
 	sep()
 	# ---- Het kantoor: niveau, band en upgrade ----
@@ -753,8 +773,8 @@ func show_release() -> void:
 	sep()
 	for cid in Game.state.clients:
 		var p: Dictionary = Game.state.players[cid]
-		lbl("%s (%s, %d jr) — rating %d, vertrouwen %d, waarde %s" % [
-			p.name, p.pos, int(p.age), int(p.rating), int(p.trust), eur(Game.value(p)),
+		lbl("%s (%s, %d jr) — rating %d, potentieel %d, vertrouwen %d, waarde %s" % [
+			p.name, p.pos, int(p.age), int(p.rating), int(p.pot), int(p.trust), eur(Game.value(p)),
 		], 23)
 		btn("Stuur %s weg" % p.name, func(): _release(cid))
 		sep()
@@ -785,26 +805,183 @@ func show_scouting() -> void:
 	lbl("Kantoor niveau %d (%s) brengt spelers tot rating ~%d binnen bereik. Je reputatie (%d) bepaalt of ze tekenen." % [
 		Game.office_level(), Game.office_name(), Game.candidate_ceiling(), int(Game.state.rep),
 	], 20)
-	for pid in candidates:
-		sep()
-		var p: Dictionary = Game.state.players[pid]
-		var est := Game.estimate(pid)
-		var lo := maxi(est - int(p.unc), int(p.rating))
-		var hi := mini(est + int(p.unc), 95)
-		var is_client: bool = pid in Game.state.clients
-		lbl("%s (%s, %d jr) — rating %d, potentieel %d–%d, %s%s" % [
-			p.name, p.pos, int(p.age), int(p.rating), lo, hi,
-			Game.club_name(str(p.club)), "  [CLIËNT]" if is_client else "",
-		], 24)
-		if int(Game.state.scout_points) > 0 and int(p.unc) > 2:
-			btn("Scout (1 punt)", func(): _scout(pid))
-		if not is_client:
-			if approached.has(pid):
-				lbl("Al benaderd dit seizoen — hij wil er even over nadenken.", 20)
-			elif Game.state.clients.size() < Game.client_cap():
-				btn("Benader als cliënt (kans %d%%)" % int(round(Game.sign_chance(pid) * 100)), func(): _try_sign(pid))
+	# Sorteerknoppen — tik nogmaals op dezelfde sleutel om de richting te draaien.
+	var sort_row := HBoxContainer.new()
+	sort_row.add_theme_constant_override("separation", 8)
+	content.add_child(sort_row)
+	var sl := Label.new()
+	sl.text = "Sorteer:"
+	sl.add_theme_font_size_override("font_size", 20)
+	sort_row.add_child(sl)
+	sort_row.add_child(_sort_button("Rating", "rating"))
+	sort_row.add_child(_sort_button("Leeftijd", "age"))
+	for pid in _sorted_candidates():
+		content.add_child(_candidate_card(pid))
 	sep()
 	btn("Naar events →", _goto_events)
+
+
+func _candidate_card(pid: String) -> Control:
+	# Eén speler als kaartje: info links, en rechts twee badges — potentieel
+	# (groene rechthoek, rechtsboven) en rating (blauw vierkant, rechtsonder).
+	var p: Dictionary = Game.state.players[pid]
+	var is_client: bool = pid in Game.state.clients
+	var rating := int(p.rating)
+	# Potentieel: bekende exacte waarde voor cliënten, anders de geschatte band.
+	var pot_text := ""
+	if is_client:
+		pot_text = str(int(p.pot))
+	else:
+		var est := Game.estimate(pid)
+		var lo := maxi(est - int(p.unc), rating)
+		var hi := mini(est + int(p.unc), 95)
+		pot_text = "%d–%d" % [lo, hi]
+
+	var card := PanelContainer.new()
+	var card_style := StyleBoxFlat.new()
+	card_style.bg_color = Color(0.13, 0.13, 0.17, 0.85)
+	card_style.set_corner_radius_all(10)
+	card_style.content_margin_left = 12
+	card_style.content_margin_right = 10
+	card_style.content_margin_top = 8
+	card_style.content_margin_bottom = 8
+	card.add_theme_stylebox_override("panel", card_style)
+
+	var hb := HBoxContainer.new()
+	hb.add_theme_constant_override("separation", 10)
+	card.add_child(hb)
+
+	# --- Links: info + knoppen ---
+	var info := VBoxContainer.new()
+	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	info.add_theme_constant_override("separation", 4)
+	hb.add_child(info)
+
+	var name_lbl := Label.new()
+	name_lbl.text = "%s%s" % [str(p.name), "   [CLIËNT]" if is_client else ""]
+	name_lbl.add_theme_font_size_override("font_size", 24)
+	info.add_child(name_lbl)
+
+	var sub := Label.new()
+	sub.text = "%s, %d jr · %s" % [str(p.pos), int(p.age), Game.club_name(str(p.club))]
+	sub.add_theme_font_size_override("font_size", 18)
+	sub.add_theme_color_override("font_color", Color(0.75, 0.75, 0.78))
+	info.add_child(sub)
+
+	if not is_client and not approached.has(pid):
+		var chance := Label.new()
+		chance.text = "tekenkans %d%%" % int(round(Game.sign_chance(pid) * 100))
+		chance.add_theme_font_size_override("font_size", 18)
+		chance.add_theme_color_override("font_color", Color(0.7, 0.82, 0.95))
+		info.add_child(chance)
+
+	var btn_row := HBoxContainer.new()
+	btn_row.add_theme_constant_override("separation", 8)
+	info.add_child(btn_row)
+	# Scout- én benaderknop verdwijnen zodra je hem dit seizoen hebt benaderd
+	# (afgewezen): dan valt er niets meer te doen tot volgend seizoen.
+	if not is_client and approached.has(pid):
+		var al := Label.new()
+		al.text = "al benaderd dit seizoen"
+		al.add_theme_font_size_override("font_size", 18)
+		al.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
+		btn_row.add_child(al)
+	elif not is_client:
+		if int(Game.state.scout_points) > 0 and int(p.unc) > 2:
+			btn_row.add_child(_mini_btn("Scout", func(): _scout(pid)))
+		if Game.state.clients.size() < Game.client_cap():
+			btn_row.add_child(_mini_btn("Benader", func(): _try_sign(pid)))
+
+	# --- Rechts: badges (potentieel boven, rating onder) ---
+	var badges := VBoxContainer.new()
+	badges.custom_minimum_size = Vector2(96, 0)
+	badges.add_theme_constant_override("separation", 6)
+	hb.add_child(badges)
+	badges.add_child(_stat_badge("POT", pot_text, Color(0.16, 0.55, 0.28), Vector2(96, 52), Control.SIZE_SHRINK_END))
+	var spacer := Control.new()
+	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
+	badges.add_child(spacer)
+	badges.add_child(_stat_badge("RAT", str(rating), Color(0.18, 0.42, 0.78), Vector2(64, 64), Control.SIZE_SHRINK_END))
+
+	return card
+
+
+func _stat_badge(caption: String, value: String, bg: Color, min_size: Vector2, halign := Control.SIZE_SHRINK_CENTER) -> PanelContainer:
+	var pc := PanelContainer.new()
+	pc.custom_minimum_size = min_size
+	pc.size_flags_horizontal = halign
+	var sb := StyleBoxFlat.new()
+	sb.bg_color = bg
+	sb.set_corner_radius_all(8)
+	sb.content_margin_left = 6
+	sb.content_margin_right = 6
+	sb.content_margin_top = 3
+	sb.content_margin_bottom = 3
+	pc.add_theme_stylebox_override("panel", sb)
+	var vb := VBoxContainer.new()
+	vb.add_theme_constant_override("separation", 0)
+	pc.add_child(vb)
+	var cap := Label.new()
+	cap.text = caption
+	cap.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	cap.add_theme_font_size_override("font_size", 13)
+	cap.add_theme_color_override("font_color", Color(1, 1, 1, 0.7))
+	vb.add_child(cap)
+	var val := Label.new()
+	val.text = value
+	val.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	val.add_theme_font_size_override("font_size", 26)
+	val.add_theme_color_override("font_color", Color(1, 1, 1))
+	vb.add_child(val)
+	return pc
+
+
+func _sort_button(label: String, key: String) -> Button:
+	var b := Button.new()
+	var arrow := ""
+	if scout_sort == key:
+		arrow = "  ↓" if scout_sort_desc else "  ↑"
+	b.text = label + arrow
+	b.add_theme_font_size_override("font_size", 20)
+	b.custom_minimum_size = Vector2(0, 48)
+	b.pressed.connect(func(): _toggle_sort(key))
+	return b
+
+
+func _toggle_sort(key: String) -> void:
+	if scout_sort == key:
+		scout_sort_desc = not scout_sort_desc
+	else:
+		scout_sort = key
+		scout_sort_desc = true
+	show_scouting()
+
+
+func _sorted_candidates() -> Array:
+	var arr: Array = candidates.duplicate()
+	var key := scout_sort
+	var desc := scout_sort_desc
+	arr.sort_custom(func(a, b):
+		var pa: Dictionary = Game.state.players[a]
+		var pb: Dictionary = Game.state.players[b]
+		var va := int(pa.rating) if key == "rating" else int(pa.age)
+		var vb := int(pb.rating) if key == "rating" else int(pb.age)
+		if desc:
+			return va > vb
+		return va < vb
+	)
+	return arr
+
+
+func _mini_btn(text: String, cb: Callable, enabled := true) -> Button:
+	# Compacte knop (voor de scoutinglijst) — kleiner dan de standaard btn().
+	var b := Button.new()
+	b.text = text
+	b.disabled = not enabled
+	b.add_theme_font_size_override("font_size", 20)
+	b.custom_minimum_size = Vector2(130, 46)
+	b.pressed.connect(cb)
+	return b
 
 
 func _scout(pid: String) -> void:
@@ -815,11 +992,20 @@ func _scout(pid: String) -> void:
 func _try_sign(pid: String) -> void:
 	var p: Dictionary = Game.state.players[pid]
 	approached.append(pid)
-	if Game.attempt_sign(pid):
+	var signed := Game.attempt_sign(pid)
+	if signed:
 		flash = "%s tekent bij jou!" % p.name
+		flash_color = Color(0.35, 0.9, 0.4)
 	else:
 		flash = "%s wijst je af. 'Ik hoor goede verhalen over een ander kantoor.'" % p.name
+		flash_color = Color(1.0, 0.5, 0.5)
 	show_scouting()
+	# Feedback ná het herbouwen van het scherm (confetti/puff hangen aan de
+	# root, niet aan `content`, dus ze overleven de clear() in show_scouting()).
+	if signed:
+		_confetti("✔ %s tekent!" % p.name, Color(0.35, 0.9, 0.4))
+	else:
+		_small_negative_puff("✗ afgewezen")
 
 
 # ---------------------------------------------------------------- fase 3: events
@@ -1934,14 +2120,18 @@ func _play_favor_halve() -> void:
 const CONFETTI_EMOJI := ["🎉", "✨", "🎊", "⭐", "💰"]
 
 func _confetti_burst(combo_name: String) -> void:
+	_confetti("★ COMBO — %s! ★" % combo_name, Color(1.0, 0.85, 0.2))
+
+
+func _confetti(banner_text: String, banner_color: Color) -> void:
 	var vp := get_viewport_rect().size
 	var center := vp / 2.0
 
 	var banner := Label.new()
-	banner.text = "★ COMBO — %s! ★" % combo_name
+	banner.text = banner_text
 	banner.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 	banner.add_theme_font_size_override("font_size", 36)
-	banner.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+	banner.add_theme_color_override("font_color", banner_color)
 	banner.position = Vector2(0, vp.y * 0.30)
 	banner.size = Vector2(vp.x, 60)
 	banner.z_index = 100
@@ -1976,6 +2166,29 @@ func _confetti_burst(combo_name: String) -> void:
 		tw.parallel().tween_property(p, "rotation", burst_rng.randf_range(-4.0, 4.0), dur)
 		tw.parallel().tween_property(p, "modulate:a", 0.0, dur * 0.7).set_delay(dur * 0.3)
 		tw.tween_callback(p.queue_free)
+
+
+func _small_negative_puff(text: String) -> void:
+	# Klein negatief feedbackje (bijv. bij een afwijzing): een rood tekstje dat
+	# kort opkomt, iets omhoog zakt en wegvaagt. Bewust bescheiden — geen
+	# schermvullende teleurstelling.
+	var vp := get_viewport_rect().size
+	var l := Label.new()
+	l.text = text
+	l.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+	l.add_theme_font_size_override("font_size", 30)
+	l.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
+	l.position = Vector2(0, vp.y * 0.36)
+	l.size = Vector2(vp.x, 40)
+	l.z_index = 100
+	l.modulate.a = 0.0
+	add_child(l)
+	var tw := create_tween()
+	tw.tween_property(l, "modulate:a", 1.0, 0.1)
+	tw.parallel().tween_property(l, "position:y", vp.y * 0.32, 0.1)
+	tw.tween_interval(0.5)
+	tw.tween_property(l, "modulate:a", 0.0, 0.4)
+	tw.tween_callback(l.queue_free)
 
 
 func _close_nego(deal: bool) -> void:
@@ -2058,7 +2271,7 @@ func _show_wrapup_report(report: Array) -> void:
 # ---------------------------------------------------------------- de shop
 
 func _enter_shop() -> void:
-	shop_offers = Game.shop_offer(Game.rng, 2)
+	shop_offers = Game.shop_offer(Game.rng, 3)
 	show_shop()
 
 
@@ -2066,25 +2279,40 @@ func show_shop() -> void:
 	refresh_header()
 	clear()
 	lbl("🪙 DE SHOP", 34)
-	lbl("Elke seizoenswissel liggen hier 2 willekeurige upgrades voor de rest van deze run. Koop wat je wilt, of loop gewoon door — niets verplicht.", 22)
+	lbl("Elke seizoenswissel liggen hier 3 willekeurige upgrades voor de rest van deze run. Koop wat je wilt, reroll voor een andere set, of loop gewoon door — niets verplicht.", 22)
 	show_flash()
 	sep()
 	if shop_offers.is_empty():
 		lbl("Niets (meer) te koop deze keer.", 24)
 	for id in shop_offers:
 		var up: Dictionary = Game.SHOP_UPGRADES[id]
-		lbl("%s — %s" % [str(up.name), str(up.desc)], 23)
+		var title := lbl(str(up.name), 26)
+		title.add_theme_color_override("font_color", Color(0.95, 0.85, 0.4))
+		lbl(str(up.desc), 21)
 		if Game.has_shop(id):
 			lbl("✔ Gekocht", 20)
 		else:
 			btn("Kopen (%s)" % eur(Game.shop_price(id)), func(): _buy_shop(id), Game.can_buy_shop(id))
 		sep()
+	btn("🎲 Reroll — andere upgrades (%s)" % eur(Game.shop_reroll_cost()), _reroll_shop, Game.can_reroll_shop())
+	sep()
 	btn("Doorgaan naar volgend seizoen →", show_prep)
 
 
 func _buy_shop(id: String) -> void:
 	if Game.buy_shop_upgrade(id):
 		flash = "%s gekocht!" % str(Game.SHOP_UPGRADES[id].name)
+	show_shop()
+
+
+func _reroll_shop() -> void:
+	if Game.pay_shop_reroll():
+		# Sluit de huidige set uit, zodat een reroll echt iets anders geeft
+		# (tenzij er te weinig andere upgrades over zijn).
+		shop_offers = Game.shop_offer(Game.rng, 3, shop_offers)
+		flash = "Nieuwe upgrades ingeladen."
+	else:
+		flash = "Te weinig geld om te rerollen."
 	show_shop()
 
 
