@@ -13,3 +13,21 @@ To do list:
 Events:
 -onder druk gezet: geen incentive om zelf te regelen
 -de petitie  heeft alleen positieve eerste keuze, geen nadelen
+
+
+
+-maak het duidelijk bij een event waarbij je een speler kan overnemen, aangezien iemand die alleen de opties leest, niet doorheeft dat je een speler kan winnen. 
+-bedragen van events en minigames moeten op zelfde manier geindexeerd worden als kantoorkosten stijgingen per seizoen
+-vertrouwen heeft nog te weinig impact
+- het is heel makkelijk om vertrouwen en reputatie te winnen, maak het spel moeilijker. Mogelijk door positieve rewards kleiner te maken dan negateive gevolgen. seizoen 5 heb ik al 100 rep
+-bied oorlog lijkt beetje onzinnig. gewoon knopjes drukken tot je bij einde komt
+
+
+-te weinig upgrades, na 6 seizoenen ben je er al doorheen. Maak ze ten eerste een stuk duurder en maak er veel meer, want nu klik je alles gewoon aan, omdat je genoeg geld hebt
+-scouting geeft geen spelers meer als reputatie hoog is. Dat hoort niet. Het aantal mogelijke spelers mag varieren, maar het moet niet vastlopen op 0 elk seizoen. 
+-bij succes in kaapevent: geef onderaan het scherm info over deze nieuwe speler,w ant ik heb niks aan alleen die naam.
+-het lijkt alsof spelers van kaapevents 58 rated zijn. als dat niet toevallig is, moet je dat fixen en laten scalen met reputatie, maar maak het nog beter, aangezien het uitzonderlijke spelers zijn
+-maak progressie van combos duidelijker:"als je op 1 zit = geel, laatste = groen. Bij combo van 3= geel, rood, groen, bij combo van 4, geel, blauw, rood, groen. maak variabel, zodat deze logica werkt op mogelijke nieuwe combos
+
+
+-Vanaf dag 1 heb je elk seizoen 20 spelers te zien van allerlei nieveaus(van amateur tot best mogelijk van kantoor), maar kans van tekenen is gebonden aan reputatie. Elk seizoen kan je je kantoor upgraden, met een vast bedrag van 100.000*({niveau}^2). je bent bij niveau 1 en beste is 5. gemiddelde spelerniveaus per niveau is 45, 57, 69, 78, 86. Geef elk niveau een leuke naam. Dus niet "Kantoor niveau 1", maar "Home Office" ofzo, geef voor andere niveaus suggesties. Ik ga er art voor maken, zodat de hele achterggrond art veranderd per niveau, dus let op dat de namen een bepaalde vibe/beeld hebben wat ik kan visualiseren

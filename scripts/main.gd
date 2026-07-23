@@ -555,7 +555,7 @@ func _buy_perk(id: String) -> void:
 
 
 func _refresh_inf_btn() -> void:
-	inf_btn.text = "∞ ×%s\n+0,1%%\nkoop: %d pt" % [
+	inf_btn.text = "∞ ×%s\n+1%%\nkoop: %d pt" % [
 		("%.3f" % Meta.inf_multiplier()).replace(".", ","), Meta.INF_COST,
 	]
 	inf_btn.disabled = int(Meta.state.legacy_points) < Meta.INF_COST
@@ -853,6 +853,12 @@ func _resolve(ev: Dictionary, opt: Dictionary) -> void:
 	_show_effect_lines(used, cname)
 	for n in notes:
 		lbl(">> " + str(n), 24)
+	if Game.last_new_client_id != "":
+		# Een kaap-event leverde een nieuwe cliënt op — toon zijn/haar echte
+		# stats onderaan i.p.v. alleen de naam in de meldingsregel hierboven.
+		_show_player_info(Game.last_new_client_id)
+	elif str(ev.client_id) != "":
+		_show_player_info(str(ev.client_id))
 	sep()
 	btn("Verder →", _next_event)
 
@@ -1264,6 +1270,8 @@ func show_poker() -> void:
 		_show_effect_lines(o.effects)
 		for n in poker_notes:
 			lbl(">> " + str(n), 24)
+		if Game.last_new_client_id != "":
+			_show_player_info(Game.last_new_client_id)
 		btn("Verder →", _finish_poker)
 	else:
 		btn("Meegaan" if poker.to_call > 0 else "Checken", func(): _play_poker("meegaan"))
@@ -1756,28 +1764,64 @@ func show_nego() -> void:
 		for combo in combo_list:
 			var done: bool = str(combo.id) in nego.combos_done
 			var progress := nego.combo_progress(combo)
+			var reached: int = combo.pattern.size() if done else progress
 			var req := ""
 			if combo.has("req_pers"):
 				req = "  [vereist bekende %s]" % str(combo.req_pers)
-			var mark := "·"
-			var suffix := ""
-			var color := Color(0.75, 0.75, 0.75)  # neutraal grijs
-			if done:
-				mark = "✔"
-				color = Color(0.35, 0.9, 0.4)       # groen: voltooid
-			elif progress > 0:
-				mark = "▸"
-				suffix = "  — OP KOERS (%d/%d)!" % [progress, combo.pattern.size()]
-				color = Color(1.0, 0.78, 0.15)      # goud: op koers
-			var l := lbl("%s %s: %s  (+%d)%s%s" % [
-				mark, str(combo.name), nego.combo_pattern_text(combo),
-				int(combo.bonus), req, suffix,
-			], 19)
-			l.add_theme_color_override("font_color", color)
-			if progress > 0 and not done:
-				l.add_theme_font_size_override("font_size", 21)
+			var mark := "✔" if done else ("▸" if progress > 0 else "·")
+			var header_color := Color(0.35, 0.9, 0.4) if done else (Color(1.0, 0.78, 0.15) if progress > 0 else Color(0.75, 0.75, 0.75))
+			var header := lbl("%s %s (+%d)%s" % [mark, str(combo.name), int(combo.bonus), req], 19)
+			header.add_theme_color_override("font_color", header_color)
+			_show_combo_pattern_row(combo.pattern, reached)
 
 		content = real_content
+
+
+# Kleurenschema voor combo-stappen: stap 1 is altijd geel ("net begonnen"),
+# de LAATSTE stap is altijd groen ("klaar"), en de stappen ertussen worden
+# van AchterAF (vanaf het einde) ingevuld met dit palet — zo werkt de
+# kleuring vanzelf voor een combo van willekeurige lengte:
+#   lengte 2 → [geel, groen]
+#   lengte 3 → [geel, rood, groen]
+#   lengte 4 → [geel, blauw, rood, groen]
+const COMBO_STEP_FIRST := Color(0.95, 0.85, 0.15)    # geel: stap 1
+const COMBO_STEP_FROM_END := [
+	Color(0.35, 0.9, 0.4),     # laatste stap: groen
+	Color(0.95, 0.3, 0.3),     # voorlaatste stap: rood
+	Color(0.35, 0.55, 0.95),   # derde van achteren: blauw
+	Color(0.75, 0.4, 0.95),    # vierde van achteren: paars (toekomstige langere combo's)
+	Color(0.95, 0.6, 0.2),     # vijfde van achteren: oranje
+]
+const COMBO_STEP_UNREACHED := Color(0.5, 0.5, 0.5)   # nog niet bereikt: grijs
+
+
+func _combo_step_color(step_idx: int, total_steps: int) -> Color:
+	if step_idx == 0 and total_steps > 1:
+		return COMBO_STEP_FIRST
+	var distance_from_end := total_steps - 1 - step_idx
+	if distance_from_end < COMBO_STEP_FROM_END.size():
+		return COMBO_STEP_FROM_END[distance_from_end]
+	return Color(0.85, 0.85, 0.85)
+
+
+func _show_combo_pattern_row(pattern: Array, reached: int) -> void:
+	var row := HFlowContainer.new()
+	row.add_theme_constant_override("h_separation", 4)
+	row.add_theme_constant_override("v_separation", 2)
+	content.add_child(row)
+	for i in range(pattern.size()):
+		var step_lbl := Label.new()
+		step_lbl.text = str(Negotiation.MOVE_LABELS.get(pattern[i], pattern[i]))
+		step_lbl.add_theme_font_size_override("font_size", 18)
+		var col := _combo_step_color(i, pattern.size()) if i < reached else COMBO_STEP_UNREACHED
+		step_lbl.add_theme_color_override("font_color", col)
+		row.add_child(step_lbl)
+		if i < pattern.size() - 1:
+			var arrow := Label.new()
+			arrow.text = "→"
+			arrow.add_theme_font_size_override("font_size", 18)
+			arrow.add_theme_color_override("font_color", COMBO_STEP_UNREACHED)
+			row.add_child(arrow)
 
 
 func _play_tactic(t: Dictionary) -> void:

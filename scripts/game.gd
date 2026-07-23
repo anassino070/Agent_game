@@ -34,6 +34,11 @@ const RIVAL_NAMES := ["Bureau Marchetti", "Star XI Management", "Agentschap De W
 
 var rng := RandomNumberGenerator.new()
 var state: Dictionary = {}
+# UI-hulpvar: pid van de speler die de laatste apply_effects()-aanroep erbij
+# heeft geworven (new_client/new_top_client), leeg als dat niet gebeurde.
+# Zo kan main.gd na afloop het infopaneel op de NIEUWE cliënt richten i.p.v.
+# alleen de kale naam in een meldingsregel te tonen.
+var last_new_client_id := ""
 
 
 # ---------------------------------------------------------------- run setup
@@ -119,51 +124,108 @@ func bank_deposits_list() -> Array:
 
 
 # ---------------------------------------------------------------- de shop
-# Tien eenmalige upgrades voor déze run (géén legacy-perks — die verdwijnen
+# 24 eenmalige upgrades voor déze run (géén legacy-perks — die verdwijnen
 # aan het einde van de run net als de rest van Game.state). Elk seizoen na
 # de afsluiting kies je uit 2 willekeurige, nog niet gekochte upgrades.
 # Prijzen schalen mee met event_money_scale() zodat ze de hele run relevant
-# blijven.
+# blijven. Fors duurder dan de oorspronkelijke 10 (en met 14 extra opties)
+# zodat je tegen het einde van de run niet allang alles hebt kunnen kopen.
 const SHOP_UPGRADES := {
 	"groter_kantoor": {
-		"name": "Groter kantoor", "price": 15000,
+		"name": "Groter kantoor", "price": 36000,
 		"desc": "+1 stalplek voor de rest van deze run.",
 	},
 	"pr_bureau": {
-		"name": "PR-bureau", "price": 12000,
+		"name": "PR-bureau", "price": 28000,
 		"desc": "+2 extra schandaalverval per seizoen, de rest van de run.",
 	},
 	"jeugdscout": {
-		"name": "Eigen jeugdscout", "price": 18000,
+		"name": "Eigen jeugdscout", "price": 42000,
 		"desc": "+1 scoutpunt per seizoen, de rest van de run.",
 	},
 	"juridisch_adviseur": {
-		"name": "Juridisch adviseur", "price": 14000,
+		"name": "Juridisch adviseur", "price": 32000,
 		"desc": "Schandaal-stijgingen 1 lager (minimaal 1), de rest van de run.",
 	},
 	"mediatrainer_stal": {
-		"name": "Media-trainer voor je stal", "price": 10000,
+		"name": "Media-trainer voor je stal", "price": 24000,
 		"desc": "Eenmalig: +15 vertrouwen bij al je huidige cliënten.",
 	},
 	"netwerkdiner": {
-		"name": "Netwerkdiner-abonnement", "price": 20000,
+		"name": "Netwerkdiner-abonnement", "price": 46000,
 		"desc": "+1 gunst per seizoen, de rest van de run.",
 	},
 	"kantoorrenovatie": {
-		"name": "Kantoorrenovatie", "price": 16000,
+		"name": "Kantoorrenovatie", "price": 38000,
 		"desc": "Eenmalig +8 reputatie, plus +3 op je rating-plafonds voor de rest van de run.",
 	},
 	"data_analytics": {
-		"name": "Data-analytics abonnement", "price": 17000,
+		"name": "Data-analytics abonnement", "price": 38000,
 		"desc": "Scouten verlaagt de onzekerheid 2 extra, de rest van de run.",
 	},
 	"noodfonds": {
-		"name": "Noodfonds (lifeline)", "price": 25000,
+		"name": "Noodfonds (lifeline)", "price": 52000,
 		"desc": "Eén keer per run: kom je onder €0, dan reset je saldo naar €0 en ga je door.",
 	},
 	"onderhandelcoach": {
-		"name": "Onderhandelaar-coach", "price": 15000,
+		"name": "Onderhandelaar-coach", "price": 34000,
 		"desc": "+3% slagingskans op alle onderhandeltactieken, de rest van de run.",
+	},
+	"veiligheidsnet": {
+		"name": "Veiligheidsnet", "price": 34000,
+		"desc": "Rivalen kapen je cliënten merkbaar minder vaak weg, de rest van de run.",
+	},
+	"psycholoog": {
+		"name": "Sportpsycholoog", "price": 30000,
+		"desc": "Vertrekkans van je cliënten daalt (alsof hun vertrouwen 8 hoger is), de rest van de run.",
+	},
+	"belastingadviseur": {
+		"name": "Fiscalist", "price": 36000,
+		"desc": "+2% fee-percentage op elke transfer, de rest van de run.",
+	},
+	"breed_scoutingnetwerk": {
+		"name": "Breed scoutingnetwerk", "price": 34000,
+		"desc": "Bredere kandidatenband bij scouten, de rest van de run.",
+	},
+	"pr_strategie": {
+		"name": "Reputatiebeheerder", "price": 34000,
+		"desc": "Je reputatie zakt niet meer vanzelf terug richting de basislijn, de rest van de run.",
+	},
+	"investeringsfonds": {
+		"name": "Investeringsfonds", "price": 30000,
+		"desc": "Stortingen bij De Bank keren nog beter uit, de rest van de run.",
+	},
+	"clubcontacten": {
+		"name": "Clubcontactenboek", "price": 40000,
+		"desc": "Clubbudgetten groeien sneller per seizoen, de rest van de run.",
+	},
+	"risicomanager": {
+		"name": "Risicomanager", "price": 30000,
+		"desc": "Schandaal kan niet meer boven de 80 uitkomen, de rest van de run.",
+	},
+	"contractenspecialist": {
+		"name": "Contractenspecialist", "price": 32000,
+		"desc": "+30% tekengeld bij elke contractverlenging, de rest van de run.",
+	},
+	"nog_groter_kantoor": {
+		"name": "Nog groter kantoor", "price": 44000,
+		"desc": "Nog eens +1 stalplek voor de rest van deze run (stapelt met Groter kantoor).",
+	},
+	"scoutingbudget": {
+		"name": "Extra scoutingbudget", "price": 22000,
+		"desc": "Eenmalig: +3 scoutpunten.",
+	},
+	"pr_campagne": {
+		"name": "PR-campagne", "price": 24000,
+		"desc": "Eenmalig: +10 reputatie.",
+	},
+	"clubarts_netwerk": {
+		"name": "Clubarts-netwerk", "price": 26000,
+		"desc": "Eenmalig: -15 schandaal.",
+	},
+	"vip_netwerk": {
+		"name": "VIP-netwerkclub", "price": 24000,
+		"desc": "Eenmalig: +2 gunsten.",
 	},
 }
 
@@ -200,6 +262,14 @@ func buy_shop_upgrade(id: String) -> bool:
 				p["trust"] = clampi(int(p.trust) + 15, 0, 100)
 		"kantoorrenovatie":
 			state.rep = clampi(int(state.rep) + 8, 0, 100)
+		"scoutingbudget":
+			state.scout_points = int(state.scout_points) + 3
+		"pr_campagne":
+			state.rep = clampi(int(state.rep) + 10, 0, 100)
+		"clubarts_netwerk":
+			state.scandal = maxi(int(state.scandal) - 15, 0)
+		"vip_netwerk":
+			state.favors = int(state.favors) + 2
 	return true
 
 
@@ -258,12 +328,15 @@ func scout_points_per_season() -> int:
 
 
 func client_cap() -> int:
-	return CLIENT_CAP + Meta.perk_bonus("kantoor") + (1 if has_shop("groter_kantoor") else 0)
+	return CLIENT_CAP + Meta.perk_bonus("kantoor") + (1 if has_shop("groter_kantoor") else 0) + (1 if has_shop("nog_groter_kantoor") else 0)
 
 
 func fee_cut() -> float:
 	# Commissiekunst-perk: +0,2% fee per niveau (value staat in tienden van %).
-	return FEE_CUT + float(Meta.perk_bonus("commissie")) / 1000.0
+	var c := FEE_CUT + float(Meta.perk_bonus("commissie")) / 1000.0
+	if has_shop("belastingadviseur"):
+		c += 0.02
+	return c
 
 
 func poach_chance(p: Dictionary) -> float:
@@ -274,6 +347,8 @@ func poach_chance(p: Dictionary) -> float:
 		return 0.0
 	var c := 0.03 + (float(p.rating) - 50.0) * 0.005 - (float(p.trust) - 50.0) * 0.006
 	c -= float(Meta.perk_bonus("binding")) * 0.01
+	if has_shop("veiligheidsnet"):
+		c -= 0.05
 	return clampf(c, 0.0, 0.35)
 
 
@@ -281,6 +356,8 @@ func leave_chance(p: Dictionary) -> float:
 	# Doorlopende curve i.p.v. een harde knip: onder LEAVE_SAFE_TRUST loopt
 	# het vertrekrisico lineair op naarmate vertrouwen lager wordt.
 	var trust := float(p.trust) + float(Meta.perk_bonus("empathie"))
+	if has_shop("psycholoog"):
+		trust += 8.0
 	var c := (LEAVE_SAFE_TRUST - trust) * LEAVE_SLOPE
 	return clampf(c, 0.0, LEAVE_CHANCE_MAX)
 
@@ -339,6 +416,7 @@ func scale_money_effects(effects: Dictionary) -> Dictionary:
 func apply_effects(effects: Dictionary, client_id: String = "") -> Array:
 	# Geeft extra meldingsregels terug (bijv. wie zich bij je stal voegt).
 	var notes: Array = []
+	last_new_client_id = ""
 	for key in effects:
 		var v = effects[key]
 		match key:
@@ -358,7 +436,8 @@ func apply_effects(effects: Dictionary, client_id: String = "") -> Array:
 					if has_shop("juridisch_adviseur"):
 						reduction += 1
 					sv = maxi(sv - reduction, 1)
-				state.scandal = clampi(int(state.scandal) + sv, 0, 100)
+				var scandal_cap := 80 if has_shop("risicomanager") else 100
+				state.scandal = clampi(int(state.scandal) + sv, 0, scandal_cap)
 			"favors":
 				state.favors = maxi(int(state.favors) + int(v), 0)
 			"scout_points":
@@ -393,32 +472,66 @@ func apply_effects(effects: Dictionary, client_id: String = "") -> Array:
 	return notes
 
 
+func _best_of_sample(pool: Array, sample_size: int) -> String:
+	# Kiest niet zomaar willekeurig uit de pool, maar de BESTE (hoogste
+	# rating) uit een kleine willekeurige steekproef zonder teruglegging —
+	# zodat kaap-events stelselmatig naar de bovenkant van de pool trekken
+	# i.p.v. een gemiddelde uitkomst op te leveren.
+	var work: Array = pool.duplicate()
+	var n := mini(sample_size, work.size())
+	var best := ""
+	for i in range(n):
+		var idx := rng.randi_range(0, work.size() - 1)
+		var candidate: String = work[idx]
+		work.remove_at(idx)
+		if best == "" or int(state.players[candidate].rating) > int(state.players[best].rating):
+			best = candidate
+	return best
+
+
 func _sign_event_talent() -> String:
-	# Voegt een vrij talent toe aan de stal (voor events als 'poachen').
+	# Voegt een vrij talent toe aan de stal (voor events als 'poachen'). De
+	# ondergrens schaalt mee met reputatie — maar wordt geclampt op de
+	# daadwerkelijk hoogst beschikbare rating in de pool, zodat een hoge
+	# reputatie nooit tot een lege pool (en dus altijd hetzelfde ~58-rating
+	# resultaat, of erger: niemand) leidt. Best-of-3 boven op die vloer maakt
+	# het resultaat ook echt "uitzonderlijk" i.p.v. een doorsnee scoutvondst.
 	if state.clients.size() >= client_cap():
 		return ""
 	var pool: Array = []
+	var max_rating := 0
 	for pid in state.players:
 		if pid in state.clients:
 			continue
 		var p: Dictionary = state.players[pid]
-		if int(p.age) <= 24 and int(p.rating) >= 58:
+		if int(p.age) <= 26:
 			pool.append(pid)
+			max_rating = maxi(max_rating, int(p.rating))
 	if pool.is_empty():
 		for pid in state.players:
 			if not (pid in state.clients):
 				pool.append(pid)
+				max_rating = maxi(max_rating, int(state.players[pid].rating))
 	if pool.is_empty():
 		return ""
-	var pick: String = pool[rng.randi_range(0, pool.size() - 1)]
+	var min_rating: int = mini(58 + int(state.rep) / 3, max_rating)
+	var filtered: Array = []
+	for pid in pool:
+		if int(state.players[pid].rating) >= min_rating:
+			filtered.append(pid)
+	if filtered.is_empty():
+		filtered = pool
+	var pick := _best_of_sample(filtered, 3)
 	_make_client(pick, 60)
+	last_new_client_id = pick
 	return str(state.players[pick].name)
 
 
 func _sign_top_talent() -> String:
 	# Net als _sign_event_talent(), maar gericht op een échte topper (voor
 	# events als 'topspeler_kaap') — met soepele terugvalopties zodat het
-	# altijd wel iemand oplevert.
+	# altijd wel iemand oplevert, en ook hier best-of-3 zodat je niet zomaar
+	# de zwakste topper uit de pool treft.
 	if state.clients.size() >= client_cap():
 		return ""
 	var pool: Array = []
@@ -436,8 +549,9 @@ func _sign_top_talent() -> String:
 				pool.append(pid)
 	if pool.is_empty():
 		return _sign_event_talent()
-	var pick: String = pool[rng.randi_range(0, pool.size() - 1)]
+	var pick := _best_of_sample(pool, 3)
 	_make_client(pick, 55)
+	last_new_client_id = pick
 	return str(state.players[pick].name)
 
 
@@ -464,20 +578,42 @@ func gen_candidates() -> Array:
 	# ondergrens) — anders blijft de kandidatenpool numeriek gedomineerd
 	# door de vele laag-gerateerde spelers en verandert het gemiddelde
 	# nauwelijks, ook al stijgt het plafond zelf wel degelijk.
-	var y_cap := rating_cap_young()
-	var y_floor := maxi(45, y_cap - CANDIDATE_WINDOW)
-	var o_cap := rating_cap_older()
-	var o_floor := maxi(50, o_cap - CANDIDATE_WINDOW)
-	var young: Array = []
-	var older: Array = []
+	#
+	# Het plafond wordt hier eerst geclampt op de daadwerkelijk hoogst
+	# beschikbare rating in de leeftijdscategorie, en de vloer mag het
+	# (geclampte) plafond nooit overschrijden — bij hoge reputatie/seizoen
+	# schoof de vloer anders de lucht in tot ver boven wat er in de wereld
+	# bestaat, met een lege band (en dus 0 kandidaten) als gevolg. Zo mag de
+	# poolgrootte nog steeds variëren, maar loopt hij nooit meer vast op 0.
+	var window := CANDIDATE_WINDOW + (8 if has_shop("breed_scoutingnetwerk") else 0)
+	var young_pool: Array = []
+	var older_pool: Array = []
+	var young_max := 0
+	var older_max := 0
 	for pid in state.players:
 		if pid in state.clients:
 			continue
 		var p: Dictionary = state.players[pid]
 		var r := int(p.rating)
-		if int(p.age) <= 22 and r >= y_floor and r <= y_cap:
+		if int(p.age) <= 22:
+			young_pool.append(pid)
+			young_max = maxi(young_max, r)
+		elif int(p.age) >= 23 and int(p.age) <= 30:
+			older_pool.append(pid)
+			older_max = maxi(older_max, r)
+	var y_cap := mini(rating_cap_young(), young_max)
+	var y_floor := mini(maxi(45, y_cap - window), y_cap)
+	var o_cap := mini(rating_cap_older(), older_max)
+	var o_floor := mini(maxi(50, o_cap - window), o_cap)
+	var young: Array = []
+	var older: Array = []
+	for pid in young_pool:
+		var r := int(state.players[pid].rating)
+		if r >= y_floor and r <= y_cap:
 			young.append(pid)
-		elif int(p.age) >= 23 and int(p.age) <= 30 and r >= o_floor and r <= o_cap:
+	for pid in older_pool:
+		var r := int(state.players[pid].rating)
+		if r >= o_floor and r <= o_cap:
 			older.append(pid)
 	var count := 4 + Meta.perk_level("extra_kandidaat")
 	var out: Array = []
@@ -486,6 +622,14 @@ func gen_candidates() -> Array:
 	# Vul aan als een pool (bijna) leeg was of het Brede netwerk-perk actief is.
 	var rest: Array = young + older
 	_take_random(rest, count - out.size(), out)
+	if out.is_empty():
+		# Absolute laatste redmiddel (extreem kleine of uitgeputte wereld):
+		# pak gewoon wie er nog vrij is, in plaats van niemand.
+		var any_free: Array = []
+		for pid in state.players:
+			if not (pid in state.clients):
+				any_free.append(pid)
+		_take_random(any_free, count, out)
 	return out
 
 
@@ -695,7 +839,8 @@ func extend_mult(p: Dictionary) -> float:
 
 func extend_contract(client_id: String) -> int:
 	var p: Dictionary = state.players[client_id]
-	var tekengeld := int(value(p) * 0.02 * tekengeld_mult() * extend_mult(p))
+	var coach_bonus := 1.3 if has_shop("contractenspecialist") else 1.0
+	var tekengeld := int(value(p) * 0.02 * tekengeld_mult() * extend_mult(p) * coach_bonus)
 	state.money = int(state.money) + tekengeld
 	state.total_fees = int(state.total_fees) + tekengeld
 	p["contract"] = int(p.contract) + 2
@@ -720,9 +865,10 @@ func end_of_season() -> Array:
 	# terwijl spelerswaarde via ontwikkeling en value() flink doorgroeit.
 	# Zonder dit kan een goed ontwikkelde cliënt tegen seizoen 10-12 letterlijk
 	# duurder zijn dan élke club zich kan veroorloven — nul interesse, altijd.
+	var club_growth := CLUB_BUDGET_GROWTH + (0.05 if has_shop("clubcontacten") else 0.0)
 	for cid in state.clubs:
 		var cl: Dictionary = state.clubs[cid]
-		cl["budget"] = int(float(cl.budget) * (1.0 + CLUB_BUDGET_GROWTH))
+		cl["budget"] = int(float(cl.budget) * (1.0 + club_growth))
 
 	# De bank: rijpe stortingen keren verdubbeld uit; de rest tikt een jaar af.
 	# (get() met fallback: oudere saves van vóór De Bank kennen dit veld nog niet.)
@@ -730,7 +876,8 @@ func end_of_season() -> Array:
 	for d in state.get("bank_deposits", []):
 		var seasons_left := int(d.seasons_left) - 1
 		if seasons_left <= 0:
-			var payout := int(round(float(d.amount) * BANK_MULTIPLIER))
+			var bank_mult := BANK_MULTIPLIER + (0.3 if has_shop("investeringsfonds") else 0.0)
+			var payout := int(round(float(d.amount) * bank_mult))
 			state.money = int(state.money) + payout
 			lines.append("De bank keert uit: je storting van €%d wordt €%d." % [int(d.amount), payout])
 		else:
@@ -808,7 +955,7 @@ func end_of_season() -> Array:
 	# Reputatie zakt licht terug richting een neutrale basis als je boven
 	# die basis zit — anders groei je één keer naar 100 en blijft het daar
 	# hangen zonder dat je nog iets hoeft te doen om het te behouden.
-	if int(state.rep) > REP_BASELINE:
+	if int(state.rep) > REP_BASELINE and not has_shop("pr_strategie"):
 		state.rep = maxi(int(state.rep) - REP_DECAY_ABOVE_BASELINE, REP_BASELINE)
 
 	# Oud geld-perk: rente over een positief saldo.
