@@ -214,13 +214,17 @@ func play(t: Dictionary, rng: RandomNumberGenerator) -> void:
 		if counts_for_combo:
 			success_run.append(str(t.id))
 		_shift_mood(int(t.get("mood_ok", 0)))
+		# Zolang het TD-type onbekend is, tonen we ook in de log geen exact
+		# cijfer — anders zou je alsnog uit het loggetal kunnen afleiden wat
+		# een actie deed (en dus welk type hij is).
+		var drop_txt := str(int(drop)) if pers_known else "?"
 		if t.has("cut_cost"):
 			cut = maxf(cut - float(t.cut_cost), 0.04)
-			log.append("%s Weerstand -%d; jouw fee zakt naar %d%%." % [
-				str(t.get("ok_txt", "")), int(drop), int(round(cut * 100))])
+			log.append("%s Weerstand -%s; jouw fee zakt naar %d%%." % [
+				str(t.get("ok_txt", "")), drop_txt, int(round(cut * 100))])
 		else:
-			log.append("%s Weerstand -%d.%s" % [
-				str(t.get("ok_txt", "Het werkt.")), int(drop),
+			log.append("%s Weerstand -%s.%s" % [
+				str(t.get("ok_txt", "Het werkt.")), drop_txt,
 				("  (FLOW +%d%%)" % int(round((flow_mult - 1.0) * 100))) if flow else ""])
 		if counts_for_combo:
 			_check_combos()
@@ -253,9 +257,11 @@ func _check_combos() -> void:
 			continue
 		if success_run.slice(success_run.size() - pat.size()) == pat:
 			combos_done.append(str(combo.id))
+			var was_known := pers_known
 			resistance -= float(combo.bonus)
 			last_combo = str(combo.name)
-			log.append("COMBO — %s! Extra weerstand -%d." % [str(combo.name), int(combo.bonus)])
+			var bonus_txt := str(int(combo.bonus)) if was_known else "?"
+			log.append("COMBO — %s! Extra weerstand -%s." % [str(combo.name), bonus_txt])
 			if combo.has("req_pers") and not pers_known:
 				pers_known = true
 				log.append("…en nu weet je het zeker: %s" % str(PERS_INFO[pers]))
@@ -292,7 +298,10 @@ func halve_resistance() -> void:
 	rounds_left -= 1
 	resistance = maxf(resistance / 2.0, 0.0)
 	streak += 1
-	log.append("Je zet een gunst in: een contact belt de TD persoonlijk. Weerstand halveert naar %d." % int(resistance))
+	# Zelfde geheimhouding als bij tactieken: zolang het type onbekend is,
+	# geen exact resterend getal in de log.
+	var res_txt := str(int(resistance)) if pers_known else "?"
+	log.append("Je zet een gunst in: een contact belt de TD persoonlijk. Weerstand halveert naar %s." % res_txt)
 	_check_end()
 
 
