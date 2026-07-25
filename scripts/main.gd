@@ -1702,7 +1702,9 @@ func show_dice() -> void:
 	else:
 		lbl("Tik dobbelstenen aan om ze vast te houden, gooi dan de rest opnieuw.", 20)
 		btn("Opnieuw gooien (%d over)" % dice.rolls_left, _reroll_dice, dice.rolls_left > 0)
-		btn("Nu stoppen, uitbetalen", _stop_dice)
+		var bonus_pct := int(round((dice.early_stop_bonus_for(dice.rolls_left) - 1.0) * 100))
+		var stop_label := ("Nu stoppen, uitbetalen  (+%d%% bonus)" % bonus_pct) if bonus_pct > 0 else "Nu stoppen, uitbetalen"
+		btn(stop_label, _stop_dice)
 
 
 func _toggle_die(i: int) -> void:

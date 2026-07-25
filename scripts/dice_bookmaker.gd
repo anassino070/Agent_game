@@ -11,7 +11,15 @@ var rolls_left := 2
 var stake := 0
 var finished := false
 var payout_mult := 0.0
+var stop_bonus := 1.0    # >1.0 als je vroeg stopte i.p.v. alle rerolls opmaakte
 var log: Array = []
+
+
+func early_stop_bonus_for(rolls_remaining: int) -> float:
+	# Beloont zekerheid nemen: hoe meer rerolls je nog over had toen je stopte,
+	# hoe groter de bonus op een winnende uitbetaling. 0 rerolls over (gewoon
+	# uitgespeeld) geeft geen bonus.
+	return 1.0 + float(rolls_remaining) * 0.25
 
 
 func setup(rng: RandomNumberGenerator, money_scale: float = 1.0) -> void:
@@ -40,6 +48,7 @@ func reroll(rng: RandomNumberGenerator) -> void:
 
 func stop_early() -> void:
 	if not finished:
+		stop_bonus = early_stop_bonus_for(rolls_left)
 		_score()
 
 
@@ -75,10 +84,14 @@ func _score() -> void:
 
 
 func outcome() -> Dictionary:
-	var delta := int(round(float(stake) * payout_mult))
+	# De bonus geldt alleen bij een winnende uitbetaling — vroeg stoppen mag
+	# een verlies niet vergroten, alleen een gok belonen die uitpakte.
+	var mult := (payout_mult * stop_bonus) if payout_mult > 0.0 else payout_mult
+	var delta := int(round(float(stake) * mult))
 	if payout_mult > 0.0:
+		var bonus_txt := ("  (+%d%% bonus voor vroeg stoppen)" % int(round((stop_bonus - 1.0) * 100))) if stop_bonus > 1.0 else ""
 		return {"effects": {"money": delta},
-			"txt": "Uitbetaling op je inzet van %s: %s." % [_eur(stake), _eur(delta)]}
+			"txt": "Uitbetaling op je inzet van %s: %s.%s" % [_eur(stake), _eur(delta), bonus_txt]}
 	return {"effects": {"money": -stake},
 		"txt": "Verloren: %s." % _eur(-stake)}
 
