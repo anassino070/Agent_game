@@ -72,6 +72,11 @@ var player_info_panel: PanelContainer
 var player_info_label: Label
 var player_info_badges: HBoxContainer
 
+# Vaste (niet-scrollende) balk vlak boven de scrollende content: toont de
+# beurten/pogingen/scoutpunten-blokjes zodat ze altijd zichtbaar blijven,
+# ook als je in een lange log naar beneden scrollt.
+var turn_bar: Control
+
 # ---- Developer-only puntenreset: verborgen achter een tik-sequentie + wachtwoord.
 # Geen echte beveiliging (GDScript-bronnen zijn leesbaar), maar voorkomt dat
 # spelers of testers er per ongeluk tegenaan lopen.
@@ -149,6 +154,11 @@ func _ready() -> void:
 	header.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	header.add_theme_font_size_override("font_size", 24)
 	vbox.add_child(header)
+
+	turn_bar = HBoxContainer.new()
+	turn_bar.add_theme_constant_override("separation", 10)
+	turn_bar.visible = false
+	vbox.add_child(turn_bar)
 
 	var scroll := ScrollContainer.new()
 	scroll.size_flags_vertical = Control.SIZE_EXPAND_FILL
@@ -242,6 +252,13 @@ func clear() -> void:
 	if inf_btn:
 		inf_btn.visible = false
 	_show_player_info("")
+	# De turn-bar is scherm-specifiek: elk scherm dat 'm nodig heeft, zet 'm
+	# opnieuw via _set_turn_bar(). Zonder deze reset zou de balk van het
+	# vorige scherm blijven hangen op een scherm zonder eigen teller.
+	if turn_bar:
+		for c in turn_bar.get_children():
+			c.queue_free()
+		turn_bar.visible = false
 
 
 func lbl(text: String, size := 28) -> Label:
@@ -929,7 +946,7 @@ func show_scouting() -> void:
 	refresh_header()
 	clear()
 	lbl("SCOUTING", 34)
-	content.add_child(_turn_blocks("Scoutpunten:", int(Game.state.scout_points), Game.scout_points_per_season()))
+	_set_turn_bar("Scoutpunten:", int(Game.state.scout_points), Game.scout_points_per_season())
 	show_flash()
 	lbl("De potentieel-band is een schátting — die kan er flink naast zitten. Scouten trekt haar naar de waarheid én maakt tekenen makkelijker (+5% per scout, max +10%).", 22)
 	lbl("Kantoor niveau %d (%s) brengt spelers tot rating ~%d binnen bereik. Je reputatie (%d) bepaalt of ze tekenen." % [
@@ -1164,21 +1181,22 @@ func _mini_btn(text: String, cb: Callable, enabled := true) -> Button:
 	return b
 
 
-func _turn_blocks(label: String, current: int, max_turns: int) -> Control:
-	# HP-bar-achtige rij blokjes i.p.v. een kaal getal in tekst: één blokje
-	# per beurt/punt. Fel = nog beschikbaar, dof = al opgebruikt. Gebruikt
-	# voor alle "X over"-tellers (rondes, pogingen, scoutpunten) in
-	# events/minigames en het scoutingscherm.
-	var row := HBoxContainer.new()
-	row.add_theme_constant_override("separation", 10)
+func _set_turn_bar(label: String, current: int, max_turns: int) -> void:
+	# Vult de VASTE balk vlak boven de scrollende content met de beurten/
+	# pogingen/scoutpunten-blokjes — blijft daardoor altijd zichtbaar, ook als
+	# je in een lange log naar beneden scrollt (i.t.t. content.add_child()).
+	# HP-bar-achtig: fel blokje = nog beschikbaar, dof = al opgebruikt.
+	for c in turn_bar.get_children():
+		c.queue_free()
+	turn_bar.visible = true
 	if label != "":
 		var l := Label.new()
 		l.text = label
 		l.add_theme_font_size_override("font_size", 20)
-		row.add_child(l)
+		turn_bar.add_child(l)
 	var blocks := HBoxContainer.new()
 	blocks.add_theme_constant_override("separation", 4)
-	row.add_child(blocks)
+	turn_bar.add_child(blocks)
 	# Defensief: als current ooit boven max_turns uitkomt (bijv. een perk die
 	# na aanvang nog bijtelt), tekenen we toch genoeg blokjes om het te tonen.
 	var shown_max := maxi(max_turns, current)
@@ -1187,7 +1205,6 @@ func _turn_blocks(label: String, current: int, max_turns: int) -> Control:
 		block.custom_minimum_size = Vector2(20, 20)
 		block.color = Color(0.95, 0.75, 0.15) if i < current else Color(0.22, 0.22, 0.26)
 		blocks.add_child(block)
-	return row
 
 
 func _scout(pid: String) -> void:
@@ -1538,7 +1555,7 @@ func show_bidding() -> void:
 	_dev_test_banner()
 	lbl("BIEDINGSOORLOG", 32)
 	_name_row("Cliënt: ", bidding.client_id, "", 24)
-	content.add_child(_turn_blocks("Rondes:", bidding.rounds_left, 4))
+	_set_turn_bar("Rondes:", bidding.rounds_left, 4)
 	sep()
 	for c in bidding.clubs:
 		var status := "actief" if c.active else "afgehaakt"
@@ -1606,7 +1623,7 @@ func show_press() -> void:
 	var cid := str(mg_ev.client_id)
 	lbl("PERSCONFERENTIE", 32)
 	_name_row("", cid, "   |   Spanning: %d/100" % int(press.tension), 24)
-	content.add_child(_turn_blocks("Vragen:", press.questions_left, 5))
+	_set_turn_bar("Vragen:", press.questions_left, 5)
 	if not press.log.is_empty():
 		sep()
 		for line in press.log:
@@ -1647,7 +1664,7 @@ func show_sponsor() -> void:
 	lbl("SPONSORPITCH", 32)
 	_name_row("Cliënt: ", cid, "", 24)
 	lbl("Terughoudendheid merk: %d" % int(sponsor.reluctance), 26)
-	content.add_child(_turn_blocks("Rondes:", sponsor.rounds_left, 3))
+	_set_turn_bar("Rondes:", sponsor.rounds_left, 3)
 	if not sponsor.log.is_empty():
 		sep()
 		for line in sponsor.log:
@@ -1792,7 +1809,7 @@ func show_dice() -> void:
 	_dev_test_banner()
 	lbl("DOBBELEN BIJ DE BOOKMAKER", 32)
 	lbl("Inzet: %s" % eur(dice.stake), 24)
-	content.add_child(_turn_blocks("Herkansingen:", dice.rolls_left, 2))
+	_set_turn_bar("Herkansingen:", dice.rolls_left, 2)
 	lbl("Uitbetaling op je inzet: 5 gelijke ogen ×10, 4 gelijk ×4, full house ×3, 3 gelijk ×1,5, twee paar ×0,5. Niets van dit alles? Dan ben je je inzet kwijt.", 19)
 	sep()
 	var row := HBoxContainer.new()
@@ -1853,7 +1870,7 @@ func show_accounting() -> void:
 	_dev_test_banner()
 	lbl("DE BOEKHOUDPUZZEL", 32)
 	lbl("Vul elke rij en kolom met de cijfers 1-5, elk precies één keer.", 22)
-	content.add_child(_turn_blocks("Pogingen:", accounting.attempts_left, 3))
+	_set_turn_bar("Pogingen:", accounting.attempts_left, 3)
 	sep()
 	var grid := GridContainer.new()
 	grid.columns = AccountingPuzzle.SIZE
@@ -1984,7 +2001,7 @@ func show_scoutdate() -> void:
 	_dev_test_banner()
 	lbl("SPEED-DATEN OP DE SCOUTINGBEURS", 32)
 	lbl("Vastgezet: %d/4" % scoutdate.locked_count(), 24)
-	content.add_child(_turn_blocks("Pogingen:", scoutdate.attempts_left, 6))
+	_set_turn_bar("Pogingen:", scoutdate.attempts_left, 6)
 	if not scoutdate.log.is_empty():
 		sep()
 		for line in scoutdate.log:
@@ -2173,8 +2190,13 @@ func show_nego() -> void:
 	lbl("ONDERHANDELING", 32)
 	lbl("%s → %s" % [p.name, c.name], 26)
 	lbl("Transfersom: %s   |   Jouw fee: %d%%" % [eur(nego.deal_value), int(round(nego.cut * 100))], 24)
-	lbl("Weerstand van TD %s: %d" % [c.td, int(maxf(nego.resistance, 0))], 26)
-	content.add_child(_turn_blocks("Rondes:", nego.rounds_left, 5 + Meta.perk_level("reserves")))
+	# Zodra er een actie is gespeeld (log niet meer leeg) blijft de weerstand
+	# zelf ook verborgen tot je de TD kent — anders zou je uit het verschil
+	# vóór/na alsnog kunnen afleiden wat een actie deed (en dus welk type hij
+	# is), ook al staat er geen expliciet effect meer bij de knoppen.
+	var res_txt := "?" if (not nego.pers_known and not nego.log.is_empty()) else str(int(maxf(nego.resistance, 0)))
+	lbl("Weerstand van TD %s: %s" % [c.td, res_txt], 26)
+	_set_turn_bar("Rondes:", nego.rounds_left, 5 + Meta.perk_level("reserves"))
 	lbl("Stemming: %s" % nego.mood_name(), 24)
 	if nego.pers_known:
 		lbl("Type: %s" % str(Negotiation.PERS_INFO[nego.pers]), 22)
@@ -2221,10 +2243,12 @@ func show_nego() -> void:
 			if str(t.id) == "aftasten":
 				btn("%s  [kost %d ronde%s]" % [str(t.label), nego.aftast_cost, "" if nego.aftast_cost == 1 else "s"], func(): _play_tactic(t))
 			else:
-				# De slagingskans blijft verborgen tot je de TD kent (aftasten of
-				# een type-combo). Tot dan zie je alleen de weerstandswinst.
+				# Zowel de slagingskans als het weerstandseffect blijven verborgen
+				# tot je de TD kent (aftasten of een type-combo) — anders zou je
+				# via het effect alsnog kunnen afleiden welk type hij is.
 				var chance_txt := ("%d%%" % int(round(float(t.chance) * 100))) if nego.pers_known else "kans ?"
-				btn("%s  [%s, weerstand -%d]" % [str(t.label), chance_txt, int(t.drop)], func(): _play_tactic(t))
+				var drop_txt := ("weerstand -%d" % int(t.drop)) if nego.pers_known else "weerstand ?"
+				btn("%s  [%s, %s]" % [str(t.label), chance_txt, drop_txt], func(): _play_tactic(t))
 		btn("Percentage verhogen (+%d%%, raakt weerstand/flow niet)" % int(round(Negotiation.RAISE_FEE_STEP * 100)), _raise_fee, nego.cut < Negotiation.MAX_CUT)
 
 		var favor_btn := Button.new()
