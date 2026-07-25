@@ -81,16 +81,19 @@ func setup(rng: RandomNumberGenerator, season: int = 1) -> void:
 func cycle_cell(i: int) -> void:
 	if fixed[i] or finished:
 		return
-	grid[i] = int(grid[i]) % SIZE + 1
+	# Cyclus loopt 0 (leeg) → 1 → 2 → 3 → 4 → 5 → 0 → …: na de 5 komt weer een
+	# lege stand, zodat je een vakje kunt legen voor overzicht i.p.v. gedwongen
+	# altijd een cijfer te laten staan.
+	grid[i] = (int(grid[i]) + 1) % (SIZE + 1)
 
 
 func check() -> bool:
+	# Geen vergelijking meer met de ene gegenereerde solution — een Latijns
+	# vierkant heeft meerdere geldige oplossingen. We valideren generiek: elke
+	# rij en kolom moet 1..SIZE bevatten, elk precies één keer (dus ook geen
+	# lege vakjes meer). Zolang het logisch klopt, is het goed.
 	attempts_left -= 1
-	var ok := true
-	for i in range(CELLS):
-		if int(grid[i]) != int(solution[i]):
-			ok = false
-			break
+	var ok := _is_valid_grid()
 	if ok:
 		finished = true
 		success = true
@@ -102,6 +105,24 @@ func check() -> bool:
 	else:
 		log.append("Nog niet helemaal goed. Nog %d poging(en)." % attempts_left)
 	return ok
+
+
+func _is_valid_grid() -> bool:
+	for r in range(SIZE):
+		var seen: Dictionary = {}
+		for c in range(SIZE):
+			var v := int(grid[r * SIZE + c])
+			if v < 1 or v > SIZE or seen.has(v):
+				return false
+			seen[v] = true
+	for c in range(SIZE):
+		var seen: Dictionary = {}
+		for r in range(SIZE):
+			var v := int(grid[r * SIZE + c])
+			if v < 1 or v > SIZE or seen.has(v):
+				return false
+			seen[v] = true
+	return true
 
 
 func outcome(money_scale: float = 1.0) -> Dictionary:
