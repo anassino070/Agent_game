@@ -1648,7 +1648,10 @@ func show_poker() -> void:
 		btn("Verder →", _finish_poker)
 	else:
 		btn("Meegaan" if poker.to_call > 0 else "Checken", func(): _play_poker("meegaan"))
-		btn("Verhogen", func(): _play_poker("verhogen"))
+		# Na een re-raise van de tegenstander mag je alleen nog meegaan of
+		# passen — geen re-re-raise, om het simpel en overzichtelijk te houden.
+		if not poker.awaiting_my_response:
+			btn("Verhogen", func(): _play_poker("verhogen"))
 		btn("Passen (veilig wegwezen)", func(): _play_poker("passen"))
 
 

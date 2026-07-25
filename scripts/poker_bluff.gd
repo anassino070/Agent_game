@@ -25,6 +25,7 @@ var to_call := 0
 var finished := false
 var folded_by_me := false
 var folded_by_opp := false
+var awaiting_my_response := false   # tegenstander heeft ge-re-raist; alleen meegaan/passen toegestaan
 var log: Array = []
 
 
@@ -72,14 +73,24 @@ func play(action: String, rng: RandomNumberGenerator) -> void:
 			pot += cost
 			to_call = 0
 			log.append("Je gaat mee. Pot: %s." % _eur(pot))
+			if awaiting_my_response:
+				# Je hebt de re-raise van de tegenstander betaald — nu pas
+				# gaat de hand verder naar de volgende straat.
+				awaiting_my_response = false
+				_advance_street(rng)
+				return
 		"verhogen":
+			if awaiting_my_response:
+				# Geen re-re-raise — na een re-raise van de tegenstander mag
+				# je alleen meegaan of passen.
+				return
 			var raise_amt := maxi(mini(int(round(float(ante) * 2.0)), my_stack - to_call), 0)
 			var cost := to_call + raise_amt
 			my_stack -= cost
 			pot += cost
 			log.append("Je verhoogt met %s." % _eur(raise_amt))
 			_opp_respond_to_raise(rng, raise_amt)
-			if finished:
+			if finished or awaiting_my_response:
 				return
 	_advance_street(rng)
 
@@ -90,6 +101,18 @@ func _opp_respond_to_raise(rng: RandomNumberGenerator, raise_amt: int) -> void:
 		folded_by_opp = true
 		finished = true
 		log.append("De tegenstander legt zich neer voor jouw verhoging!")
+		return
+	# Bij een sterke hand vecht hij soms terug met een RE-RAISE i.p.v. gewoon
+	# mee te gaan — zo is verhogen geen gratis winst: een sterke tegenstander
+	# kan je juist onder druk zetten en jou voor een echte keuze stellen
+	# (meegaan tegen extra kosten, of alsnog passen).
+	if strength > 0.6 and rng.randf() < 0.5:
+		var re_raise := mini(int(round(float(raise_amt) * 1.5)), opp_stack)
+		opp_stack -= re_raise
+		pot += re_raise
+		to_call = re_raise
+		awaiting_my_response = true
+		log.append("De tegenstander re-raist met %s! Wat doe jij?" % _eur(re_raise))
 		return
 	var cost := mini(raise_amt, opp_stack)
 	opp_stack -= cost
