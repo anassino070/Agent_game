@@ -157,9 +157,12 @@ func bank_deposits_list() -> Array:
 # 24 eenmalige upgrades voor déze run (géén legacy-perks — die verdwijnen
 # aan het einde van de run net als de rest van Game.state). Elk seizoen na
 # de afsluiting kies je uit 3 willekeurige, nog niet gekochte upgrades (of reroll).
-# Prijzen schalen mee met event_money_scale() zodat ze de hele run relevant
-# blijven. Fors duurder dan de oorspronkelijke 10 (en met 14 extra opties)
-# zodat je tegen het einde van de run niet allang alles hebt kunnen kopen.
+# Prijzen schalen mee met shop_money_scale() (een MILDE, eigen groeivoet —
+# zie die functie) zodat ze de hele run relevant én betaalbaar blijven, in
+# plaats van in de tweede seizoenshelft onbetaalbaar te worden zoals bij de
+# harde event_money_scale()-curve. Fors duurder dan de oorspronkelijke 10
+# (en met 14 extra opties) zodat je tegen het einde van de run niet allang
+# alles hebt kunnen kopen.
 const SHOP_UPGRADES := {
 	"groter_kantoor": {
 		"name": "Groter kantoor", "price": 36000,
@@ -274,7 +277,7 @@ const SHOP_PRICE_MULT := 0.9
 
 
 func shop_price(id: String) -> int:
-	return int(round(float(SHOP_UPGRADES[id].price) * SHOP_PRICE_MULT * event_money_scale()))
+	return int(round(float(SHOP_UPGRADES[id].price) * SHOP_PRICE_MULT * shop_money_scale()))
 
 
 func can_buy_shop(id: String) -> bool:
@@ -338,7 +341,7 @@ const SHOP_REROLL_BASE := 8000
 
 
 func shop_reroll_cost() -> int:
-	return int(round(float(SHOP_REROLL_BASE) * event_money_scale()))
+	return int(round(float(SHOP_REROLL_BASE) * shop_money_scale()))
 
 
 func can_reroll_shop() -> bool:
@@ -482,6 +485,21 @@ func event_money_scale() -> float:
 	# anders lopen ze uit de pas met de rest van de economie en voelen ze
 	# na een paar seizoenen als zakgeld naast de exponentieel stijgende kosten.
 	return pow(COSTS_MULT, float(state.season) - 1.0)
+
+
+const SHOP_MONEY_GROWTH := 1.15   # milde groeivoet, los van event_money_scale()
+
+
+func shop_money_scale() -> float:
+	# Shop-upgrades zijn OPTIONEEL, geen verplichte kosten zoals de kantoor-
+	# huur. Zouden ze met dezelfde harde ×1,8/seizoen-curve als event_money_
+	# scale() meegroeien, dan worden ze in de tweede seizoenshelft absurd
+	# duur (seizoen 15 ≈ ×728) terwijl je inkomen (clubbudgetten groeien maar
+	# 12-17%/seizoen) daar nooit bij in de buurt komt — dan koop je ze
+	# gewoon nooit meer. Eigen, veel mildere groeivoet (seizoen 15 ≈ ×6) zodat
+	# ze de hele run door haalbaar blijven, terwijl vroeg kopen nog steeds
+	# goedkoper is dan laat kopen.
+	return pow(SHOP_MONEY_GROWTH, float(state.season) - 1.0)
 
 
 func scale_money_effects(effects: Dictionary) -> Dictionary:
@@ -675,11 +693,14 @@ func office_name() -> String:
 
 
 func office_upgrade_cost() -> int:
-	# Vast bedrag: €60.000 × (doelniveau)². -1 = al op het hoogste niveau.
+	# Vast bedrag: €100.000 × (doelniveau)². -1 = al op het hoogste niveau.
+	# Bewust duur: het kantoorniveau is de centrale progressie-as van een run
+	# en mag, in tegenstelling tot de optionele shop-upgrades, gewoon een
+	# forse investering blijven.
 	var next_lvl := office_level() + 1
 	if next_lvl > office_max_level():
 		return -1
-	return 60000 * next_lvl * next_lvl
+	return 100000 * next_lvl * next_lvl
 
 
 func can_upgrade_office() -> bool:
