@@ -1370,10 +1370,12 @@ func _start_minigame(ev: Dictionary) -> void:
 		"biedingsoorlog":
 			var cid := str(ev.client_id)
 			var value := Game.value(Game.state.players[cid])
+			# Budget is geen harde bottleneck: elke andere club kan meebieden
+			# (financiering is hún probleem, niet een reden om jouw speler
+			# onverkoopbaar te maken).
 			var pool: Array = []
 			for club_id in Game.state.clubs:
-				var c: Dictionary = Game.state.clubs[club_id]
-				if club_id != str(Game.state.players[cid].club) and int(c.budget) >= int(float(value) * 0.5):
+				if club_id != str(Game.state.players[cid].club):
 					pool.append(club_id)
 			var picked: Array = []
 			while picked.size() < 3 and not pool.is_empty():
@@ -1982,13 +1984,7 @@ func show_window() -> void:
 		], 26)
 		var ints: Array = interest.get(cid, [])
 		if ints.is_empty():
-			if not Game.any_club_can_afford(cid):
-				var l := lbl("Geen enkele club kan hem betalen (waarde %s, rijkste club heeft %s over)." % [
-					eur(Game.value(p)), eur(Game.richest_club_budget()),
-				], 20)
-				l.add_theme_color_override("font_color", Color(1.0, 0.6, 0.3))
-			else:
-				lbl("Geen interesse van clubs dit seizoen.", 22)
+			lbl("Geen interesse van clubs dit seizoen.", 22)
 
 		# Drie mogelijke opties per cliënt: onderhandelen met elke
 		# geïnteresseerde club plus contract verlengen. Normaal mag je er

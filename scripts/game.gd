@@ -800,25 +800,12 @@ func gen_events() -> Array:
 
 # ---------------------------------------------------------------- transfers
 
-func richest_club_budget() -> int:
-	var best := 0
-	for cid in state.clubs:
-		best = maxi(best, int(state.clubs[cid].budget))
-	return best
-
-
-func any_club_can_afford(client_id: String) -> bool:
-	var v := value(state.players[client_id])
-	for cid in state.clubs:
-		if cid == str(state.players[client_id].club):
-			continue
-		if int(state.clubs[cid].budget) >= v:
-			return true
-	return false
-
-
 func gen_interest(client_id: String) -> Array:
-	# 0–2 geïnteresseerde clubs, afhankelijk van rating, budget en ambitie.
+	# 0–2 geïnteresseerde clubs, afhankelijk van rating en ambitie. Budget is
+	# GEEN harde bottleneck meer — elke speler moet altijd verkoopbaar zijn.
+	# Een club met te weinig budget vindt wel iets moeilijker financiering
+	# (kans-penalty), maar wordt niet volledig uitgesloten: ze lenen, zoeken
+	# een investeerder, of verkopen eerst iemand anders.
 	var p: Dictionary = state.players[client_id]
 	var v := value(p)
 	var ids: Array = state.clubs.keys()
@@ -833,9 +820,9 @@ func gen_interest(client_id: String) -> Array:
 		if club_id == str(p.club):
 			continue
 		var c: Dictionary = state.clubs[club_id]
-		if int(c.budget) < v:
-			continue
 		var chance := 0.10 + (float(p.rating) - 50.0) * 0.01 + float(c.ambition) * 0.04
+		if int(c.budget) < v:
+			chance *= 0.5
 		if rng.randf() < chance:
 			out.append(club_id)
 		if out.size() >= 2:
