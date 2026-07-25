@@ -627,6 +627,11 @@ func show_perks() -> void:
 			btn("Annuleer", func(): _set_confirm_prestige(false))
 		else:
 			btn("✦ Prestige (perkboom weg, +1 Prestige-ster)", func(): _set_confirm_prestige(true))
+	else:
+		lbl("Prestigen kan pas vanaf %s%% boomvoortgang (nu %s%%) — bij te weinig opgebouwd stelt de opoffering niets voor." % [
+			("%.0f" % (Meta.PRESTIGE_MIN_TREE_PROGRESS * 100.0)),
+			("%.1f" % (Meta.tree_progress() * 100.0)).replace(".", ","),
+		], 19)
 	sep()
 	var spent := Meta.spent_points()
 	if spent > 0:
@@ -818,7 +823,8 @@ func show_prep() -> void:
 	deposit_btn.pressed.connect(_do_bank_deposit)
 	bank_row.add_child(deposit_btn)
 	sep()
-	btn("Naar scouting →" if Meta.perk_level("vaste_kern") > 0 else "Naar stalbeheer →", _goto_release)
+	var skip_release := Meta.perk_level("vaste_kern") > 0 or int(Game.state.season) == 1
+	btn("Naar scouting →" if skip_release else "Naar stalbeheer →", _goto_release)
 
 
 func _upgrade_office() -> void:
@@ -847,6 +853,12 @@ func _do_bank_deposit() -> void:
 func _goto_release() -> void:
 	# ★ Vaste kern-perk: jij bent de uitzondering op de ontslagregel.
 	if Meta.perk_level("vaste_kern") > 0:
+		_goto_scouting()
+		return
+	# Seizoen 1 slaat het verplichte ontslag altijd over — anders zou de
+	# Erfenis-perk Kroonjuweel-netwerk (extra startcliënt) meteen weer
+	# ongedaan worden gemaakt vóór je ook maar één seizoen hebt gespeeld.
+	if int(Game.state.season) == 1:
 		_goto_scouting()
 		return
 	# Met 0 of 1 cliënten is ontslaan direct game over ("leeg") — dan slaan

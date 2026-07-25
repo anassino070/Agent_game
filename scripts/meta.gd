@@ -426,9 +426,15 @@ func reset_perks() -> void:
 
 # ---- Prestige & Erfenis-perks ----
 
+const PRESTIGE_MIN_TREE_PROGRESS := 0.5   # minstens 50% van de boom nodig om te mogen prestigen
+
+
 func can_prestige() -> bool:
-	# Alleen zinvol als er ook echt iets te resetten valt.
-	return spent_points() > 0
+	# Prestigen offert je hele boom op — dat moet ook echt iets voorstellen.
+	# Bij een paar losse niveaus is de "opoffering" bijna gratis, dus eisen we
+	# minstens 50% voortgang op de reguliere boom (tree_progress(), exclusief
+	# de OP-extra's) voordat de knop beschikbaar wordt.
+	return tree_progress() >= PRESTIGE_MIN_TREE_PROGRESS
 
 
 func prestige_run() -> void:
