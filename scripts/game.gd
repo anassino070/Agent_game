@@ -917,10 +917,13 @@ func extend_mult(p: Dictionary) -> float:
 	return 0.5 if is_high_rated(p) else 1.0
 
 
+const EXTEND_FEE_PCT := 0.07   # tekengeld bij contractverlenging = 7% van value()
+
+
 func extend_contract(client_id: String) -> int:
 	var p: Dictionary = state.players[client_id]
 	var coach_bonus := 1.3 if has_shop("contractenspecialist") else 1.0
-	var tekengeld := int(value(p) * 0.02 * tekengeld_mult() * extend_mult(p) * coach_bonus)
+	var tekengeld := int(value(p) * EXTEND_FEE_PCT * tekengeld_mult() * extend_mult(p) * coach_bonus)
 	state.money = int(state.money) + tekengeld
 	state.total_fees = int(state.total_fees) + tekengeld
 	p["contract"] = int(p.contract) + 2

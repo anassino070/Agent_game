@@ -2014,7 +2014,7 @@ func show_window() -> void:
 			if can_extend:
 				if high and not ints.is_empty():
 					lbl("Hoge rating: verlengen blijft een optie náást beide clubgesprekken, maar het tekengeld is lager — met clubs in de rij bindt hij zich niet goedkoop.", 19)
-				var tg_preview := int(Game.value(p) * 0.02 * Game.tekengeld_mult() * Game.extend_mult(p))
+				var tg_preview := int(Game.value(p) * Game.EXTEND_FEE_PCT * Game.tekengeld_mult() * Game.extend_mult(p))
 				btn("Contract verlengen (tekengeld ~%s)" % eur(tg_preview), func(): _extend(cid))
 			elif str(p.club) != "":
 				lbl("Verlengen kan pas in het laatste contractjaar.", 19)
