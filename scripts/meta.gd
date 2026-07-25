@@ -21,9 +21,36 @@ const WIN_REWARD_PCT := 1.0
 const INF_COST := 200
 const INF_STEP := 0.01
 
+# Kampioensbonus: bij een gewonnen run krijg je BOVENOP de normale beloning
+# in één klap dit percentage van je bestaande carrière-puntensaldo erbij —
+# een erkenning voor een lange, succesvolle carrière, niet alleen voor deze
+# ene run. Berekend over het saldo VÓÓR deze run se punten worden bijgeschreven.
+const CHAMPION_BONUS_PCT := 0.12
+
 # De OVERPOWERED extra's: peperduur (30–50% van de boomkosten), tellen NIET
 # mee voor de 100%-voortgang.
 const OP_PERKS := ["superprovisie", "ijzeren_stal", "helderziend", "vaste_kern"]
+
+# Prestige: na een gewonnen run kun je vrijwillig je hele perkboom resetten
+# — GEEN puntenrefund (in tegenstelling tot reset_perks()) — in ruil voor
+# 1 Prestige-ster. Sterren kopen Erfenis-perks: bonussen die je NOOIT met
+# gewone legacy points kunt kopen, hoeveel je er ook opspaart. Dat is het
+# hele punt van prestigen: niet "punten wegdoen", maar toegang tot iets dat
+# anders onbereikbaar blijft.
+const LEGACY_PERKS := {
+	"kroonjuweel_netwerk": {
+		"name": "Kroonjuweel-netwerk", "stars": 1,
+		"desc": "Je begint elke run met een extra startcliënt.",
+	},
+	"kantoorvoorsprong": {
+		"name": "Kantoorvoorsprong", "stars": 2,
+		"desc": "Je begint elke run standaard op kantoorniveau 2 i.p.v. niveau 1.",
+	},
+	"eeuwige_gunst": {
+		"name": "Eeuwige gunst", "stars": 3,
+		"desc": "Je begint elke run met +2 extra gunsten.",
+	},
+}
 
 # De perkboom: 3 takken × 4 rijen × 3 opties = 36 perks. Volledig kopen kost
 # ~1,4 miljoen punten — een lange grind waarin elke run iets achterlaat.
@@ -257,6 +284,23 @@ func load_meta() -> void:
 	for id in PERKS:
 		if not state.perks.has(id):
 			state.perks[id] = 0
+	if not state.has("prestige_stars"):
+		state.prestige_stars = 0
+	if not state.has("legacy_perks"):
+		state.legacy_perks = {}
+	for id in LEGACY_PERKS:
+		if not state.legacy_perks.has(id):
+			state.legacy_perks[id] = false
+	if not state.has("hall_of_fame"):
+		state.hall_of_fame = []
+	if not state.has("has_won_ever"):
+		state.has_won_ever = false
+
+
+# UI-hulpvar: hoeveel van de laatst toegekende punten kampioensbonus was
+# (0 als de laatste run geen winst was). Analoog aan Game.last_new_client_id
+# — een aparte "wat gebeurde er net"-var i.p.v. de return-waarde te belasten.
+var last_champion_bonus := 0
 
 
 func save_meta() -> void:
@@ -380,6 +424,58 @@ func reset_perks() -> void:
 	save_meta()
 
 
+# ---- Prestige & Erfenis-perks ----
+
+func can_prestige() -> bool:
+	# Alleen zinvol als er ook echt iets te resetten valt.
+	return spent_points() > 0
+
+
+func prestige_run() -> void:
+	# In tegenstelling tot reset_perks(): GEEN puntenrefund. De prijs van een
+	# Prestige-ster is je opgebouwde perkboom, niet iets gratis.
+	for id in PERKS:
+		state.perks[id] = 0
+	state.prestige_stars = int(state.prestige_stars) + 1
+	save_meta()
+
+
+func has_legacy_perk(id: String) -> bool:
+	return bool(state.legacy_perks.get(id, false))
+
+
+func can_buy_legacy_perk(id: String) -> bool:
+	if has_legacy_perk(id):
+		return false
+	return int(state.prestige_stars) >= int(LEGACY_PERKS[id].stars)
+
+
+func buy_legacy_perk(id: String) -> bool:
+	if not can_buy_legacy_perk(id):
+		return false
+	state.prestige_stars = int(state.prestige_stars) - int(LEGACY_PERKS[id].stars)
+	state.legacy_perks[id] = true
+	save_meta()
+	return true
+
+
+# ---- Hall of Fame (puur cosmetisch, geen mechanisch effect) ----
+
+const HALL_OF_FAME_MAX := 10
+
+
+func record_win(client_name: String, total_fees: int, seasons: int) -> void:
+	state.hall_of_fame.append({
+		"client_name": client_name, "total_fees": total_fees, "seasons": seasons,
+	})
+	state.hall_of_fame.sort_custom(func(a, b): return int(a.total_fees) > int(b.total_fees))
+	if state.hall_of_fame.size() > HALL_OF_FAME_MAX:
+		state.hall_of_fame = state.hall_of_fame.slice(0, HALL_OF_FAME_MAX)
+	# Ontgrendelt voorgoed het geheime 6e kantoorniveau (zie Game.office_max_level()).
+	state.has_won_ever = true
+	save_meta()
+
+
 # ---- De ∞-upgrade (statisch, oneindig, vaste prijs) ----
 
 func inf_level() -> int:
@@ -419,10 +515,34 @@ func award_run(total_fees: int, seasons_survived: int, won: bool) -> int:
 		points = maxi(int(round(full * pow(REWARD_BASE, float(seasons_survived - RUN_SEASONS)))), 10)
 	# De ∞-upgrade vermenigvuldigt alles wat binnenkomt.
 	points = int(round(float(points) * inf_multiplier()))
-	state.legacy_points = int(state.legacy_points) + points
+	# Kampioensbonus: alleen bij winst, in één klap CHAMPION_BONUS_PCT van je
+	# bestaande carrière-saldo erbij — berekend VÓÓR deze run se punten worden
+	# bijgeschreven, zodat het een bonus op je carrière is, niet op jezelf.
+	last_champion_bonus = (int(round(float(state.legacy_points) * CHAMPION_BONUS_PCT))) if won else 0
+	state.legacy_points = int(state.legacy_points) + points + last_champion_bonus
 	state.runs_completed = int(state.runs_completed) + 1
 	state.total_career_fees = int(state.total_career_fees) + total_fees
 	state.best_fees = maxi(int(state.best_fees), total_fees)
 	state.best_season = maxi(int(state.best_season), seasons_survived)
+	# Mega-boost: een winst zet een eenmalige vlag die je ALLEEN in je
+	# eerstvolgende nieuwe run een klapper geeft (zie Game.new_run()) — geen
+	# permanente perk, puur momentum voor de volgende poging.
+	if won:
+		state.pending_boost = true
 	save_meta()
-	return points
+	return points + last_champion_bonus
+
+
+func has_pending_boost() -> bool:
+	return bool(state.get("pending_boost", false))
+
+
+func consume_pending_boost() -> bool:
+	# Geeft true terug (en wist de vlag meteen) als er een mega-boost
+	# klaarstond. Aangeroepen door Game.new_run() bij het opzetten van een
+	# nieuwe run — verbruikt zich dus vanzelf, ongeacht hoe die run afloopt.
+	var had := has_pending_boost()
+	if had:
+		state.pending_boost = false
+		save_meta()
+	return had

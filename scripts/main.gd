@@ -63,6 +63,7 @@ var anagram_timer_label: Label = null
 var home_btn: Button
 var inf_btn: Button                # ∞-upgrade, klein vierkant rechtsboven op het perkscherm
 var confirm_reset := false         # tweestaps-bevestiging voor de perk-reset
+var confirm_prestige := false      # tweestaps-bevestiging voor prestigen (perkboom weg, GEEN refund)
 
 # Permanent info-schermpje onderaan: hover werkt niet betrouwbaar (o.a. op
 # touch/mobiel), dus toont dit gewoon altijd de stats van de relevante
@@ -420,10 +421,21 @@ func show_start() -> void:
 		eur(Meta.state.total_career_fees),
 	], 21)
 	btn("Perkboom (%s legacy points te besteden) →" % _pts(Meta.state.legacy_points), show_perks)
+	if Meta.has_pending_boost():
+		var boost_lbl := lbl("🚀 MEGA-BOOST KLAAR: je volgende nieuwe run start met dubbel startkapitaal, +25 reputatie, +1 gunst en +2 scoutpunten.", 21)
+		boost_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 	sep()
 	btn("NIEUWE RUN", _on_new_run)
 	if Game.has_save():
 		btn("Doorgaan met vorige run", _on_continue)
+	if not Meta.state.hall_of_fame.is_empty():
+		sep()
+		lbl("🏆 HALL OF FAME", 26)
+		for entry in Meta.state.hall_of_fame:
+			var cname: String = str(entry.client_name)
+			lbl("  %s — %s (seizoen %d)" % [
+				cname if cname != "" else "Naamloze topper", eur(int(entry.total_fees)), int(entry.seasons),
+			], 20)
 	sep()
 	var dev_tap := btn("v1.0", _on_dev_tap)
 	dev_tap.add_theme_font_size_override("font_size", 14)
@@ -604,6 +616,18 @@ func show_perks() -> void:
 	for id in Meta.OP_PERKS:
 		_perk_node(str(id))
 	sep()
+	lbl("✦ ERFENIS-PERKS — %d Prestige-ster%s" % [int(Meta.state.prestige_stars), "" if int(Meta.state.prestige_stars) == 1 else "ren"], 26)
+	lbl("Bonussen die je NOOIT met gewone legacy points kunt kopen — alleen met Prestige-sterren. Die krijg je door te prestigen: je hele perkboom resetten NA een gewonnen run, zonder puntenrefund.", 20)
+	for id in Meta.LEGACY_PERKS:
+		_legacy_perk_node(str(id))
+	if Meta.can_prestige():
+		if confirm_prestige:
+			lbl("Weet je het zeker? Je hele perkboom (%s punten aan niveaus) gaat naar 0 — GEEN refund — in ruil voor 1 Prestige-ster." % _pts(Meta.spent_points()), 22)
+			btn("JA — prestige nu", _do_prestige)
+			btn("Annuleer", func(): _set_confirm_prestige(false))
+		else:
+			btn("✦ Prestige (perkboom weg, +1 Prestige-ster)", func(): _set_confirm_prestige(true))
+	sep()
 	var spent := Meta.spent_points()
 	if spent > 0:
 		if confirm_reset:
@@ -613,6 +637,35 @@ func show_perks() -> void:
 		else:
 			btn("Reset alle perks (geeft %s punten terug)" % _pts(spent), func(): _set_confirm(true))
 	btn("← Terug", show_start)
+
+
+func _legacy_perk_node(id: String) -> void:
+	var perk: Dictionary = Meta.LEGACY_PERKS[id]
+	var owned := Meta.has_legacy_perk(id)
+	lbl("  %s  (%d ster%s)%s" % [
+		str(perk.name), int(perk.stars), "" if int(perk.stars) == 1 else "ren",
+		"  ✔ ACTIEF" if owned else "",
+	], 24)
+	lbl("       " + str(perk.desc), 20)
+	if not owned:
+		btn("Koop %s  (%d ster%s)" % [str(perk.name), int(perk.stars), "" if int(perk.stars) == 1 else "ren"],
+			func(): _buy_legacy_perk(id), Meta.can_buy_legacy_perk(id))
+
+
+func _buy_legacy_perk(id: String) -> void:
+	Meta.buy_legacy_perk(id)
+	show_perks()
+
+
+func _set_confirm_prestige(v: bool) -> void:
+	confirm_prestige = v
+	show_perks()
+
+
+func _do_prestige() -> void:
+	Meta.prestige_run()
+	confirm_prestige = false
+	show_perks()
 
 
 func _pts(n) -> String:
@@ -672,9 +725,25 @@ func _finish_run_meta(won: bool) -> int:
 		return 0
 	var seasons := mini(int(Game.state.season), Game.MAX_SEASONS)
 	var earned := Meta.award_run(int(Game.state.total_fees)/10, seasons, won)
+	if won:
+		Meta.record_win(_best_client_name(), int(Game.state.total_fees), seasons)
 	Game.state.meta_awarded = true
 	Game.save_game()
 	return earned
+
+
+func _best_client_name() -> String:
+	# Hall of Fame: de meest waardevolle cliënt in je stal op het moment van
+	# winnen — puur cosmetisch, geen mechanisch effect.
+	var best_name := ""
+	var best_value := -1
+	for cid in Game.state.clients:
+		var p: Dictionary = Game.state.players[cid]
+		var v := Game.value(p)
+		if v > best_value:
+			best_value = v
+			best_name = str(p.name)
+	return best_name
 
 
 func _on_new_run() -> void:
@@ -713,11 +782,11 @@ func show_prep() -> void:
 	sep()
 	# ---- Het kantoor: niveau, band en upgrade ----
 	var band: Dictionary = Game.office_band()
-	lbl("🏢 KANTOOR — niveau %d/%d: %s" % [Game.office_level(), Game.OFFICE_MAX_LEVEL, Game.office_name()], 28)
+	lbl("🏢 KANTOOR — niveau %d/%d: %s" % [Game.office_level(), Game.office_max_level(), Game.office_name()], 28)
 	lbl("Je ziet elk seizoen %d spelers, rating %d–%d (gemiddeld ~%d). Hoger niveau = betere spelers binnen bereik." % [
 		Game.candidate_count(), Game.candidate_floor(), Game.candidate_ceiling(), int(band.avg),
 	], 20)
-	if Game.office_level() < Game.OFFICE_MAX_LEVEL:
+	if Game.office_level() < Game.office_max_level():
 		var next_band: Dictionary = Game.OFFICE_LEVELS[Game.office_level()]
 		var cost := Game.office_upgrade_cost()
 		var l := lbl("Upgraden tilt je naar niveau %d: %s (spelers tot ~%d)." % [
@@ -847,7 +916,8 @@ func _goto_scouting() -> void:
 func show_scouting() -> void:
 	refresh_header()
 	clear()
-	lbl("SCOUTING  (%d punten over)" % int(Game.state.scout_points), 34)
+	lbl("SCOUTING", 34)
+	content.add_child(_turn_blocks("Scoutpunten:", int(Game.state.scout_points), Game.scout_points_per_season()))
 	show_flash()
 	lbl("De potentieel-band is een schátting — die kan er flink naast zitten. Scouten trekt haar naar de waarheid én maakt tekenen makkelijker (+5% per scout, max +10%).", 22)
 	lbl("Kantoor niveau %d (%s) brengt spelers tot rating ~%d binnen bereik. Je reputatie (%d) bepaalt of ze tekenen." % [
@@ -1080,6 +1150,32 @@ func _mini_btn(text: String, cb: Callable, enabled := true) -> Button:
 	b.custom_minimum_size = Vector2(130, 46)
 	b.pressed.connect(cb)
 	return b
+
+
+func _turn_blocks(label: String, current: int, max_turns: int) -> Control:
+	# HP-bar-achtige rij blokjes i.p.v. een kaal getal in tekst: één blokje
+	# per beurt/punt. Fel = nog beschikbaar, dof = al opgebruikt. Gebruikt
+	# voor alle "X over"-tellers (rondes, pogingen, scoutpunten) in
+	# events/minigames en het scoutingscherm.
+	var row := HBoxContainer.new()
+	row.add_theme_constant_override("separation", 10)
+	if label != "":
+		var l := Label.new()
+		l.text = label
+		l.add_theme_font_size_override("font_size", 20)
+		row.add_child(l)
+	var blocks := HBoxContainer.new()
+	blocks.add_theme_constant_override("separation", 4)
+	row.add_child(blocks)
+	# Defensief: als current ooit boven max_turns uitkomt (bijv. een perk die
+	# na aanvang nog bijtelt), tekenen we toch genoeg blokjes om het te tonen.
+	var shown_max := maxi(max_turns, current)
+	for i in range(shown_max):
+		var block := ColorRect.new()
+		block.custom_minimum_size = Vector2(20, 20)
+		block.color = Color(0.95, 0.75, 0.15) if i < current else Color(0.22, 0.22, 0.26)
+		blocks.add_child(block)
+	return row
 
 
 func _scout(pid: String) -> void:
@@ -1429,7 +1525,8 @@ func show_bidding() -> void:
 	clear()
 	_dev_test_banner()
 	lbl("BIEDINGSOORLOG", 32)
-	_name_row("Cliënt: ", bidding.client_id, "   |   Rondes over: %d" % bidding.rounds_left, 24)
+	_name_row("Cliënt: ", bidding.client_id, "", 24)
+	content.add_child(_turn_blocks("Rondes:", bidding.rounds_left, 4))
 	sep()
 	for c in bidding.clubs:
 		var status := "actief" if c.active else "afgehaakt"
@@ -1496,7 +1593,8 @@ func show_press() -> void:
 	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
 	lbl("PERSCONFERENTIE", 32)
-	_name_row("", cid, "   |   Spanning: %d/100   |   Vragen over: %d" % [int(press.tension), press.questions_left], 24)
+	_name_row("", cid, "   |   Spanning: %d/100" % int(press.tension), 24)
+	content.add_child(_turn_blocks("Vragen:", press.questions_left, 5))
 	if not press.log.is_empty():
 		sep()
 		for line in press.log:
@@ -1536,7 +1634,8 @@ func show_sponsor() -> void:
 	var cid := str(mg_ev.client_id)
 	lbl("SPONSORPITCH", 32)
 	_name_row("Cliënt: ", cid, "", 24)
-	lbl("Terughoudendheid merk: %d   |   Rondes over: %d" % [int(sponsor.reluctance), sponsor.rounds_left], 26)
+	lbl("Terughoudendheid merk: %d" % int(sponsor.reluctance), 26)
+	content.add_child(_turn_blocks("Rondes:", sponsor.rounds_left, 3))
 	if not sponsor.log.is_empty():
 		sep()
 		for line in sponsor.log:
@@ -1680,7 +1779,8 @@ func show_dice() -> void:
 	clear()
 	_dev_test_banner()
 	lbl("DOBBELEN BIJ DE BOOKMAKER", 32)
-	lbl("Inzet: %s   |   Herkansingen over: %d" % [eur(dice.stake), dice.rolls_left], 24)
+	lbl("Inzet: %s" % eur(dice.stake), 24)
+	content.add_child(_turn_blocks("Herkansingen:", dice.rolls_left, 2))
 	lbl("Uitbetaling op je inzet: 5 gelijke ogen ×10, 4 gelijk ×4, full house ×3, 3 gelijk ×1,5, twee paar ×0,5. Niets van dit alles? Dan ben je je inzet kwijt.", 19)
 	sep()
 	var row := HBoxContainer.new()
@@ -1740,7 +1840,8 @@ func show_accounting() -> void:
 	clear()
 	_dev_test_banner()
 	lbl("DE BOEKHOUDPUZZEL", 32)
-	lbl("Vul elke rij en kolom met de cijfers 1-5, elk precies één keer. Pogingen over: %d" % accounting.attempts_left, 22)
+	lbl("Vul elke rij en kolom met de cijfers 1-5, elk precies één keer.", 22)
+	content.add_child(_turn_blocks("Pogingen:", accounting.attempts_left, 3))
 	sep()
 	var grid := GridContainer.new()
 	grid.columns = AccountingPuzzle.SIZE
@@ -1870,7 +1971,8 @@ func show_scoutdate() -> void:
 	clear()
 	_dev_test_banner()
 	lbl("SPEED-DATEN OP DE SCOUTINGBEURS", 32)
-	lbl("Vastgezet: %d/4   |   Pogingen over: %d" % [scoutdate.locked_count(), scoutdate.attempts_left], 24)
+	lbl("Vastgezet: %d/4" % scoutdate.locked_count(), 24)
+	content.add_child(_turn_blocks("Pogingen:", scoutdate.attempts_left, 6))
 	if not scoutdate.log.is_empty():
 		sep()
 		for line in scoutdate.log:
@@ -2059,7 +2161,8 @@ func show_nego() -> void:
 	lbl("ONDERHANDELING", 32)
 	lbl("%s → %s" % [p.name, c.name], 26)
 	lbl("Transfersom: %s   |   Jouw fee: %d%%" % [eur(nego.deal_value), int(round(nego.cut * 100))], 24)
-	lbl("Weerstand van TD %s: %d   |   Rondes over: %d" % [c.td, int(maxf(nego.resistance, 0)), nego.rounds_left], 26)
+	lbl("Weerstand van TD %s: %d" % [c.td, int(maxf(nego.resistance, 0))], 26)
+	content.add_child(_turn_blocks("Rondes:", nego.rounds_left, 5 + Meta.perk_level("reserves")))
 	lbl("Stemming: %s" % nego.mood_name(), 24)
 	if nego.pers_known:
 		lbl("Type: %s" % str(Negotiation.PERS_INFO[nego.pers]), 22)
@@ -2469,6 +2572,9 @@ func show_win() -> void:
 	sep()
 	if earned > 0:
 		lbl("+%s legacy points verdiend  →  totaal %s" % [_pts(earned), _pts(Meta.state.legacy_points)], 24)
+		if Meta.last_champion_bonus > 0:
+			var bonus_lbl := lbl("Waarvan %s KAMPIOENSBONUS — 12%% van je hele carrière-saldo, in één klap." % _pts(Meta.last_champion_bonus), 22)
+			bonus_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 	else:
 		lbl("Legacy points: %s" % _pts(Meta.state.legacy_points), 24)
 	btn("Perks bekijken →", show_perks)

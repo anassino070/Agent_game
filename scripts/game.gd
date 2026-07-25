@@ -45,20 +45,34 @@ var last_new_client_id := ""
 
 # ---------------------------------------------------------------- run setup
 
+# Mega-boost (eenmalig verbruikt): een gewonnen run zet Meta's pending_boost-
+# vlag, die precies deze ene keer een klapper geeft aan de allereerstvolgende
+# nieuwe run — dubbel startkapitaal, flink meer startreputatie, een extra
+# gunst en twee extra scoutpunten. Geen permanente perk: puur momentum.
+const BOOST_MONEY_MULT := 2.0
+const BOOST_REP_BONUS := 25
+const BOOST_FAVORS_BONUS := 1
+const BOOST_SCOUT_POINTS_BONUS := 2
+
+
 func new_run() -> void:
 	rng.randomize()
 	var world: Dictionary = WorldGen.generate(rng)
+	var boost := Meta.consume_pending_boost()
+	var base_money := START_MONEY
+	if boost:
+		base_money = int(round(float(base_money) * BOOST_MONEY_MULT))
 	state = {
 		"season": 1,
-		"money": START_MONEY + Meta.perk_bonus("startkapitaal") + Meta.perk_bonus("onderpand"),
-		"rep": clampi(50 + Meta.perk_bonus("netwerk") + Meta.perk_bonus("iconenstatus"), 0, 100),
+		"money": base_money + Meta.perk_bonus("startkapitaal") + Meta.perk_bonus("onderpand"),
+		"rep": clampi(50 + (BOOST_REP_BONUS if boost else 0) + Meta.perk_bonus("netwerk") + Meta.perk_bonus("iconenstatus"), 0, 100),
 		"scandal": 0,
-		"favors": 1 + Meta.perk_bonus("gunsten"),
-		"scout_points": scout_points_per_season(),
+		"favors": 1 + (BOOST_FAVORS_BONUS if boost else 0) + (2 if Meta.has_legacy_perk("eeuwige_gunst") else 0) + Meta.perk_bonus("gunsten"),
+		"scout_points": scout_points_per_season() + (BOOST_SCOUT_POINTS_BONUS if boost else 0),
 		"players": world.players,
 		"clubs": world.clubs,
 		"clients": [],
-		"news": "Je opent je kantoor boven een snackbar. Eén cliënt gelooft in je.",
+		"news": "Je opent je kantoor met een enorme boost in de rug — je vorige triomf gonst nog na." if boost else "Je opent je kantoor boven een snackbar. Eén cliënt gelooft in je.",
 		"used_events": [],
 		"total_fees": 0,
 		"game_over": "",
@@ -66,7 +80,8 @@ func new_run() -> void:
 		"bank_deposits": [],   # [{"amount": int, "seasons_left": int}] — De Bank
 		"shop_owned": [],      # ids uit SHOP_UPGRADES die je deze run al kocht
 		"noodfonds_used": false,
-		"office_level": 1,     # 1..OFFICE_MAX_LEVEL — bepaalt het spelersplafond
+		# Erfenis-perk "Kantoorvoorsprong": start op niveau 2 i.p.v. 1.
+		"office_level": 2 if Meta.has_legacy_perk("kantoorvoorsprong") else 1,
 		"candidate_ids": [],   # pids van de verse scoutingkandidaten dit seizoen
 		"candidate_counter": 0, # oplopende teller voor unieke kandidaat-pids
 	}
@@ -80,6 +95,15 @@ func new_run() -> void:
 		pool = state.players.keys()
 	var pick: String = pool[rng.randi_range(0, pool.size() - 1)]
 	_make_client(pick, 65)
+	# Erfenis-perk "Kroonjuweel-netwerk": een tweede startcliënt uit dezelfde pool.
+	if Meta.has_legacy_perk("kroonjuweel_netwerk"):
+		pool.erase(pick)
+		if pool.is_empty():
+			pool = state.players.keys()
+			pool.erase(pick)
+		if not pool.is_empty():
+			var pick2: String = pool[rng.randi_range(0, pool.size() - 1)]
+			_make_client(pick2, 65)
 
 
 func _make_client(pid: String, trust: int) -> void:
@@ -627,11 +651,19 @@ const OFFICE_LEVELS := [
 	{"name": "Het Grachtenpand",  "avg": 69, "floor": 57, "ceiling": 81},
 	{"name": "De Glazen Toren",   "avg": 78, "floor": 68, "ceiling": 88},
 	{"name": "Monaco",            "avg": 86, "floor": 78, "ceiling": 94},
+	{"name": "De Kampioenssuite", "avg": 91, "floor": 86, "ceiling": 97},
 ]
 
 
+func office_max_level() -> int:
+	# Niveau 6 ("De Kampioenssuite") is een geheime, exclusieve trofee: hij
+	# bestaat pas zodra je ooit ÉÉN run hebt gewonnen (Meta.state.has_won_ever)
+	# — daarna blijft hij voor altijd beschikbaar, in elke run.
+	return OFFICE_MAX_LEVEL + 1 if bool(Meta.state.get("has_won_ever", false)) else OFFICE_MAX_LEVEL
+
+
 func office_level() -> int:
-	return clampi(int(state.get("office_level", 1)), 1, OFFICE_MAX_LEVEL)
+	return clampi(int(state.get("office_level", 1)), 1, office_max_level())
 
 
 func office_band() -> Dictionary:
@@ -643,10 +675,9 @@ func office_name() -> String:
 
 
 func office_upgrade_cost() -> int:
-	# Vast bedrag: €100.000 × (doelniveau)². L2=€400k, L3=€900k, L4=€1,6mln,
-	# L5=€2,5mln. -1 = al op het hoogste niveau.
+	# Vast bedrag: €60.000 × (doelniveau)². -1 = al op het hoogste niveau.
 	var next_lvl := office_level() + 1
-	if next_lvl > OFFICE_MAX_LEVEL:
+	if next_lvl > office_max_level():
 		return -1
 	return 60000 * next_lvl * next_lvl
 
