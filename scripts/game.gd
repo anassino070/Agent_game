@@ -84,6 +84,7 @@ func new_run() -> void:
 
 func _make_client(pid: String, trust: int) -> void:
 	state.players[pid]["trust"] = clampi(trust + Meta.perk_bonus("vertrouwenspersoon"), 0, 100)
+	state.players[pid]["client_since"] = int(state.season)
 	state.clients.append(pid)
 
 
@@ -394,7 +395,13 @@ func poach_chance(p: Dictionary) -> float:
 	# Rivalen kapen ook cliënten met redelijk vertrouwen weg: hoe hoger de
 	# rating, hoe aantrekkelijker; hoog vertrouwen beschermt — sterker dan
 	# voorheen, zodat vertrouwen hier ook echt voor elk punt iets doet.
+	# Onaantastbaar tijdens zijn eerste 2 seizoenen bij je: een net getekende
+	# cliënt is nog niet interessant genoeg voor een rivaal om over te stappen
+	# — pas vanaf zijn 3e seizoen loopt hij risico.
 	if Meta.perk_level("ijzeren_stal") > 0:
+		return 0.0
+	var since := int(p.get("client_since", state.season))
+	if int(state.season) - since < 2:
 		return 0.0
 	var c := 0.03 + (float(p.rating) - 50.0) * 0.005 - (float(p.trust) - 50.0) * 0.006
 	c -= float(Meta.perk_bonus("binding")) * 0.01
