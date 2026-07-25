@@ -1389,6 +1389,7 @@ func _start_minigame(ev: Dictionary) -> void:
 			show_press()
 		"sponsorpitch":
 			sponsor = SponsorPitch.new()
+			sponsor.setup(Game.rng)
 			show_sponsor()
 		"fiscale_schikking":
 			tax = TaxSettlement.new()
@@ -1545,9 +1546,12 @@ func show_sponsor() -> void:
 		_show_effect_lines(o.effects, str(Game.state.players[cid].name))
 		btn("Verder →", func(): _finish_sponsor(o))
 	else:
-		btn("Cijfers tonen  [70%%, -15]", func(): _play_sponsor("cijfers"))
-		btn("Exclusiviteit beloven  [55%%, -22, kost vertrouwen]", func(): _play_sponsor("exclusiviteit"))
-		btn("Prestatiebonus voorstellen  [85%%, -10]", func(): _play_sponsor("prestatiebonus"))
+		# Geen zichtbare kansen/effecten meer: welke tactiek het beste werkt
+		# hangt af van het merk (zie de openingszin hierboven in de log) — met
+		# vaste percentages op de knop zou je toch gewoon de hoogste spammen.
+		btn("Cijfers tonen", func(): _play_sponsor("cijfers"))
+		btn("Exclusiviteit beloven  [kost vertrouwen]", func(): _play_sponsor("exclusiviteit"))
+		btn("Prestatiebonus voorstellen", func(): _play_sponsor("prestatiebonus"))
 
 
 func _play_sponsor(action: String) -> void:
