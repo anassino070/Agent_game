@@ -65,8 +65,8 @@ static func get_events() -> Array:
 			],
 		},
 		{
-			"id": "investeerder", "title": "De weldoener",
-			"text": "Een 'investeerder' met vage connecties biedt je €20.000 werkkapitaal. Geen contract, alleen 'wederzijds begrip'.",
+			"id": "investeerder", "title": "De weldoener", "amount": 20000,
+			"text": "Een 'investeerder' met vage connecties biedt je {amount} werkkapitaal. Geen contract, alleen 'wederzijds begrip'.",
 			"options": [
 				{"label": "Accepteren",
 					"effects": {"money": 20000, "scandal": 15},
@@ -123,8 +123,8 @@ static func get_events() -> Array:
 			],
 		},
 		{
-			"id": "lening", "title": "Oude bekende",
-			"text": "Een oud-teamgenoot uit je jeugd zit financieel aan de grond en vraagt om €10.000.",
+			"id": "lening", "title": "Oude bekende", "amount": 10000,
+			"text": "Een oud-teamgenoot uit je jeugd zit financieel aan de grond en vraagt om {amount}.",
 			"options": [
 				{"label": "Lenen", "req_money": 10000,
 					"effects": {"money": -10000, "favors": 2},
@@ -392,8 +392,8 @@ static func get_events() -> Array:
 			],
 		},
 		{
-			"id": "verkeerde_storting", "title": "Verkeerde storting",
-			"text": "Een club maakt per ongeluk €14.000 te veel over voor een oude deal. Niemand belt erover — nog niet.",
+			"id": "verkeerde_storting", "title": "Verkeerde storting", "amount": 14000,
+			"text": "Een club maakt per ongeluk {amount} te veel over voor een oude deal. Niemand belt erover — nog niet.",
 			"options": [
 				{"label": "Melden en terugstorten", "effects": {"rep": 5},
 					"txt": "De club is opgelucht en onthoudt je eerlijkheid."},
@@ -642,11 +642,6 @@ static func get_events() -> Array:
 			"id": "persconferentie_druk", "title": "Persconferentie onder druk", "needs_client": true,
 			"minigame": "persconferentie",
 			"text": "Na een dramatische nederlaag moet {client} de pers te woord staan. Jij zit naast hem en fluistert antwoorden — de vragen worden ronde na ronde scherper.",
-		},
-		{
-			"id": "sponsorpitch", "title": "De sponsorpitch", "needs_client": true,
-			"minigame": "sponsorpitch",
-			"text": "Een groot merk wil {client} als gezicht van een campagne, maar de eerste pitch-vergadering wordt een pokerspel over voorwaarden.",
 		},
 		{
 			"id": "fiscale_schikking", "title": "Schikkingsvoorstel",

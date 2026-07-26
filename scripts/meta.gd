@@ -322,6 +322,17 @@ func perk_cost(id: String) -> int:
 	return int(PERKS[id].base_cost) * (lvl + 1)
 
 
+func _fmt_thousands(n: int) -> String:
+	# Zelfde duizendtal-notatie als main.gd's eur(), zonder valutateken.
+	var s := str(absi(n))
+	var out := ""
+	while s.length() > 3:
+		out = "." + s.substr(s.length() - 3) + out
+		s = s.substr(0, s.length() - 3)
+	out = s + out
+	return ("-" + out) if n < 0 else out
+
+
 func perk_desc(id: String, levels: int) -> String:
 	# Beschrijving voor `levels` niveaus, met de juiste eenheid.
 	var p: Dictionary = PERKS[id]
@@ -331,7 +342,7 @@ func perk_desc(id: String, levels: int) -> String:
 	var txt := str(amount)
 	match str(p.get("fmt", "int")):
 		"money":
-			txt = "€%d" % amount
+			txt = "€%s" % _fmt_thousands(amount)
 		"pct10":
 			txt = ("%.1f%%" % (float(amount) / 10.0)).replace(".", ",")
 	return str(p.desc) % txt

@@ -3,7 +3,7 @@
 # transferwindow → afsluiting. Game (autoload) bevat alle logica en staat.
 extends Control
 
-var header: Label
+var header: RichTextLabel   # BBCode aan, zodat "Gunsten" er goudkleurig uit kan springen
 var content: VBoxContainer
 
 # Achtergrond die per kantoorniveau wisselt. De art maak je zelf: leg
@@ -42,7 +42,6 @@ var nego_club := ""
 var mg_ev: Dictionary = {}          # het originerende event (voor client_id, terugkeer)
 var bidding: BiddingWar = null
 var press: PressConference = null
-var sponsor: SponsorPitch = null
 var tax: TaxSettlement = null
 var poker: PokerBluff = null
 var poker_notes: Array = []
@@ -150,9 +149,12 @@ func _ready() -> void:
 	vbox.add_theme_constant_override("separation", 16)
 	margin.add_child(vbox)
 
-	header = Label.new()
+	header = RichTextLabel.new()
+	header.bbcode_enabled = true
+	header.fit_content = true
+	header.scroll_active = false
 	header.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	header.add_theme_font_size_override("font_size", 24)
+	header.add_theme_font_size_override("normal_font_size", 24)
 	vbox.add_child(header)
 
 	turn_bar = HBoxContainer.new()
@@ -386,7 +388,7 @@ func _name_row(before: String, pid: String, after: String, size := 24) -> void:
 
 func refresh_header() -> void:
 	var s: Dictionary = Game.state
-	header.text = "Seizoen %d/%d  |  %s  |  Rep %d  |  Schandaal %d  |  Gunsten %d  |  Stal %d/%d  |  🏢 Nv.%d %s" % [
+	header.text = "Seizoen %d/%d  |  %s  |  Rep %d  |  Schandaal %d  |  [color=#ffd633]Gunsten %d[/color]  |  Stal %d/%d  |  🏢 Nv.%d %s" % [
 		int(s.season), Game.MAX_SEASONS, eur(s.money),
 		int(s.rep), int(s.scandal), int(s.favors),
 		s.clients.size(), Game.client_cap(),
@@ -578,7 +580,6 @@ func _dev_cleanup_minigames() -> void:
 	# passen — puur navigatie tijdens het testen, geen echte uitkomst.
 	bidding = null
 	press = null
-	sponsor = null
 	tax = null
 	poker = null
 	poker_notes = []
@@ -1273,11 +1274,18 @@ func show_event(ev: Dictionary) -> void:
 	if str(ev.client_id) != "":
 		cname = str(Game.state.players[ev.client_id].name)
 	lbl("EVENT: %s" % str(ev.title), 32)
+	# Events met een concreet geldbedrag in hun flavor-tekst gebruiken een
+	# "amount"-key (ongeschaalde basiswaarde) i.p.v. het bedrag hard te coderen
+	# — anders klopt de tekst na seizoen 1 niet meer met het WERKELIJK
+	# geschaalde effect (Game.event_money_scale()).
+	var text := str(ev.text)
+	if ev.has("amount"):
+		text = text.replace("{amount}", eur(int(round(float(ev.amount) * Game.event_money_scale()))))
 	if str(ev.client_id) != "":
 		_show_player_info(str(ev.client_id))
-		lbl(str(ev.text).replace("{client}", cname), 26)
+		lbl(text.replace("{client}", cname), 26)
 	else:
-		lbl(str(ev.text), 26)
+		lbl(text, 26)
 	sep()
 	if ev.has("minigame"):
 		btn("Beginnen →", func(): _start_minigame(ev))
@@ -1404,7 +1412,7 @@ func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: b
 				text = "%s: %s" % [label, amount]
 			else:
 				text = "%s %s" % [_emphasis_symbol(key, emphasize, v), label]
-			rows.append({"text": text, "good": good})
+			rows.append({"text": text, "good": good, "key": key})
 	if effects.has("trust") and int(effects.trust) != 0:
 		var v := int(effects.trust)
 		var who := client_name if client_name != "" else "cliënt"
@@ -1424,11 +1432,22 @@ func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: b
 	return rows
 
 
+const GUNST_GOLD := Color(1.0, 0.84, 0.2)
+
+
 func _show_effect_rows(effects: Dictionary, client_name: String = "", show_numbers: bool = true, emphasize: Dictionary = {}) -> void:
 	var rows := _effect_rows(effects, client_name, show_numbers, emphasize)
 	for row in rows:
 		var l := lbl(str(row.text), 24 if show_numbers else 20)
-		l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35))
+		# Gunsten krijgen altijd hun herkenbare goud, ongeacht of de mutatie
+		# positief of negatief is — consistent met de goudkleurige "Gunsten"
+		# in de header.
+		var col: Color
+		if str(row.get("key", "")) == "favors":
+			col = GUNST_GOLD
+		else:
+			col = Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35)
+		l.add_theme_color_override("font_color", col)
 
 
 # ---------------------------------------------------------------- preview-nadruk
@@ -1514,10 +1533,6 @@ func _start_minigame(ev: Dictionary) -> void:
 			press = PressConference.new()
 			press.setup(Game.rng)
 			show_press()
-		"sponsorpitch":
-			sponsor = SponsorPitch.new()
-			sponsor.setup(Game.rng)
-			show_sponsor()
 		"fiscale_schikking":
 			tax = TaxSettlement.new()
 			show_tax()
@@ -1651,47 +1666,6 @@ func _play_press(action: String) -> void:
 func _finish_press(o: Dictionary) -> void:
 	Game.apply_effects(o.effects, str(mg_ev.client_id))
 	press = null
-	_next_event()
-
-
-# -- Sponsorpitch --
-
-func show_sponsor() -> void:
-	refresh_header()
-	clear()
-	_dev_test_banner()
-	var cid := str(mg_ev.client_id)
-	lbl("SPONSORPITCH", 32)
-	_name_row("Cliënt: ", cid, "", 24)
-	lbl("Terughoudendheid merk: %d" % int(sponsor.reluctance), 26)
-	_set_turn_bar("Rondes:", sponsor.rounds_left, 3)
-	if not sponsor.log.is_empty():
-		sep()
-		for line in sponsor.log:
-			lbl("· " + str(line), 20)
-	sep()
-	if sponsor.finished:
-		var o := sponsor.outcome(Game.event_money_scale())
-		lbl(str(o.txt), 26)
-		_show_effect_lines(o.effects, str(Game.state.players[cid].name))
-		btn("Verder →", func(): _finish_sponsor(o))
-	else:
-		# Geen zichtbare kansen/effecten meer: welke tactiek het beste werkt
-		# hangt af van het merk (zie de openingszin hierboven in de log) — met
-		# vaste percentages op de knop zou je toch gewoon de hoogste spammen.
-		btn("Cijfers tonen", func(): _play_sponsor("cijfers"))
-		btn("Exclusiviteit beloven  [kost vertrouwen]", func(): _play_sponsor("exclusiviteit"))
-		btn("Prestatiebonus voorstellen", func(): _play_sponsor("prestatiebonus"))
-
-
-func _play_sponsor(action: String) -> void:
-	sponsor.play(action, Game.rng)
-	show_sponsor()
-
-
-func _finish_sponsor(o: Dictionary) -> void:
-	Game.apply_effects(o.effects, str(mg_ev.client_id))
-	sponsor = null
 	_next_event()
 
 

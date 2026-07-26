@@ -43,6 +43,21 @@ var state: Dictionary = {}
 var last_new_client_id := ""
 
 
+# Duizendtal-scheiding voor getallen in de eind-van-seizoen-meldingsregels
+# (`lines.append(...)` in end_of_season()) — deze teksten worden ongewijzigd
+# door main.gd getoond, dus de opmaak moet hier al kloppen. Zelfde notatie
+# als main.gd's eur(), maar zonder valutateken (voor gebruik ná een "€").
+func fmt_thousands(n) -> String:
+	var v := int(n)
+	var s := str(absi(v))
+	var out := ""
+	while s.length() > 3:
+		out = "." + s.substr(s.length() - 3) + out
+		s = s.substr(0, s.length() - 3)
+	out = s + out
+	return ("-" + out) if v < 0 else out
+
+
 # ---------------------------------------------------------------- run setup
 
 # Mega-boost (eenmalig verbruikt): een gewonnen run zet Meta's pending_boost-
@@ -987,7 +1002,7 @@ func end_of_season() -> Array:
 		costs = int(costs * (1.0 - float(discount) / 100.0))
 	costs = maxi(costs - Meta.perk_bonus("schuldpapier"), 0)
 	state.money = int(state.money) - costs
-	lines.append("Kantoorkosten: -€%d" % costs)
+	lines.append("Kantoorkosten: -€%s" % fmt_thousands(costs))
 
 	# Clubbudgetten groeien elk seizoen mee (tv-gelden, sponsoring) — anders
 	# blijven ze voor altijd vastzitten op hun startwaarde uit seizoen 1,
@@ -1008,7 +1023,7 @@ func end_of_season() -> Array:
 			var bank_mult := BANK_MULTIPLIER + (0.3 if has_shop("investeringsfonds") else 0.0)
 			var payout := int(round(float(d.amount) * bank_mult))
 			state.money = int(state.money) + payout
-			lines.append("De bank keert uit: je storting van €%d wordt €%d." % [int(d.amount), payout])
+			lines.append("De bank keert uit: je storting van €%s wordt €%s." % [fmt_thousands(int(d.amount)), fmt_thousands(payout)])
 		else:
 			still_pending.append({"amount": int(d.amount), "seasons_left": seasons_left})
 	state.bank_deposits = still_pending
@@ -1029,7 +1044,7 @@ func end_of_season() -> Array:
 			pp["club"] = MYSTERY_CLUB_ID
 			pp["contract"] = 3
 			pp["trust"] = clampi(int(pp.trust) + int(ceil(6.0 * trust_gain_mult())), 0, 100)
-			lines.append("Voorbereide transfer: %s naar een mysterieuze buitenlandse club — jouw fee €%d." % [pp.name, income])
+			lines.append("Voorbereide transfer: %s naar een mysterieuze buitenlandse club — jouw fee €%s." % [pp.name, fmt_thousands(income)])
 			prepared_results.append({"name": str(pp.name), "success": true, "transfer_sum": transfer_sum, "income": income})
 		else:
 			lines.append("Voorbereide transfer van %s ging niet door — de prognose bleek onjuist." % pp.name)
@@ -1069,7 +1084,7 @@ func end_of_season() -> Array:
 				var tg := int(value(p) * 0.01 * tekengeld_mult())
 				state.money = int(state.money) + tg
 				state.total_fees = int(state.total_fees) + tg
-				lines.append("%s verlengt bij zijn club; tekengeld €%d voor jou." % [p.name, tg])
+				lines.append("%s verlengt bij zijn club; tekengeld €%s voor jou." % [p.name, fmt_thousands(tg)])
 		if Meta.perk_level("ijzeren_stal") == 0 and rng.randf() < leave_chance(p):
 			leavers.append(cid)
 			lines.append("!! %s VERTREKT naar een andere makelaar. Het vertrouwen was op (%d)." % [p.name, int(p.trust)])
@@ -1098,7 +1113,7 @@ func end_of_season() -> Array:
 		var rente := int(float(state.money) * float(rente_pct) / 100.0)
 		if rente > 0:
 			state.money = int(state.money) + rente
-			lines.append("Rente op je vermogen: +€%d." % rente)
+			lines.append("Rente op je vermogen: +€%s." % fmt_thousands(rente))
 
 	# Gunstenfabriek-perk: elk 3e seizoen extra gunsten.
 	var gf := Meta.perk_bonus("gunstenfabriek")
