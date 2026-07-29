@@ -525,6 +525,14 @@ func dev_wipe_points() -> void:
 	save_meta()
 
 
+func dev_toggle_won_ever() -> void:
+	# Developer-only: schakelt het geheime 6e kantoorniveau (De Kampioenssuite)
+	# handmatig aan/uit, zodat je 'm kunt testen zonder een volledige 15-
+	# seizoenen-run te winnen.
+	state.has_won_ever = not bool(state.get("has_won_ever", false))
+	save_meta()
+
+
 # Beloning na afloop van een run (game over of gewonnen). Exponentiële
 # curve: elk seizoen verder vermenigvuldigt de beloning met REWARD_BASE,
 # met als plafond precies WIN_REWARD_PCT% van de volledige boom voor een

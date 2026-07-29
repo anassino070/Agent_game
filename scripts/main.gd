@@ -20,6 +20,7 @@ const OFFICE_BG_COLORS := [
 	Color(0.09, 0.13, 0.11),   # 3 Het Grachtenpand — hout/grachtgroen
 	Color(0.07, 0.10, 0.16),   # 4 De Glazen Toren — koel glasblauw
 	Color(0.06, 0.13, 0.15),   # 5 Monaco — turquoise Middellandse Zee
+	Color(0.16, 0.12, 0.03),   # 6 De Kampioenssuite — donker champagnegoud
 ]
 
 var event_queue: Array = []
@@ -407,7 +408,11 @@ func _update_office_background() -> void:
 	if lvl == _bg_level:
 		return
 	_bg_level = lvl
-	office_bg_fallback.color = OFFICE_BG_COLORS[lvl - 1]
+	# Defensief geclampt: mocht Game.OFFICE_LEVELS ooit meer niveaus tellen dan
+	# er kleuren gedefinieerd zijn, dan valt dit terug op de laatste kleur
+	# i.p.v. te crashen op een out-of-bounds index (zoals eerder gebeurde bij
+	# het geheime niveau 6 vóórdat deze array werd bijgewerkt).
+	office_bg_fallback.color = OFFICE_BG_COLORS[clampi(lvl - 1, 0, OFFICE_BG_COLORS.size() - 1)]
 	var path := "res://art/office_%d.png" % lvl
 	if ResourceLoader.exists(path):
 		office_bg.texture = load(path)
@@ -514,6 +519,10 @@ func show_dev_panel() -> void:
 	sep()
 	lbl("Testmodus: doorloopt ALLE %d events op volgorde, met onbeperkt geld en zonder fail-checks. Start een verse testrun in het geheugen — je opgeslagen run blijft veilig op schijf." % EventsDB.get_events().size(), 20)
 	btn("Test: doorloop alle events →", _start_event_test)
+	sep()
+	var won_ever := bool(Meta.state.get("has_won_ever", false))
+	lbl("Geheim kantoorniveau 6 (De Kampioenssuite): %s" % ("ontgrendeld" if won_ever else "nog vergrendeld"), 20)
+	btn("Zet uit (test)" if won_ever else "Forceer ontgrendeld (test)", func(): Meta.dev_toggle_won_ever(); show_dev_panel())
 	sep()
 	btn("← Terug naar start", func(): dev_unlocked = false; dev_confirm = false; show_start())
 
@@ -791,6 +800,15 @@ func show_prep() -> void:
 	if str(Game.state.news) != "":
 		lbl("Nieuws: " + str(Game.state.news), 24)
 	show_flash()
+	# Schandaal doet vanaf niveau 40/70 daadwerkelijk iets (zie scandal_*() in
+	# game.gd) — deze waarschuwing maakt dat zichtbaar, anders merk je alleen
+	# een lagere tekenkans/hogere kaapkans zonder te snappen waarom.
+	if int(Game.state.scandal) >= 70:
+		var l := lbl("⚠ Schandaal %d — je reputatie is in vrije val: rivalen kapen je cliënten makkelijker weg en clubs mijden je bij transfers." % int(Game.state.scandal), 20)
+		l.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
+	elif int(Game.state.scandal) >= 40:
+		var l := lbl("⚠ Schandaal %d — je staat onder een vergrootglas: nieuwe cliënten tekenen minder makkelijk bij je." % int(Game.state.scandal), 20)
+		l.add_theme_color_override("font_color", Color(1.0, 0.7, 0.3))
 	sep()
 	lbl("Jouw stal (%d/%d):" % [Game.state.clients.size(), Game.client_cap()], 28)
 	for cid in Game.state.clients:

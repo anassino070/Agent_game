@@ -11,7 +11,13 @@ const MAX_SEASONS := 15       # de volledige run
 const CLIENT_CAP := 4
 const SCOUT_POINTS := 3
 const BASE_COSTS := 10000     # kantoorkosten seizoen 1
-const COSTS_MULT := 1.8       # kosten vermenigvuldigen elk seizoen met deze factor
+# Was 1.8. De nieuwe transferwaarde-curve (zie VALUE_ANCHORS) maakt de hogere
+# kantoorniveaus 2,7×-7,2× rijker dan voorheen — zonder compensatie zou de
+# late game daardoor JUIST makkelijker worden, het omgekeerde van de bedoeling.
+# 1,95 houdt de vroege seizoenen (kleine bedragen) bijna ongemoeid maar maakt
+# seizoen 15 ongeveer 3× duurder (~€115mln i.p.v. ~€37,5mln), wat de extra
+# fee-macht op de hogere niveaus grotendeels neutraliseert.
+const COSTS_MULT := 1.95      # kosten vermenigvuldigen elk seizoen met deze factor
 const FEE_CUT := 0.10         # standaard fee-percentage
 
 # Vertrekkans is een DOORLOPENDE curve i.p.v. een harde knip bij één
@@ -21,6 +27,39 @@ const FEE_CUT := 0.10         # standaard fee-percentage
 const LEAVE_SAFE_TRUST := 60.0
 const LEAVE_SLOPE := 0.016
 const LEAVE_CHANCE_MAX := 0.85
+
+# Schandaal deed tot nu toe NIETS tussen 0 en 99 — alleen bij exact 100 verlies
+# je je licentie. Dat maakt het een binaire val i.p.v. een voelbare stat: een
+# makelaar op schandaal 70 merkte er niets van totdat de teller toevallig
+# verder opliep. Twee drempels geven schandaal continue, oplopende gevolgen
+# (lineair van 0 bij de drempel tot het max-effect bij 100), zodat een hoog
+# schandaal al vóór de 100-grens pijn doet.
+const SCANDAL_TIER1 := 40.0   # "onder een vergrootglas": lagere tekenkans
+const SCANDAL_TIER2 := 70.0   # "reputatie in vrije val": hogere kaapkans, minder clubinteresse
+const SCANDAL_TIER1_MAX_PENALTY := 0.20   # tekenkans tot -20% bij schandaal 100
+const SCANDAL_TIER2_MAX_POACH := 0.20     # kaapkans tot +20% bij schandaal 100
+const SCANDAL_TIER2_MAX_INTEREST_PENALTY := 0.5   # clubinteresse-kans tot -50% bij schandaal 100
+
+
+func _scandal_tier_factor(tier: float) -> float:
+	# 0.0 onder de drempel, oplopend naar 1.0 bij schandaal 100.
+	if float(state.scandal) < tier:
+		return 0.0
+	return (float(state.scandal) - tier) / (100.0 - tier)
+
+
+func scandal_signing_penalty() -> float:
+	return SCANDAL_TIER1_MAX_PENALTY * _scandal_tier_factor(SCANDAL_TIER1)
+
+
+func scandal_poach_bonus() -> float:
+	return SCANDAL_TIER2_MAX_POACH * _scandal_tier_factor(SCANDAL_TIER2)
+
+
+func scandal_interest_mult() -> float:
+	# Multiplier (niet een af te trekken percentage) — makkelijker te
+	# combineren met de bestaande budget-penalty (×0,5) in gen_interest().
+	return 1.0 - SCANDAL_TIER2_MAX_INTEREST_PENALTY * _scandal_tier_factor(SCANDAL_TIER2)
 
 # Reputatie/vertrouwen zijn te makkelijk te winnen: positieve mutaties tellen
 # maar voor een deel, negatieve tellen volledig — netto duw je dus actief
@@ -80,7 +119,7 @@ func new_run() -> void:
 	state = {
 		"season": 1,
 		"money": base_money + Meta.perk_bonus("startkapitaal") + Meta.perk_bonus("onderpand"),
-		"rep": clampi(50 + (BOOST_REP_BONUS if boost else 0) + Meta.perk_bonus("netwerk") + Meta.perk_bonus("iconenstatus"), 0, 100),
+		"rep": maxi(50 + (BOOST_REP_BONUS if boost else 0) + Meta.perk_bonus("netwerk") + Meta.perk_bonus("iconenstatus"), 0),
 		"scandal": 0,
 		"favors": 1 + (BOOST_FAVORS_BONUS if boost else 0) + (2 if Meta.has_legacy_perk("eeuwige_gunst") else 0) + Meta.perk_bonus("gunsten"),
 		"scout_points": scout_points_per_season() + (BOOST_SCOUT_POINTS_BONUS if boost else 0),
@@ -145,7 +184,12 @@ const PREPARED_TRANSFER_VALUE_PCT := 0.80
 # zodat ze de stijgende spelerswaarde (rating-ontwikkeling × value()) kunnen
 # bijbenen. Zonder groei bevriezen budgetten op hun seizoen-1-waarde terwijl
 # spelers duurder worden — met een harde muur van "nul interesse" tot gevolg.
-const CLUB_BUDGET_GROWTH := 0.12
+# Was 0,12: de nieuwe VALUE_ANCHORS-curve maakt de top (niveau 5-6) 2,8×-7,2×
+# duurder dan voorheen — zonder deze verhoging zouden zelfs de rijkste clubs
+# (ambitie 5) tegen seizoen 15 nooit meer dan ~16mln kunnen ophoesten, ver
+# onder de nieuwe €54mln-gemiddelde op het topniveau. Bij 0,20 komt de
+# rijkste club op ~€77mln uit — genoeg om ook de duurste toppers te kopen.
+const CLUB_BUDGET_GROWTH := 0.20
 
 
 func bank_deposit(amount: int) -> bool:
@@ -314,11 +358,11 @@ func buy_shop_upgrade(id: String) -> bool:
 				var p: Dictionary = state.players[cid]
 				p["trust"] = clampi(int(p.trust) + 15, 0, 100)
 		"kantoorrenovatie":
-			state.rep = clampi(int(state.rep) + 8, 0, 100)
+			state.rep = maxi(int(state.rep) + 8, 0)
 		"scoutingbudget":
 			state.scout_points = int(state.scout_points) + 3
 		"pr_campagne":
-			state.rep = clampi(int(state.rep) + 10, 0, 100)
+			state.rep = maxi(int(state.rep) + 10, 0)
 		"clubarts_netwerk":
 			state.scandal = maxi(int(state.scandal) - 15, 0)
 		"vip_netwerk":
@@ -396,13 +440,41 @@ func ensure_test_client() -> void:
 
 # ---------------------------------------------------------------- helpers
 
+# Transferwaarde-ankerpunten (rating → gem. marktwaarde op dat kantoorniveau),
+# log-lineair geïnterpoleerd per segment — vervangt de oude kwadratische
+# formule (pow(r-40,5)^2*3000), die veel te traag groeide om de gewenste
+# waardesprong tussen kantoorniveaus te halen. Doelwaarden per niveau-gem.:
+# N1(28)=€45k, N2(40)=€330k, N3(55)=€880k, N4(70)=€3,8mln, N5(84)=€16mln,
+# N6(90)=€54mln. De eerste/laatste ankers (18 en 94) zijn de uiterste ratings
+# die het spel kan opleveren (niveau 1-floor resp. de wereldwijde 94-cap in
+# world_gen.gd) — erbuiten wordt geclampt, dus nooit geëxtrapoleerd.
+const VALUE_ANCHORS := [
+	[18.0, 8548.0],
+	[28.0, 45000.0],
+	[40.0, 330000.0],
+	[55.0, 880000.0],
+	[70.0, 3800000.0],
+	[84.0, 16000000.0],
+	[90.0, 54000000.0],
+	[94.0, 121500000.0],
+]
+
+
+func _value_for_rating(r: float) -> float:
+	var rc := clampf(r, VALUE_ANCHORS[0][0], VALUE_ANCHORS[VALUE_ANCHORS.size() - 1][0])
+	for i in range(VALUE_ANCHORS.size() - 1):
+		var r0: float = VALUE_ANCHORS[i][0]
+		var r1: float = VALUE_ANCHORS[i + 1][0]
+		if rc <= r1:
+			var v0: float = VALUE_ANCHORS[i][1]
+			var v1: float = VALUE_ANCHORS[i + 1][1]
+			var t := (rc - r0) / (r1 - r0)
+			return v0 * pow(v1 / v0, t)
+	return VALUE_ANCHORS[VALUE_ANCHORS.size() - 1][1]
+
+
 func value(p: Dictionary) -> int:
-	# Marktwaarde: kwadratisch in rating, zodat toppers écht lonen. Factor
-	# fors verhoogd (was 650) zodat een fee al vanaf pak 'm beet seizoen 4
-	# meetelt tegen de exponentieel stijgende kantoorkosten — anders voelt
-	# een deal van €40k fee al na een paar seizoenen als zakgeld.
-	var r: float = float(p.rating)
-	var v := pow(maxf(r - 40.0, 5.0), 2.0) * 3000.0
+	var v := _value_for_rating(float(p.rating))
 	v *= 1.0 + float(Meta.perk_bonus("waardestijging")) / 100.0
 	return int(v)
 
@@ -449,6 +521,9 @@ func poach_chance(p: Dictionary) -> float:
 	c -= float(Meta.perk_bonus("binding")) * 0.01
 	if has_shop("veiligheidsnet"):
 		c -= 0.05
+	# Vanaf schandaal 70 ruiken rivalen bloed: een omstreden makelaar is een
+	# makkelijker doelwit (zie scandal_poach_bonus()).
+	c += scandal_poach_bonus()
 	return clampf(c, 0.0, 0.35)
 
 
@@ -541,7 +616,7 @@ func apply_effects(effects: Dictionary, client_id: String = "") -> Array:
 				var rv := int(v)
 				if rv > 0:
 					rv = int(ceil(float(rv) * REP_GAIN_MULT))
-				state.rep = clampi(int(state.rep) + rv, 0, 100)
+				state.rep = maxi(int(state.rep) + rv, 0)
 			"scandal":
 				var sv := int(v)
 				# Crisismanagement-perk en Juridisch adviseur (shop) dempen
@@ -678,13 +753,21 @@ func _sign_top_talent() -> String:
 # eigen sfeer/beeld zodat de achtergrond-art per niveau kan wisselen.
 const OFFICE_MAX_LEVEL := 5
 const CANDIDATES_PER_SEASON := 8
+# Niveaus verder uit elkaar getrokken en het gemiddelde omlaag (was gem. 71,
+# nu gem. ~61) — vooral het BEGIN is nu veel zwakker (niveau 1: gem. 28 i.p.v.
+# 45, bijna zuiver amateurniveau). Zonder dit kon je vroeg al redelijk veel
+# geld verdienen en dat compound sparen (bank/rente), waardoor de late game
+# bijna vanzelf makkelijk werd. De top blijft bewust binnen de 94-cap uit
+# world_gen.gd (make_candidate() capt pot/est altijd op 94) — die grens
+# doorbreken zou rating > potentieel kunnen opleveren, dus niveau 6 gaat niet
+# hoger dan Monaco kon, maar wél met een hogere floor (minder variantie).
 const OFFICE_LEVELS := [
-	{"name": "Boven de Snackbar", "avg": 45, "floor": 33, "ceiling": 57},
-	{"name": "De Portacabin",     "avg": 57, "floor": 45, "ceiling": 69},
-	{"name": "Het Grachtenpand",  "avg": 69, "floor": 57, "ceiling": 81},
-	{"name": "De Glazen Toren",   "avg": 78, "floor": 68, "ceiling": 88},
-	{"name": "Monaco",            "avg": 86, "floor": 78, "ceiling": 94},
-	{"name": "De Kampioenssuite", "avg": 91, "floor": 86, "ceiling": 97},
+	{"name": "Boven de Snackbar", "avg": 28, "floor": 18, "ceiling": 40},
+	{"name": "De Portacabin",     "avg": 40, "floor": 28, "ceiling": 54},
+	{"name": "Het Grachtenpand",  "avg": 55, "floor": 43, "ceiling": 68},
+	{"name": "De Glazen Toren",   "avg": 70, "floor": 58, "ceiling": 82},
+	{"name": "Monaco",            "avg": 84, "floor": 74, "ceiling": 93},
+	{"name": "De Kampioenssuite", "avg": 90, "floor": 84, "ceiling": 94},
 ]
 
 
@@ -707,15 +790,22 @@ func office_name() -> String:
 	return str(office_band().name)
 
 
+const OFFICE_UPGRADE_PCT_OF_VALUE := 0.4   # upgrade-kosten = 40% van de gem. spelerswaarde op het doelniveau
+
+
 func office_upgrade_cost() -> int:
-	# Vast bedrag: €100.000 × (doelniveau)². -1 = al op het hoogste niveau.
-	# Bewust duur: het kantoorniveau is de centrale progressie-as van een run
-	# en mag, in tegenstelling tot de optionele shop-upgrades, gewoon een
-	# forse investering blijven.
+	# Schaalt automatisch mee met VALUE_ANCHORS in plaats van een losse vaste
+	# formule (was €100.000 × doelniveau², volledig losgezongen van de
+	# transferwaardes) — zo blijft de upgrade altijd "een paar transfers
+	# waard" ongeacht hoe de waardecurve later nog verandert. -1 = al op het
+	# hoogste niveau. Bewust duur: het kantoorniveau is de centrale
+	# progressie-as van een run en mag, in tegenstelling tot de optionele
+	# shop-upgrades, gewoon een forse investering blijven.
 	var next_lvl := office_level() + 1
 	if next_lvl > office_max_level():
 		return -1
-	return 100000 * next_lvl * next_lvl
+	var target_avg := float(OFFICE_LEVELS[next_lvl - 1].avg)
+	return int(round(_value_for_rating(target_avg) * OFFICE_UPGRADE_PCT_OF_VALUE))
 
 
 func can_upgrade_office() -> bool:
@@ -833,6 +923,9 @@ func sign_chance(pid: String) -> float:
 	c += float(Meta.perk_bonus("babbel")) * 0.01
 	# Gescoute spelers voelen zich serieus genomen: +5% per scout, max +10%.
 	c += mini(int(p.get("scouted", 0)), 2) * 0.05
+	# Vanaf schandaal 40 vinden spelers een omstreden makelaar minder
+	# aantrekkelijk om bij te tekenen (zie scandal_signing_penalty()).
+	c -= scandal_signing_penalty()
 	return clampf(c, 0.1, 0.85)
 
 
@@ -841,7 +934,7 @@ func attempt_sign(pid: String) -> bool:
 		return false
 	if rng.randf() < sign_chance(pid):
 		_make_client(pid, 55)
-		state.rep = clampi(int(state.rep) + 1, 0, 100)
+		state.rep = maxi(int(state.rep) + 1, 0)
 		return true
 	return false
 
@@ -899,6 +992,9 @@ func gen_interest(client_id: String) -> Array:
 		var chance := 0.10 + (float(p.rating) - 50.0) * 0.01 + float(c.ambition) * 0.04
 		if int(c.budget) < v:
 			chance *= 0.5
+		# Vanaf schandaal 70 mijden clubs een omstreden makelaar bij transfers
+		# (zie scandal_interest_mult()).
+		chance *= scandal_interest_mult()
 		if rng.randf() < chance:
 			out.append(club_id)
 		if out.size() >= 2:
@@ -956,7 +1052,7 @@ func complete_transfer(client_id: String, club_id: String, fee: int, cut: float)
 	var c: Dictionary = state.clubs[club_id]
 	c["relation"] = clampi(int(c.relation) + 5, 0, 100)
 	c["budget"] = maxi(int(c.budget) - fee, 0)
-	state.rep = clampi(int(state.rep) + Meta.perk_bonus("pr_machine"), 0, 100)
+	state.rep = maxi(int(state.rep) + Meta.perk_bonus("pr_machine"), 0)
 	return income
 
 
