@@ -127,7 +127,11 @@ func _is_valid_grid() -> bool:
 
 func outcome(money_scale: float = 1.0) -> Dictionary:
 	if success:
-		var savings := int(round(4000.0 * money_scale))
+		# Was €4.000 — flink verhoogd (was karig voor een pure denkpuzzel
+		# zonder enig geldrisico, terwijl dit qua moeilijkheidsgraad een van
+		# de zwaarste minigames is: 14-17 lege vakjes op een 5×5-rooster,
+		# maar 3 controles).
+		var savings := int(round(15000.0 * money_scale))
 		return {"effects": {"money": savings},
 			"txt": "Het rooster klopt helemaal. Legale besparing: %s." % _eur(savings)}
 	return {"effects": {},
