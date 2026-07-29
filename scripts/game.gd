@@ -209,7 +209,7 @@ const SHOP_UPGRADES := {
 	},
 	"data_analytics": {
 		"name": "Data-analytics abonnement", "price": 38000,
-		"desc": "Scouten verlaagt de onzekerheid 2 extra, de rest van de run.",
+		"desc": "Effect van 1 scoutpunt verdubbelt, de rest van de run.",
 	},
 	"noodfonds": {
 		"name": "Noodfonds (lifeline)", "price": 52000,
@@ -813,8 +813,10 @@ func scout(pid: String) -> bool:
 	if int(p.unc) <= 2:
 		return false
 	var old_unc := int(p.unc)
-	var shop_bonus := 2 if has_shop("data_analytics") else 0
-	var new_unc := maxi(old_unc - (5 + Meta.perk_bonus("talentenoog") + shop_bonus), 2)
+	var scout_drop := 5 + Meta.perk_bonus("talentenoog")
+	if has_shop("data_analytics"):
+		scout_drop *= 2
+	var new_unc := maxi(old_unc - scout_drop, 2)
 	# De schatting kruipt richting het echte potentieel naarmate je beter
 	# kijkt — maar een "70–90"-belofte kan dus een 72-dud blijken.
 	var err := estimate(pid) - int(p.pot)

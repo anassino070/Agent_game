@@ -76,7 +76,7 @@ Het effectieve plafond (`candidate_ceiling()`) is de band-bovengrens plus de met
 - **Kantoorrenovatie** (€38k) — eenmalig +8 reputatie, plus +3 op je scouting-plafond.
 - **PR-campagne** (€24k) — eenmalig +10 reputatie.
 - **Reputatiebeheerder** (€34k) — je reputatie zakt niet meer vanzelf terug richting 50 (normaal -3/seizoen, `REP_DECAY_ABOVE_BASELINE`).
-- **Data-analytics abonnement** (€38k) — scouten verlaagt onzekerheid 2 extra.
+- **Data-analytics abonnement** (€38k) — effect van 1 scoutpunt verdubbelt: de onzekerheidsverlaging per scout (normaal 5 + Talentenoog-perk) telt 2× (`scout_drop *= 2` in `scout()`).
 - **Breed scoutingnetwerk** (€34k) — +4 op je scouting-plafond: betere spelers binnen bereik (`candidate_ceiling()`).
 - **Fiscalist** (€36k) — +2% fee-percentage op elke transfer.
 - **Contractenspecialist** (€32k) — +30% tekengeld bij elke contractverlenging.
@@ -186,7 +186,7 @@ De perks vormen een boom van **3 takken × 4 rijen × 3 opties = 36 perks** (Kap
 
 De economie is ontworpen voor **~240 uur goed spel tot 100%**. De volledige boom kost ~1,4 miljoen punten en de beloning per run is exponentieel in hoe ver je komt: een **gewonnen run levert exact 1% van de boom** op (`tree_total_cost() * (Meta.WIN_REWARD_PCT/100)` ≈ 14.100 punten), en elk seizoen mínder deelt dat door 1,45 (`Meta.REWARD_BASE`). Seizoen 10 halen ≈ 2.200 punten, seizoen 5 ≈ 340, seizoen 3 ≈ 160 (minimum 10). 100% vereist dus ~100 gewonnen runs van elk ~2,5 uur — vroeg doodgaan levert bijna niets op, ver komen loont exponentieel.
 
-**Kampioensbonus:** een gewonnen run geeft bovenop de normale beloning in één klap **12% van je bestaande carrière-puntensaldo** erbij (`Meta.CHAMPION_BONUS_PCT`, berekend over het saldo vóór deze run se punten worden bijgeschreven — dus een bonus op je hele carrière, niet op jezelf). Zichtbaar apart uitgelicht op het winscherm (`Meta.last_champion_bonus`). Dat maakt latere winsten steeds waardevoller naarmate je carrière-saldo groeit.
+**Kampioensbonus:** een gewonnen run geeft bovenop de normale beloning in één klap **12% van je bestaande carrière-puntensaldo** erbij (`Meta.CHAMPION_BONUS_PCT`, berekend over het saldo vóór deze run se punten worden bijgeschreven — dus een bonus op je hele carrière, niet op jezelf), **met een ondergrens van 25% van de winbeloning zelf** (`Meta.CHAMPION_BONUS_MIN_PCT_OF_WIN`) — anders zou een vroege winst (nog weinig opgespaard) bijna geen bonus opleveren. `award_run()` neemt het maximum van beide berekeningen: bij een klein carrière-saldo wint de 25%-ondergrens, bij een groot saldo neemt de 12%-over-saldo-berekening het vanzelf over. Zichtbaar apart uitgelicht op het winscherm (`Meta.last_champion_bonus`). Dat maakt latere winsten steeds waardevoller naarmate je carrière-saldo groeit, zonder dat een vroege winst zich onbeloond voelt.
 
 **Mega-boost:** een gewonnen run zet ook een eenmalige vlag (`Meta.state.pending_boost`, via `Meta.has_pending_boost()`/`consume_pending_boost()`) die **alléén je allereerstvolgende nieuwe run** een klapper geeft — geen permanente perk, puur momentum: dubbel startkapitaal, +25 startreputatie, +1 startgunst en +2 extra scoutpunten in seizoen 1 (`Game.new_run()`, constanten `BOOST_*`). Zichtbaar als gele banner op het startscherm zolang de boost klaarstaat; wordt pas verbruikt zodra je daadwerkelijk op "NIEUWE RUN" klikt (niet bij "Doorgaan met vorige run").
 

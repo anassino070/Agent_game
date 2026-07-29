@@ -27,6 +27,13 @@ const INF_STEP := 0.01
 # ene run. Berekend over het saldo VÓÓR deze run se punten worden bijgeschreven.
 const CHAMPION_BONUS_PCT := 0.12
 
+# Ondergrens: bij een vroege winst (klein bestaand saldo) zou 12% van dat
+# saldo bijna niets voorstellen naast de normale winbeloning. Daarom is de
+# bonus ALTIJD minstens dit percentage van de winbeloning zelf — pas als je
+# carrière-saldo groot genoeg is, wordt de 12%-over-saldo-berekening hierboven
+# groter en neemt die het over.
+const CHAMPION_BONUS_MIN_PCT_OF_WIN := 0.25
+
 # De OVERPOWERED extra's: peperduur (30–50% van de boomkosten), tellen NIET
 # mee voor de 100%-voortgang.
 const OP_PERKS := ["superprovisie", "ijzeren_stal", "helderziend", "vaste_kern"]
@@ -535,7 +542,16 @@ func award_run(total_fees: int, seasons_survived: int, won: bool) -> int:
 	# Kampioensbonus: alleen bij winst, in één klap CHAMPION_BONUS_PCT van je
 	# bestaande carrière-saldo erbij — berekend VÓÓR deze run se punten worden
 	# bijgeschreven, zodat het een bonus op je carrière is, niet op jezelf.
-	last_champion_bonus = (int(round(float(state.legacy_points) * CHAMPION_BONUS_PCT))) if won else 0
+	# Met een minimum van CHAMPION_BONUS_MIN_PCT_OF_WIN van de winbeloning
+	# zelf, zodat ook een vroege winst (nog weinig carrière-saldo) een
+	# merkbare bonus geeft — pas bij een groot saldo neemt de 12%-berekening
+	# het vanzelf over.
+	if won:
+		var bonus_over_saldo := int(round(float(state.legacy_points) * CHAMPION_BONUS_PCT))
+		var bonus_min := int(round(float(points) * CHAMPION_BONUS_MIN_PCT_OF_WIN))
+		last_champion_bonus = maxi(bonus_over_saldo, bonus_min)
+	else:
+		last_champion_bonus = 0
 	state.legacy_points = int(state.legacy_points) + points + last_champion_bonus
 	state.runs_completed = int(state.runs_completed) + 1
 	state.total_career_fees = int(state.total_career_fees) + total_fees
