@@ -483,6 +483,26 @@ func buy_legacy_perk(id: String) -> bool:
 	return true
 
 
+func spent_stars() -> int:
+	# Sterren die in gekochte Erfenis-perks vastzitten (voor de reset-refund).
+	var total := 0
+	for id in LEGACY_PERKS:
+		if has_legacy_perk(id):
+			total += int(LEGACY_PERKS[id].stars)
+	return total
+
+
+func reset_legacy_perks() -> void:
+	# Erfenis-perks zijn bewust permanent zolang je ze niet zelf terugdraait
+	# — maar zonder ENIGE reset-optie zit een speler vast aan een vroege
+	# keuze. Net als reset_perks(): volledige refund van de sterren, zodat
+	# herspeccen mogelijk is zonder dat het een straf wordt.
+	state.prestige_stars = int(state.prestige_stars) + spent_stars()
+	for id in LEGACY_PERKS:
+		state.legacy_perks[id] = false
+	save_meta()
+
+
 # ---- Hall of Fame (puur cosmetisch, geen mechanisch effect) ----
 
 const HALL_OF_FAME_MAX := 10

@@ -64,6 +64,7 @@ var home_btn: Button
 var inf_btn: Button                # ∞-upgrade, klein vierkant rechtsboven op het perkscherm
 var confirm_reset := false         # tweestaps-bevestiging voor de perk-reset
 var confirm_prestige := false      # tweestaps-bevestiging voor prestigen (perkboom weg, GEEN refund)
+var confirm_legacy_reset := false  # tweestaps-bevestiging voor het resetten van Erfenis-perks (WEL refund)
 
 # Permanent info-schermpje onderaan: hover werkt niet betrouwbaar (o.a. op
 # touch/mobiel), dus toont dit gewoon altijd de stats van de relevante
@@ -659,6 +660,14 @@ func show_perks() -> void:
 			("%.0f" % (Meta.PRESTIGE_MIN_TREE_PROGRESS * 100.0)),
 			("%.1f" % (Meta.tree_progress() * 100.0)).replace(".", ","),
 		], 19)
+	var spent_stars := Meta.spent_stars()
+	if spent_stars > 0:
+		if confirm_legacy_reset:
+			lbl("Weet je het zeker? Al je Erfenis-perks gaan naar 0; je krijgt %d ster%s terug." % [spent_stars, "" if spent_stars == 1 else "ren"], 22)
+			btn("JA — reset Erfenis-perks", _do_legacy_reset)
+			btn("Annuleer", func(): _set_confirm_legacy_reset(false))
+		else:
+			btn("Reset Erfenis-perks (geeft %d ster%s terug)" % [spent_stars, "" if spent_stars == 1 else "ren"], func(): _set_confirm_legacy_reset(true))
 	sep()
 	var spent := Meta.spent_points()
 	if spent > 0:
@@ -697,6 +706,17 @@ func _set_confirm_prestige(v: bool) -> void:
 func _do_prestige() -> void:
 	Meta.prestige_run()
 	confirm_prestige = false
+	show_perks()
+
+
+func _set_confirm_legacy_reset(v: bool) -> void:
+	confirm_legacy_reset = v
+	show_perks()
+
+
+func _do_legacy_reset() -> void:
+	Meta.reset_legacy_perks()
+	confirm_legacy_reset = false
 	show_perks()
 
 
