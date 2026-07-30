@@ -431,6 +431,15 @@ func show_flash() -> void:
 		flash_color = null
 
 
+func _discard_flash() -> void:
+	# Voor schermen waar we de meldingsregel bewust niet tonen (het resultaat
+	# is al zichtbaar via de bijgewerkte staat zelf): leegt flash zonder 'm te
+	# tonen, zodat een oude melding niet alsnog opduikt zodra je naar een
+	# scherm gaat dat wél show_flash() aanroept.
+	flash = ""
+	flash_color = null
+
+
 # ---------------------------------------------------------------- startscherm
 
 func show_start() -> void:
@@ -818,7 +827,11 @@ func show_prep() -> void:
 	lbl("VOORBEREIDING", 34)
 	if str(Game.state.news) != "":
 		lbl("Nieuws: " + str(Game.state.news), 24)
-	show_flash()
+	# Geen show_flash() hier — de resultaten van acties op dit scherm (storten,
+	# upgraden) zijn al zichtbaar via de bijgewerkte staat zelf (lopende
+	# bankstortingen-lijst, kantoorniveau), een losse meldingsregel erbovenop
+	# voelde overbodig. Wel legen, anders duikt hij later ergens anders op.
+	_discard_flash()
 	# Schandaal doet vanaf niveau 40/70 daadwerkelijk iets (zie scandal_*() in
 	# game.gd) — deze waarschuwing maakt dat zichtbaar, anders merk je alleen
 	# een lagere tekenkans/hogere kaapkans zonder te snappen waarom.
@@ -996,7 +1009,10 @@ func show_scouting() -> void:
 	clear()
 	lbl("SCOUTING", 34)
 	_set_turn_bar("Scoutpunten:", int(Game.state.scout_points), Game.scout_points_per_season())
-	show_flash()
+	# Geen show_flash() hier — scout-/benaderresultaten zijn al zichtbaar via
+	# de kaart zelf (confetti bij tekenen, rood puffje bij afwijzing, of de
+	# bijgewerkte tekenkans/onzekerheid). Wel legen, anders duikt hij later op.
+	_discard_flash()
 	lbl("De potentieel-band is een schátting — die kan er flink naast zitten. Scouten trekt haar naar de waarheid én maakt tekenen makkelijker (+5% per scout, max +10%).", 22)
 	lbl("Kantoor niveau %d (%s) brengt spelers tot rating ~%d binnen bereik. Je reputatie (%d) bepaalt of ze tekenen." % [
 		Game.office_level(), Game.office_name(), Game.candidate_ceiling(), int(Game.state.rep),
