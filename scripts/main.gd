@@ -322,12 +322,10 @@ func _player_tooltip(pid: String) -> String:
 		var lo := maxi(Game.estimate(pid) - int(p.unc), int(p.rating))
 		var hi := mini(Game.estimate(pid) + int(p.unc), 95)
 		pot_str = "potentieel ca. %d–%d" % [lo, hi]
-	var club_line := Game.club_name(str(p.club))
-	if str(p.club) != "":
-		club_line += ", contract %d jr" % int(p.contract)
-	return "%s — %s, %d jr\nRating %d (%s)\nVertrouwen %d\n%s\nWaarde %s" % [
+	# Clubs staan voorlopig buiten beeld (cosmetisch) — geen waarde momenteel.
+	return "%s — %s, %d jr\nRating %d (%s)\nVertrouwen %d\nWaarde %s" % [
 		str(p.name), str(p.pos), int(p.age), int(p.rating), pot_str,
-		int(p.trust), club_line, eur(Game.value(p)),
+		int(p.trust), eur(Game.value(p)),
 	]
 
 
@@ -834,13 +832,14 @@ func show_prep() -> void:
 	lbl("Jouw stal (%d/%d):" % [Game.state.clients.size(), Game.client_cap()], 28)
 	for cid in Game.state.clients:
 		var p: Dictionary = Game.state.players[cid]
-		var club_str := Game.club_name(str(p.club))
+		# Clubs staan voorlopig buiten beeld (cosmetisch) — contractstatus
+		# blijft wel zichtbaar (relevant voor tekengeld-timing), los van de
+		# clubnaam zelf.
+		var sub := "%s, %d jr · vertrouwen %d" % [str(p.pos), int(p.age), int(p.trust)]
 		if str(p.club) != "":
-			club_str += ", contract %d jr" % int(p.contract)
-		lbl("• %s (%s, %d jr) — rating %d, potentieel %d, vertrouwen %d, %s, waarde %s" % [
-			p.name, p.pos, int(p.age), int(p.rating), int(p.pot), int(p.trust),
-			club_str, eur(Game.value(p)),
-		], 23)
+			sub += " · contract nog %d jr" % int(p.contract)
+		sub += " · waarde %s" % eur(Game.value(p))
+		_stat_card(cid, sub)
 	sep()
 	# ---- Het kantoor: niveau, band en upgrade ----
 	var band: Dictionary = Game.office_band()
@@ -1052,7 +1051,7 @@ func _candidate_card(pid: String) -> Control:
 	info.add_child(name_lbl)
 
 	var sub := Label.new()
-	sub.text = "%s, %d jr · %s" % [str(p.pos), int(p.age), Game.club_name(str(p.club))]
+	sub.text = "%s, %d jr" % [str(p.pos), int(p.age)]   # club staat voorlopig buiten beeld (cosmetisch)
 	sub.add_theme_font_size_override("font_size", 18)
 	sub.add_theme_color_override("font_color", Color(0.75, 0.75, 0.78))
 	info.add_child(sub)
