@@ -96,7 +96,8 @@ var dev_test_total := 0
 var dev_test_all: Array = []
 var dev_jump_input: LineEdit = null
 
-var bank_deposit_input: LineEdit = null
+var bank_deposit_slider: HSlider = null
+var bank_deposit_label: Label = null
 
 var shop_offers: Array = []
 
@@ -866,18 +867,23 @@ func show_prep() -> void:
 			lbl("• %s gestort — nog %d seizoen(en), dan %s terug." % [
 				eur(int(d.amount)), int(d.seasons_left), eur(int(round(float(d.amount) * Game.BANK_MULTIPLIER))),
 			], 19)
-	var bank_row := HBoxContainer.new()
-	bank_row.add_theme_constant_override("separation", 10)
-	content.add_child(bank_row)
-	bank_deposit_input = LineEdit.new()
-	bank_deposit_input.placeholder_text = "x1000"
-	bank_deposit_input.custom_minimum_size = Vector2(140, 48)
-	bank_row.add_child(bank_deposit_input)
+	var max_deposit := maxi(int(Game.state.money), 0)
+	bank_deposit_label = lbl("Storten: %s" % eur(0), 22)
+	bank_deposit_slider = HSlider.new()
+	bank_deposit_slider.min_value = 0
+	bank_deposit_slider.max_value = max_deposit
+	bank_deposit_slider.step = 1000
+	bank_deposit_slider.value = 0
+	bank_deposit_slider.custom_minimum_size = Vector2(0, 36)
+	bank_deposit_slider.editable = max_deposit > 0
+	bank_deposit_slider.value_changed.connect(_on_bank_slider_changed)
+	content.add_child(bank_deposit_slider)
 	var deposit_btn := Button.new()
 	deposit_btn.text = "Storten"
 	deposit_btn.custom_minimum_size = Vector2(0, 48)
+	deposit_btn.disabled = max_deposit <= 0
 	deposit_btn.pressed.connect(_do_bank_deposit)
-	bank_row.add_child(deposit_btn)
+	content.add_child(deposit_btn)
 	sep()
 	var skip_release := Meta.perk_level("vaste_kern") > 0 or int(Game.state.season) == 1
 	btn("Naar scouting →" if skip_release else "Naar stalbeheer →", _goto_release)
@@ -892,10 +898,15 @@ func _upgrade_office() -> void:
 	show_prep()
 
 
+func _on_bank_slider_changed(value: float) -> void:
+	if bank_deposit_label != null:
+		bank_deposit_label.text = "Storten: %s" % eur(int(value))
+
+
 func _do_bank_deposit() -> void:
-	if bank_deposit_input == null:
+	if bank_deposit_slider == null:
 		return
-	var amount := int(bank_deposit_input.text)*1000
+	var amount := int(bank_deposit_slider.value)
 	if Game.bank_deposit(amount):
 		var payout := int(round(float(amount) * (Game.BANK_MULTIPLIER + (0.3 if Game.has_shop("investeringsfonds") else 0.0))))
 		flash = "Gestort: %s. Komt over %d seizoenen terug als %s." % [eur(amount), Game.BANK_MATURITY_SEASONS, eur(payout)]
@@ -1419,9 +1430,11 @@ func _money_delta(v: int) -> String:
 const EFFECT_LABELS := {
 	"money": "Geld", "rep": "Reputatie", "scandal": "Schandaal",
 	"favors": "Gunsten", "scout_points": "Scoutpunten",
+	"scout_points_permanent": "Scoutpunten (voortaan)",
 }
 const EFFECT_GOOD_HIGH := {
 	"money": true, "rep": true, "scandal": false, "favors": true, "scout_points": true,
+	"scout_points_permanent": true,
 }
 
 
@@ -1439,7 +1452,7 @@ func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: b
 	# event) voor vóór een keuze; show_numbers=true geeft de exacte
 	# bedragen voor het uitkomstscherm ná een keuze.
 	var rows: Array = []
-	for key in ["money", "rep", "scandal", "favors", "scout_points"]:
+	for key in ["money", "rep", "scandal", "favors", "scout_points", "scout_points_permanent"]:
 		if effects.has(key) and int(effects[key]) != 0:
 			var v := int(effects[key])
 			var good: bool = (v > 0) == bool(EFFECT_GOOD_HIGH[key])
@@ -1495,7 +1508,7 @@ func _show_effect_rows(effects: Dictionary, client_name: String = "", show_numbe
 # afweging. Alleen relevant als er ook daadwerkelijk variatie is (anders
 # is "grootst" zinloos).
 
-const EFFECT_KEYS_FOR_EMPHASIS := ["money", "rep", "scandal", "favors", "scout_points", "trust", "all_trust"]
+const EFFECT_KEYS_FOR_EMPHASIS := ["money", "rep", "scandal", "favors", "scout_points", "scout_points_permanent", "trust", "all_trust"]
 
 
 func _collect_branches(ev: Dictionary) -> Array:

@@ -138,6 +138,7 @@ func new_run() -> void:
 		"office_level": 2 if Meta.has_legacy_perk("kantoorvoorsprong") else 1,
 		"candidate_ids": [],   # pids van de verse scoutingkandidaten dit seizoen
 		"candidate_counter": 0, # oplopende teller voor unieke kandidaat-pids
+		"bonus_scout_points": 0, # permanente scoutpunten-bonus uit events (scout_points_permanent)
 	}
 	# Startcliënt: een jong, beloftevol maar betaalbaar talent.
 	var pool: Array = []
@@ -480,7 +481,7 @@ func value(p: Dictionary) -> int:
 
 
 func scout_points_per_season() -> int:
-	return SCOUT_POINTS + Meta.perk_bonus("scouting") + (1 if has_shop("jeugdscout") else 0)
+	return SCOUT_POINTS + Meta.perk_bonus("scouting") + (1 if has_shop("jeugdscout") else 0) + int(state.get("bonus_scout_points", 0))
 
 
 func client_cap() -> int:
@@ -631,6 +632,13 @@ func apply_effects(effects: Dictionary, client_id: String = "") -> Array:
 			"favors":
 				state.favors = maxi(int(state.favors) + int(v), 0)
 			"scout_points":
+				state.scout_points = maxi(int(state.scout_points) + int(v), 0)
+			"scout_points_permanent":
+				# In tegenstelling tot "scout_points" (eenmalig, alleen dit
+				# seizoen) verhoogt dit ook scout_points_per_season() zelf —
+				# voor events die expliciet "voortaan meer scoutpunten"
+				# beloven, niet alleen "deze ronde".
+				state.bonus_scout_points = maxi(int(state.get("bonus_scout_points", 0)) + int(v), 0)
 				state.scout_points = maxi(int(state.scout_points) + int(v), 0)
 			"trust":
 				if client_id != "" and state.players.has(client_id):

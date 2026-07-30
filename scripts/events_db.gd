@@ -574,7 +574,7 @@ static func get_events() -> Array:
 			"text": "Een lokale voetbalacademie zoekt een investeerder in ruil voor eerste toegang tot hun talent.",
 			"options": [
 				{"label": "Investeren", "req_money": 7000,
-					"effects": {"money": -7000, "scout_points": 2, "rep": 3},
+					"effects": {"money": -7000, "scout_points_permanent": 2, "rep": 3},
 					"txt": "Je krijgt voortaan als eerste een belletje bij een nieuw talent."},
 				{"label": "Afzien", "effects": {},
 					"txt": "Te veel risico voor te weinig zekerheid."},
