@@ -47,7 +47,7 @@ const OP_PERKS := ["superprovisie", "ijzeren_stal", "helderziend", "vaste_kern"]
 const LEGACY_PERKS := {
 	"kroonjuweel_netwerk": {
 		"name": "Kroonjuweel-netwerk", "stars": 1,
-		"desc": "Je begint elke run met een extra startcliënt.",
+		"desc": "Je begint elke run met een startcliënt i.p.v. met een lege stal.",
 	},
 	"kantoorvoorsprong": {
 		"name": "Kantoorvoorsprong", "stars": 2,

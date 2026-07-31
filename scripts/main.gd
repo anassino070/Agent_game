@@ -1756,7 +1756,8 @@ func show_tax() -> void:
 				if opt_i != chosen:
 					var post_idx := i
 					var option_idx := opt_i
-					btn(labels[opt_i], func(): _choose_tax(post_idx, option_idx))
+					var preview := tax.preview_text(opt_i, scaled_amount)
+					btn("%s  [%s]" % [labels[opt_i], preview], func(): _choose_tax(post_idx, option_idx))
 		sep()
 		btn("Regelen →", _resolve_tax, tax.all_chosen())
 	else:
@@ -2158,7 +2159,11 @@ func show_window() -> void:
 		], 26)
 		var ints: Array = interest.get(cid, [])
 		if ints.is_empty():
-			lbl("Geen interesse van clubs dit seizoen.", 22)
+			# Elke speler krijgt bij binnenkomst van dit window GEGARANDEERD
+			# 1 of 2 interesses (Game.gen_interest()) — leeg hier betekent dus
+			# dat je die al hebt afgehandeld (onderhandeld/afgewezen), niet
+			# dat er nooit interesse was.
+			lbl("Alle interesse voor %s is dit venster al afgehandeld." % p.name, 22)
 
 		# Drie mogelijke opties per cliënt: onderhandelen met elke
 		# geïnteresseerde club plus contract verlengen. Normaal mag je er
@@ -2248,8 +2253,10 @@ func show_nego() -> void:
 		lbl("Reeks: 1 succes — nog één voor flow.", 20)
 	if not nego.log.is_empty():
 		sep()
-		for line in nego.log:
-			lbl("· " + str(line), 22)
+		# Alleen de meest recente regel — bij een combo kan één zet meerdere
+		# regels toevoegen (het effect + "COMBO — ..." + evt. een onthulling),
+		# maar we tonen bewust alleen de laatste, geen volledige geschiedenis.
+		lbl("· " + str(nego.log[nego.log.size() - 1]), 22)
 	sep()
 	if nego.finished:
 		if nego.success:
@@ -2288,7 +2295,9 @@ func show_nego() -> void:
 				# via het effect alsnog kunnen afleiden welk type hij is.
 				var chance_txt := ("%d%%" % int(round(float(t.chance) * 100))) if nego.pers_known else "kans ?"
 				var drop_txt := ("weerstand -%d" % int(t.drop)) if nego.pers_known else "weerstand ?"
-				btn("%s  [%s, %s]" % [str(t.label), chance_txt, drop_txt], func(): _play_tactic(t))
+				var blocked := nego.is_blocked(str(t.id))
+				var suffix := "  (net mislukt — probeer iets anders)" if blocked else ""
+				btn("%s  [%s, %s]%s" % [str(t.label), chance_txt, drop_txt, suffix], func(): _play_tactic(t), not blocked)
 		btn("Percentage verhogen (+%d%%, raakt weerstand/flow niet)" % int(round(Negotiation.RAISE_FEE_STEP * 100)), _raise_fee, nego.cut < Negotiation.MAX_CUT)
 
 		var favor_btn := Button.new()

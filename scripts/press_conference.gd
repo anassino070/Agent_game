@@ -4,24 +4,72 @@
 # abstracte knop. Een spanningsmeter (0-100) loopt op bij zwakke antwoorden;
 # blijft hij laag, dan loop je met eer weg — schiet hij door het dak, dan
 # ontspoort de persconferentie volledig.
+#
+# Elke vraag heeft een verborgen TOON die bepaalt welk antwoord echt werkt —
+# leesbaar aan de formulering, niet expliciet gelabeld. Zonder dit systeem is
+# er geen enkel patroon te leren (Toegeven is dan altijd wiskundig het beste,
+# Ontwijken nooit) en voelt de minigame als pure willekeur.
 class_name PressConference
 extends RefCounted
 
+# "beschuldigend"  → Toegeven werkt het beste (eerlijkheid ontwapent een verwijt)
+# "provocerend"    → Aanvallen werkt het beste (een uitdaging vraagt om tegengas)
+# "speculatief"    → Ontwijken werkt het beste (er zijn geen feiten om op te reageren)
 const QUESTIONS := [
-	"\"Waarom speelde hij vandaag zo slap?\"",
-	"\"Klopt het dat er ruzie is in de kleedkamer?\"",
-	"\"Wil hij eigenlijk weg bij deze club?\"",
-	"\"Ligt dit aan de trainer, of aan hem?\"",
-	"\"Wat heeft hij te zeggen tegen de fans die vanavond boe riepen?\"",
-	"\"Waarom duurde het weken voor u hierop reageerde?\"",
-	"\"Is dit het begin van het einde voor hem hier?\"",
-	"\"Speelt hij zijn laatste wedstrijden voor deze club?\"",
+	{"text": "\"Klopt het dat er ruzie is in de kleedkamer?\"", "tone": "beschuldigend"},
+	{"text": "\"Waarom duurde het weken voor u hierop reageerde?\"", "tone": "beschuldigend"},
+	{"text": "\"Ligt dit aan de trainer, of aan hem?\"", "tone": "beschuldigend"},
+	{"text": "\"Waarom speelde hij vandaag zo slap — heeft u daar een verklaring voor?\"", "tone": "beschuldigend"},
+	{"text": "\"Is dit niet gewoon het begin van het einde voor hem hier?\"", "tone": "provocerend"},
+	{"text": "\"Durft u te beweren dat dit toeval is?\"", "tone": "provocerend"},
+	{"text": "\"Speelt hij zijn laatste wedstrijden voor deze club, of houdt u ons voor de gek?\"", "tone": "provocerend"},
+	{"text": "\"Wil hij eigenlijk weg bij deze club?\"", "tone": "speculatief"},
+	{"text": "\"Wat heeft hij te zeggen tegen de fans die vanavond boe riepen?\"", "tone": "speculatief"},
+	{"text": "\"Wat zou hij nu tegen zichzelf zeggen, denkt u?\"", "tone": "speculatief"},
 ]
 
 const RESPONSES := {
 	"ontwijken": "'Daar ga ik nu niet verder op in.'",
 	"toegeven": "'Eerlijk gezegd...' — en hij vertelt het hele verhaal.",
 	"aanvallen": "'Dat is een oneerlijke vraag, en dat weet u ook.'",
+}
+
+# Per toon: welk antwoord de "beste" (good) keuze is, en de kans/effecten van
+# alle drie de antwoorden tegen die toon. "good" krijgt een flinke, betrouwbare
+# verlaging; de andere twee zijn zwakker — soms een gok, soms gegarandeerd
+# averechts — zodat er een leerbaar patroon ontstaat i.p.v. willekeur.
+const TONE_PAYOFFS := {
+	"beschuldigend": {
+		"toegeven": {"chance": 0.75, "ok": -18.0, "fail": 5.0,
+			"ok_txt": "Een eerlijk antwoord ontwapent de beschuldiging volledig.",
+			"fail_txt": "Zijn eerlijkheid wordt alsnog als een bekentenis uitgelegd."},
+		"aanvallen": {"chance": 0.35, "ok": -10.0, "fail": 18.0,
+			"ok_txt": "Een fel weerwoord, en het landt net.",
+			"fail_txt": "Tegen een gerichte beschuldiging oogt de tegenaanval vooral defensief."},
+		"ontwijken": {"chance": 0.0, "ok": 0.0, "fail": 10.0,
+			"ok_txt": "", "fail_txt": "Ontwijken bij een directe beschuldiging oogt schuldig."},
+	},
+	"provocerend": {
+		"aanvallen": {"chance": 0.70, "ok": -20.0, "fail": 15.0,
+			"ok_txt": "Een scherpe uitdaging vraagt om tegengas — en dat krijgt de zaal.",
+			"fail_txt": "De tegenaanval mist zijn doel en voedt de provocatie."},
+		"toegeven": {"chance": 0.30, "ok": -8.0, "fail": 12.0,
+			"ok_txt": "Een eerlijk antwoord haalt net de wind uit de provocatie.",
+			"fail_txt": "Toegeven op een uitlokkende vraag voedt 'm alleen maar."},
+		"ontwijken": {"chance": 0.0, "ok": 0.0, "fail": 8.0,
+			"ok_txt": "", "fail_txt": "Wegduiken voor een provocatie oogt zwak."},
+	},
+	"speculatief": {
+		"ontwijken": {"chance": 1.0, "ok": -12.0, "fail": 0.0,
+			"ok_txt": "Er zijn geen feiten om op te reageren — niet happen is de veilige zet.",
+			"fail_txt": ""},
+		"toegeven": {"chance": 0.25, "ok": -5.0, "fail": 20.0,
+			"ok_txt": "Toevallig raak, maar op puur giswerk 'toegeven' is link.",
+			"fail_txt": "Instemmen met pure speculatie bevestigt het gerucht als feit."},
+		"aanvallen": {"chance": 0.40, "ok": -8.0, "fail": 15.0,
+			"ok_txt": "Fel, maar het werkt tegen een speculatieve vraag.",
+			"fail_txt": "Zo fel reageren op giswerk oogt overdreven — alsof er iets te verbergen valt."},
+	},
 }
 
 var questions: Array = []
@@ -44,7 +92,11 @@ func setup(rng: RandomNumberGenerator) -> void:
 
 
 func current_question() -> String:
-	return str(questions[question_idx])
+	return str(questions[question_idx].text)
+
+
+func current_tone() -> String:
+	return str(questions[question_idx].tone)
 
 
 func _shift(delta: float) -> void:
@@ -54,24 +106,13 @@ func _shift(delta: float) -> void:
 func play(action: String, rng: RandomNumberGenerator) -> void:
 	log.append("Vraag: %s" % current_question())
 	log.append("Jouw antwoord: %s" % str(RESPONSES.get(action, "...")))
-	match action:
-		"ontwijken":
-			_shift(8.0)
-			log.append("De zaal wordt ongeduldig van het ontwijken.")
-		"toegeven":
-			if rng.randf() < 0.7:
-				_shift(-15.0)
-				log.append("Een eerlijk antwoord landt goed. De sfeer klaart op.")
-			else:
-				_shift(5.0)
-				log.append("Je eerlijkheid wordt uitgelegd als een bekentenis.")
-		"aanvallen":
-			if rng.randf() < 0.45:
-				_shift(-25.0)
-				log.append("Een sterk weerwoord. Applaus van de achterste rijen.")
-			else:
-				_shift(20.0)
-				log.append("Het klinkt defensief. Het filmpje gaat al rond.")
+	var payoff: Dictionary = TONE_PAYOFFS[current_tone()][action]
+	if rng.randf() < float(payoff.chance):
+		_shift(float(payoff.ok))
+		log.append(str(payoff.ok_txt))
+	else:
+		_shift(float(payoff.fail))
+		log.append(str(payoff.fail_txt))
 	questions_left -= 1
 	question_idx += 1
 	if tension >= 100.0:

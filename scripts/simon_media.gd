@@ -34,7 +34,15 @@ func setup(rng: RandomNumberGenerator, season: int = 1) -> void:
 
 
 func _extend(rng: RandomNumberGenerator) -> void:
-	sequence.append(rng.randi_range(0, moves.size() - 1))
+	# Geen directe herhaling van de vorige stap: bij een kleine pool voelt
+	# pure onafhankelijke rng (die best vaak toevallig herhaalt) als "nep"
+	# willekeurig aan — technisch correct, maar mensen ervaren dat als een
+	# bug. Dit blijft eerlijk verdeeld over de OVERBLIJVENDE opties.
+	var next_idx := rng.randi_range(0, moves.size() - 1)
+	if moves.size() > 1 and not sequence.is_empty():
+		while next_idx == int(sequence[sequence.size() - 1]):
+			next_idx = rng.randi_range(0, moves.size() - 1)
+	sequence.append(next_idx)
 	player_progress = 0
 	phase = "show"
 	round_num += 1

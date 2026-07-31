@@ -59,6 +59,7 @@ var streak := 0              # opeenvolgende successen; 2+ = flow
 var success_run: Array = []  # ids van opeenvolgende successen (voor combo's)
 var combos_done: Array = []  # elke combo maximaal één keer per gesprek
 var last_combo := ""         # naam van de combo die de LAATSTE zet afrondde ("" = geen)
+var last_failed_id := ""     # id van de tactiek die net mislukte — die mag je niet meteen herhalen
 
 # Perk-instelbaar (gezet door main.gd bij de start van een gesprek).
 var flow_mult := 1.5         # effect-multiplier bij flow
@@ -88,6 +89,10 @@ func mood_name() -> String:
 
 func has_flow() -> bool:
 	return streak >= 2
+
+
+func is_blocked(id: String) -> bool:
+	return last_failed_id != "" and id == last_failed_id
 
 
 func _mood_floor() -> int:
@@ -194,6 +199,9 @@ func tactics(rep: int) -> Array:
 func play(t: Dictionary, rng: RandomNumberGenerator) -> void:
 	last_combo = ""
 	if str(t.id) == "aftasten":
+		# Telt als een aparte beurt: een eerder mislukte tactiek mag hierna
+		# weer geprobeerd worden.
+		last_failed_id = ""
 		rounds_left -= aftast_cost
 		pers_known = true
 		log.append("Je tast af (%d ronde%s). Deze TD is %s." % [
@@ -205,6 +213,7 @@ func play(t: Dictionary, rng: RandomNumberGenerator) -> void:
 	var flow := has_flow()
 	var drop := float(t.drop) * (flow_mult if flow else 1.0)
 	if rng.randf() < float(t.chance):
+		last_failed_id = ""
 		resistance -= drop
 		streak += 1
 		# Een zet die door de persoonlijkheid volledig wordt geneutraliseerd
@@ -229,6 +238,9 @@ func play(t: Dictionary, rng: RandomNumberGenerator) -> void:
 		if counts_for_combo:
 			_check_combos()
 	else:
+		# Mislukte tactiek mag je niet meteen herhalen — voorkomt dat je
+		# gewoon op dezelfde knop blijft klikken tot hij toevallig lukt.
+		last_failed_id = str(t.id)
 		streak = 0
 		success_run.clear()
 		resistance += float(t.get("fail_res", 0))

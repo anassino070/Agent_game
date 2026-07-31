@@ -126,7 +126,7 @@ func new_run() -> void:
 		"players": world.players,
 		"clubs": world.clubs,
 		"clients": [],
-		"news": "Je opent je kantoor met een enorme boost in de rug — je vorige triomf gonst nog na." if boost else "Je opent je kantoor boven een snackbar. Eén cliënt gelooft in je.",
+		"news": "Je opent je kantoor met een enorme boost in de rug — je vorige triomf gonst nog na." if boost else "Je opent je kantoor boven een snackbar. Nog niemand gelooft in je — dat bewijs je zelf, deze eerste scoutingronde.",
 		"used_events": [],
 		"total_fees": 0,
 		"game_over": "",
@@ -140,25 +140,23 @@ func new_run() -> void:
 		"candidate_counter": 0, # oplopende teller voor unieke kandidaat-pids
 		"bonus_scout_points": 0, # permanente scoutpunten-bonus uit events (scout_points_permanent)
 	}
-	# Startcliënt: een jong, beloftevol maar betaalbaar talent.
-	var pool: Array = []
-	for pid in state.players:
-		var p: Dictionary = state.players[pid]
-		if int(p.age) <= 21 and int(p.rating) >= 52 and int(p.rating) <= 62:
-			pool.append(pid)
-	if pool.is_empty():
-		pool = state.players.keys()
-	var pick: String = pool[rng.randi_range(0, pool.size() - 1)]
-	_make_client(pick, 65)
-	# Erfenis-perk "Kroonjuweel-netwerk": een tweede startcliënt uit dezelfde pool.
+	# Geen startcliënt meer: je begint met een lege stal, en moet in de eerste
+	# scoutingronde zelf je eerste cliënt werven — een bewust moeilijker begin
+	# (met 0 of 1 cliënten slaat het verplichte-ontslag-scherm gewoon over,
+	# en de "lege stal"-fail-check triggert pas aan het EINDE van seizoen 1,
+	# dus je hebt de hele eerste ronde de tijd).
+	# Erfenis-perk "Kroonjuweel-netwerk": start toch met één cliënt.
 	if Meta.has_legacy_perk("kroonjuweel_netwerk"):
-		pool.erase(pick)
+		var pool: Array = []
+		for pid in state.players:
+			var p: Dictionary = state.players[pid]
+			if int(p.age) <= 21 and int(p.rating) >= 52 and int(p.rating) <= 62:
+				pool.append(pid)
 		if pool.is_empty():
 			pool = state.players.keys()
-			pool.erase(pick)
 		if not pool.is_empty():
-			var pick2: String = pool[rng.randi_range(0, pool.size() - 1)]
-			_make_client(pick2, 65)
+			var pick: String = pool[rng.randi_range(0, pool.size() - 1)]
+			_make_client(pick, 65)
 
 
 func _make_client(pid: String, trust: int) -> void:
@@ -168,11 +166,12 @@ func _make_client(pid: String, trust: int) -> void:
 
 
 # ---------------------------------------------------------------- de bank
-# Stort geld weg; na 2 seizoenen krijg je het verdubbeld terug. Een simpel,
+# Stort geld weg; na 3 seizoenen krijg je het verdubbeld terug. Een simpel,
 # gegarandeerd spaarmiddel tegenover de exponentieel stijgende kosten — de
-# prijs is dat het geld 2 seizoenen lang vaststaat en dus niet inzetbaar is.
+# prijs is dat het geld 3 seizoenen lang vaststaat en dus niet inzetbaar is
+# (was 2 — iets trager compound-sparen, in lijn met een moeilijker begin).
 
-const BANK_MATURITY_SEASONS := 2
+const BANK_MATURITY_SEASONS := 3
 const BANK_MULTIPLIER := 2.0
 
 # Voorbereide transfer (event 'clubarts_geheim'): 65% kans dat de insider-
@@ -978,35 +977,32 @@ func gen_events() -> Array:
 # ---------------------------------------------------------------- transfers
 
 func gen_interest(client_id: String) -> Array:
-	# 0–2 geïnteresseerde clubs, afhankelijk van rating en ambitie. Budget is
-	# GEEN harde bottleneck meer — elke speler moet altijd verkoopbaar zijn.
-	# Een club met te weinig budget vindt wel iets moeilijker financiering
-	# (kans-penalty), maar wordt niet volledig uitgesloten: ze lenen, zoeken
-	# een investeerder, of verkopen eerst iemand anders.
+	# Elke speler heeft ELK seizoen GEGARANDEERD 1 of 2 geïnteresseerde clubs
+	# — betaalbaarheid (budget) speelt daarbij geen rol meer: een club die
+	# het niet kan betalen, leent of zoekt een investeerder, maar toont
+	# sowieso interesse. Ambitie bepaalt (zacht, met ruis) WELKE clubs het
+	# eerst aan de beurt zijn, niet OF er interesse is.
 	var p: Dictionary = state.players[client_id]
-	var v := value(p)
-	var ids: Array = state.clubs.keys()
-	# Fisher-Yates met onze eigen rng, voor determinisme per seed.
-	for i in range(ids.size() - 1, 0, -1):
-		var j := rng.randi_range(0, i)
-		var tmp = ids[i]
-		ids[i] = ids[j]
-		ids[j] = tmp
+	var ids: Array = []
+	for cid in state.clubs:
+		if cid != str(p.club):
+			ids.append(cid)
+	if ids.is_empty():
+		return []
+	var scored: Array = []
+	for cid in ids:
+		var score := float(state.clubs[cid].ambition) + rng.randf_range(0.0, 3.0)
+		scored.append([score, cid])
+	scored.sort_custom(func(a, b): return a[0] > b[0])
+	# Hogere rating trekt vaker een 2e club; vanaf schandaal 70 remt
+	# scandal_interest_mult() die kans op een 2e club af (in plaats van op
+	# interesse-op-zich, die nu altijd gegarandeerd is).
+	var two_chance := clampf(0.3 + (float(p.rating) - 50.0) * 0.01, 0.1, 0.8) * scandal_interest_mult()
+	var want_two := rng.randf() < two_chance
+	var count := mini(2 if want_two else 1, scored.size())
 	var out: Array = []
-	for club_id in ids:
-		if club_id == str(p.club):
-			continue
-		var c: Dictionary = state.clubs[club_id]
-		var chance := 0.10 + (float(p.rating) - 50.0) * 0.01 + float(c.ambition) * 0.04
-		if int(c.budget) < v:
-			chance *= 0.5
-		# Vanaf schandaal 70 mijden clubs een omstreden makelaar bij transfers
-		# (zie scandal_interest_mult()).
-		chance *= scandal_interest_mult()
-		if rng.randf() < chance:
-			out.append(club_id)
-		if out.size() >= 2:
-			break
+	for i in range(count):
+		out.append(str(scored[i][1]))
 	return out
 
 
