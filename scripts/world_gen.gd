@@ -49,11 +49,13 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 		# waardeformule (zie value()) betekent dat eenzelfde transferfee nu
 		# bij een lagere rating hoort — de markt is duurder geworden.
 		var rating := clampi(rng.randi_range(35, 52) + int(float(age - 16) * 1.1) + rng.randi_range(-3, 3), 38, 82)
-		# …maar de rek is eruit: de potentieel-marge loopt richting 27 jaar naar 0.
-		var headroom := maxi(27 - age, 0) * 2
-		var pot := rating
-		if headroom > 0:
-			pot = mini(rating + rng.randi_range(2, headroom + 2), 94)
+		# Potentieel ligt gemiddeld een FLINKE marge boven de rating, voor
+		# IEDEREEN — niet meer alleen jonge spelers. Gemiddeld ~+40, zodat ook
+		# op een laag kantoorniveau (lage gemiddelde rating) het gemiddelde
+		# potentieel nog altijd rond de 68 uitkomt. Jongere spelers krijgen
+		# bovenop die vaste basis nog wat extra marge (headroom).
+		var headroom := maxi(27 - age, 0)
+		var pot := mini(rating + rng.randi_range(20, 56 + headroom), 94)
 		var club_id := ""
 		if rng.randf() > 0.15:
 			club_id = "c%d" % rng.randi_range(0, 9)
@@ -88,10 +90,10 @@ static func make_candidate(rng: RandomNumberGenerator, pid: String, rating: int)
 	# als in generate(): jonge spelers hebben meer rek én meer ruis, oudere
 	# zijn "af". Zo blijft het scout-/potentieelspel intact op de nieuwe pool.
 	var age := rng.randi_range(16, 30)
-	var headroom := maxi(27 - age, 0) * 2
-	var pot := rating
-	if headroom > 0:
-		pot = mini(rating + rng.randi_range(2, headroom + 2), 94)
+	# Zelfde filosofie als in generate(): potentieel ligt gemiddeld ~+40 boven
+	# de rating, voor iedereen — niet alleen jonge spelers.
+	var headroom := maxi(27 - age, 0)
+	var pot := mini(rating + rng.randi_range(20, 56 + headroom), 94)
 	var club_id := ""
 	if rng.randf() > 0.5:
 		club_id = "c%d" % rng.randi_range(0, 9)
