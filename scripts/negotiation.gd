@@ -303,17 +303,17 @@ func combo_pattern_text(combo: Dictionary) -> String:
 	return " → ".join(labels)
 
 
-# Gunst ingezet: een contact belt de TD persoonlijk op. Gegarandeerd succes,
-# kost een ronde en telt gewoon mee voor streak/flow — maar heeft geen eigen
-# tactiek-id, dus doorbreekt geen lopende combo (en voltooit er ook geen).
-func halve_resistance() -> void:
+# Gunst ingezet: een contact belt de TD persoonlijk op en die zwicht meteen —
+# de weerstand valt naar 0, dus _check_end() sluit het gesprek direct af als
+# geslaagd. Een INSTANT WIN (was: weerstand halveren). Gunsten zijn schaars,
+# dus dit is de premium-uitweg uit een gesprek dat je dreigt te verliezen.
+# De deal gaat rond op de HUIDIGE voorwaarden (deal_value en cut), dus vroeg
+# inzetten betekent wel dat je geen fee-opbouw of clausulewinst meer pakt.
+func use_favor_deal() -> void:
 	rounds_left -= 1
-	resistance = maxf(resistance / 2.0, 0.0)
+	resistance = 0.0
 	streak += 1
-	# Zelfde geheimhouding als bij tactieken: zolang het type onbekend is,
-	# geen exact resterend getal in de log.
-	var res_txt := str(int(resistance)) if pers_known else "?"
-	log.append("Je zet een gunst in: een contact belt de TD persoonlijk. Weerstand halveert naar %s." % res_txt)
+	log.append("Je zet een gunst in: een contact belt de TD persoonlijk. Hij zwicht op de plek.")
 	_check_end()
 
 

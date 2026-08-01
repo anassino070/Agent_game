@@ -2426,7 +2426,7 @@ func show_nego() -> void:
 		btn("Percentage verhogen (+%d%%, raakt weerstand/flow niet)" % int(round(Negotiation.RAISE_FEE_STEP * 100)), _raise_fee, nego.cut < Negotiation.MAX_CUT)
 
 		var favor_btn := Button.new()
-		favor_btn.text = "🪙 Gunst inzetten: weerstand halveren"
+		favor_btn.text = "🪙 Gunst inzetten: deal direct rond"
 		favor_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		favor_btn.custom_minimum_size = Vector2(0, 56)
 		favor_btn.disabled = int(Game.state.favors) <= 0
@@ -2530,7 +2530,7 @@ func _play_favor_halve() -> void:
 	if int(Game.state.favors) <= 0:
 		return
 	Game.apply_effects({"favors": -1}, "")
-	nego.halve_resistance()
+	nego.use_favor_deal()
 	show_nego()
 
 
