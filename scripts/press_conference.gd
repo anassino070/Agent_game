@@ -1,32 +1,57 @@
 # press_conference.gd — minigame "Persconferentie" (event: persconferentie_druk).
-# Vijf rondes van steeds scherpere, ECHTE vragen (zichtbaar in de UI) — zodat
-# Ontwijken/Toegeven/Aanvallen een reactie is op iets concreets, niet een
-# abstracte knop. Een spanningsmeter (0-100) loopt op bij zwakke antwoorden;
-# blijft hij laag, dan loop je met eer weg — schiet hij door het dak, dan
-# ontspoort de persconferentie volledig.
+# Volledig herontwerp: elke vraag komt nu van een ZICHTBARE journalist met een
+# eigen naam, icoon en duidelijke hint over welk antwoord bij hem werkt — in
+# de vorige versie moest je die "toon" blind uit de vraagformulering raden,
+# wat als pure willekeur aanvoelde. Nu is het lezen-en-koppelen: je ZIET wie
+# er voor je staat, en moet zelf onthouden/afleiden welke reactie daarbij
+# past — de tactiek zit in de koppeling, niet in het giswerk.
 #
-# Elke vraag heeft een verborgen TOON die bepaalt welk antwoord echt werkt —
-# leesbaar aan de formulering, niet expliciet gelabeld. Zonder dit systeem is
-# er geen enkel patroon te leren (Toegeven is dan altijd wiskundig het beste,
-# Ontwijken nooit) en voelt de minigame als pure willekeur.
+# Doel is nu ook positief geframed: een PUBLIEKSSYMPATHIE-meter (0-100, hoger
+# is beter) i.p.v. een spanningsmeter die je moet zien te vermijden. Twee
+# successen op rij geven MOMENTUM (+50% effect, net als Flow bij de
+# onderhandeling) en de laatste vraag is een Slotvraag met dubbele inzet —
+# een climax in plaats van gewoon "nog een ronde".
 class_name PressConference
 extends RefCounted
 
-# "beschuldigend"  → Toegeven werkt het beste (eerlijkheid ontwapent een verwijt)
-# "provocerend"    → Aanvallen werkt het beste (een uitdaging vraagt om tegengas)
-# "speculatief"    → Ontwijken werkt het beste (er zijn geen feiten om op te reageren)
-const QUESTIONS := [
-	{"text": "\"Klopt het dat er ruzie is in de kleedkamer?\"", "tone": "beschuldigend"},
-	{"text": "\"Waarom duurde het weken voor u hierop reageerde?\"", "tone": "beschuldigend"},
-	{"text": "\"Ligt dit aan de trainer, of aan hem?\"", "tone": "beschuldigend"},
-	{"text": "\"Waarom speelde hij vandaag zo slap — heeft u daar een verklaring voor?\"", "tone": "beschuldigend"},
-	{"text": "\"Is dit niet gewoon het begin van het einde voor hem hier?\"", "tone": "provocerend"},
-	{"text": "\"Durft u te beweren dat dit toeval is?\"", "tone": "provocerend"},
-	{"text": "\"Speelt hij zijn laatste wedstrijden voor deze club, of houdt u ons voor de gek?\"", "tone": "provocerend"},
-	{"text": "\"Wil hij eigenlijk weg bij deze club?\"", "tone": "speculatief"},
-	{"text": "\"Wat heeft hij te zeggen tegen de fans die vanavond boe riepen?\"", "tone": "speculatief"},
-	{"text": "\"Wat zou hij nu tegen zichzelf zeggen, denkt u?\"", "tone": "speculatief"},
-]
+const JOURNALISTS := {
+	"feitenjager": {
+		"name": "De Feitenjager", "icon": "📰",
+		"hint": "Wil bewijs zien — eerlijkheid ontwapent hem het best.",
+		"best": "toegeven",
+	},
+	"provocateur": {
+		"name": "De Provocateur", "icon": "🎤",
+		"hint": "Zoekt een botsing — een fel weerwoord werkt het best.",
+		"best": "aanvallen",
+	},
+	"speculant": {
+		"name": "De Speculant", "icon": "🔮",
+		"hint": "Vist naar een verhaal — niet happen werkt het best.",
+		"best": "ontwijken",
+	},
+}
+
+const QUESTIONS := {
+	"feitenjager": [
+		"\"Klopt het dat er ruzie is in de kleedkamer?\"",
+		"\"Waarom duurde het weken voor u hierop reageerde?\"",
+		"\"Ligt dit aan de trainer, of aan hem?\"",
+		"\"Heeft u daar een sluitende verklaring voor?\"",
+	],
+	"provocateur": [
+		"\"Is dit niet gewoon het begin van het einde voor hem hier?\"",
+		"\"Durft u te beweren dat dit toeval is?\"",
+		"\"Houdt u ons voor de gek, of speelt hij echt zijn laatste wedstrijden hier?\"",
+		"\"Wordt het nu niet eens tijd voor eerlijkheid?\"",
+	],
+	"speculant": [
+		"\"Wil hij eigenlijk weg bij deze club?\"",
+		"\"Wat heeft hij te zeggen tegen de fans die vanavond boe riepen?\"",
+		"\"Wat zou hij nu tegen zichzelf zeggen, denkt u?\"",
+		"\"Gonst het nu al in de kleedkamer over zijn toekomst?\"",
+	],
+}
 
 const RESPONSES := {
 	"ontwijken": "'Daar ga ik nu niet verder op in.'",
@@ -34,91 +59,109 @@ const RESPONSES := {
 	"aanvallen": "'Dat is een oneerlijke vraag, en dat weet u ook.'",
 }
 
-# Per toon: welk antwoord de "beste" (good) keuze is, en de kans/effecten van
-# alle drie de antwoorden tegen die toon. "good" krijgt een flinke, betrouwbare
-# verlaging; de andere twee zijn zwakker — soms een gok, soms gegarandeerd
-# averechts — zodat er een leerbaar patroon ontstaat i.p.v. willekeur.
-const TONE_PAYOFFS := {
-	"beschuldigend": {
-		"toegeven": {"chance": 0.75, "ok": -18.0, "fail": 5.0,
+# Per journalist: kans/effect van elk antwoord. "best" (uit JOURNALISTS)
+# krijgt de hoogste kans en het grootste effect; de andere twee zijn zwakker
+# — soms een bruikbare gok, soms bijna gegarandeerd averechts.
+const PAYOFFS := {
+	"feitenjager": {
+		"toegeven": {"chance": 0.75, "ok": 18.0, "fail": -5.0,
 			"ok_txt": "Een eerlijk antwoord ontwapent de beschuldiging volledig.",
 			"fail_txt": "Zijn eerlijkheid wordt alsnog als een bekentenis uitgelegd."},
-		"aanvallen": {"chance": 0.35, "ok": -10.0, "fail": 18.0,
+		"aanvallen": {"chance": 0.35, "ok": 10.0, "fail": -18.0,
 			"ok_txt": "Een fel weerwoord, en het landt net.",
 			"fail_txt": "Tegen een gerichte beschuldiging oogt de tegenaanval vooral defensief."},
-		"ontwijken": {"chance": 0.0, "ok": 0.0, "fail": 10.0,
-			"ok_txt": "", "fail_txt": "Ontwijken bij een directe beschuldiging oogt schuldig."},
+		"ontwijken": {"chance": 0.15, "ok": 4.0, "fail": -10.0,
+			"ok_txt": "Hij glipt eraan voorbij, maar het scheelde weinig.",
+			"fail_txt": "Ontwijken bij een directe beschuldiging oogt schuldig."},
 	},
-	"provocerend": {
-		"aanvallen": {"chance": 0.70, "ok": -20.0, "fail": 15.0,
+	"provocateur": {
+		"aanvallen": {"chance": 0.70, "ok": 20.0, "fail": -15.0,
 			"ok_txt": "Een scherpe uitdaging vraagt om tegengas — en dat krijgt de zaal.",
 			"fail_txt": "De tegenaanval mist zijn doel en voedt de provocatie."},
-		"toegeven": {"chance": 0.30, "ok": -8.0, "fail": 12.0,
+		"toegeven": {"chance": 0.30, "ok": 8.0, "fail": -12.0,
 			"ok_txt": "Een eerlijk antwoord haalt net de wind uit de provocatie.",
 			"fail_txt": "Toegeven op een uitlokkende vraag voedt 'm alleen maar."},
-		"ontwijken": {"chance": 0.0, "ok": 0.0, "fail": 8.0,
-			"ok_txt": "", "fail_txt": "Wegduiken voor een provocatie oogt zwak."},
+		"ontwijken": {"chance": 0.15, "ok": 4.0, "fail": -8.0,
+			"ok_txt": "Hij weigert de bal op te pakken — het went net aan.",
+			"fail_txt": "Wegduiken voor een provocatie oogt zwak."},
 	},
-	"speculatief": {
-		"ontwijken": {"chance": 1.0, "ok": -12.0, "fail": 0.0,
+	"speculant": {
+		"ontwijken": {"chance": 0.90, "ok": 12.0, "fail": -3.0,
 			"ok_txt": "Er zijn geen feiten om op te reageren — niet happen is de veilige zet.",
-			"fail_txt": ""},
-		"toegeven": {"chance": 0.25, "ok": -5.0, "fail": 20.0,
+			"fail_txt": "Zelfs een simpel 'geen commentaar' wordt breed uitgemeten."},
+		"toegeven": {"chance": 0.25, "ok": 5.0, "fail": -20.0,
 			"ok_txt": "Toevallig raak, maar op puur giswerk 'toegeven' is link.",
 			"fail_txt": "Instemmen met pure speculatie bevestigt het gerucht als feit."},
-		"aanvallen": {"chance": 0.40, "ok": -8.0, "fail": 15.0,
+		"aanvallen": {"chance": 0.40, "ok": 8.0, "fail": -15.0,
 			"ok_txt": "Fel, maar het werkt tegen een speculatieve vraag.",
 			"fail_txt": "Zo fel reageren op giswerk oogt overdreven — alsof er iets te verbergen valt."},
 	},
 }
 
-var questions: Array = []
+const TARGET_QUESTIONS := 5
+
+var questions: Array = []     # [{journalist, text}]
 var question_idx := 0
-var tension: float = 30.0
-var questions_left := 5
+var sympathy: float = 50.0    # 0-100, HOGER is beter (positief geframed, was "spanning" die je moest vermijden)
+var streak := 0               # opeenvolgende successen; 2+ = momentum (+50% effect)
+var questions_left := TARGET_QUESTIONS
 var finished := false
 var blew_up := false
 var log: Array = []
 
 
 func setup(rng: RandomNumberGenerator) -> void:
-	var pool: Array = QUESTIONS.duplicate()
-	for i in range(pool.size() - 1, 0, -1):
-		var j := rng.randi_range(0, i)
-		var tmp = pool[i]
-		pool[i] = pool[j]
-		pool[j] = tmp
-	questions = pool.slice(0, 5)
+	var jids: Array = JOURNALISTS.keys()
+	questions = []
+	for i in range(TARGET_QUESTIONS):
+		var jid: String = jids[rng.randi_range(0, jids.size() - 1)]
+		var pool: Array = QUESTIONS[jid]
+		var text: String = pool[rng.randi_range(0, pool.size() - 1)]
+		questions.append({"journalist": jid, "text": text})
 
 
 func current_question() -> String:
 	return str(questions[question_idx].text)
 
 
-func current_tone() -> String:
-	return str(questions[question_idx].tone)
+func current_journalist() -> String:
+	return str(questions[question_idx].journalist)
 
 
-func _shift(delta: float) -> void:
-	tension = clampf(tension + delta, 0.0, 100.0)
+func is_final_question() -> bool:
+	return question_idx == questions.size() - 1
+
+
+func has_momentum() -> bool:
+	return streak >= 2
 
 
 func play(action: String, rng: RandomNumberGenerator) -> void:
-	log.append("Vraag: %s" % current_question())
+	var jid := current_journalist()
+	var j: Dictionary = JOURNALISTS[jid]
+	log.append("%s vraagt: %s" % [str(j.icon), current_question()])
 	log.append("Jouw antwoord: %s" % str(RESPONSES.get(action, "...")))
-	var payoff: Dictionary = TONE_PAYOFFS[current_tone()][action]
+	var payoff: Dictionary = PAYOFFS[jid][action]
+	# De Slotvraag (laatste ronde) heeft dubbele inzet — een climax i.p.v.
+	# gewoon nog een ronde.
+	var stakes := 2.0 if is_final_question() else 1.0
+	var momentum := has_momentum()
 	if rng.randf() < float(payoff.chance):
-		_shift(float(payoff.ok))
-		log.append(str(payoff.ok_txt))
+		var delta := float(payoff.ok) * stakes * (1.5 if momentum else 1.0)
+		sympathy = clampf(sympathy + delta, 0.0, 100.0)
+		streak += 1
+		log.append("%s%s" % [str(payoff.ok_txt), "  (MOMENTUM +50%%)" if momentum else ""])
 	else:
-		_shift(float(payoff.fail))
+		var delta := float(payoff.fail) * stakes
+		sympathy = clampf(sympathy + delta, 0.0, 100.0)
+		streak = 0
 		log.append(str(payoff.fail_txt))
 	questions_left -= 1
 	question_idx += 1
-	if tension >= 100.0:
+	if sympathy <= 0.0:
 		finished = true
 		blew_up = true
-		log.append("De zaal ontspoort volledig. Dit wordt het nieuws van morgen.")
+		log.append("De zaal ontploft. Dit wordt het nieuws van morgen.")
 	elif questions_left <= 0:
 		finished = true
 
@@ -128,13 +171,13 @@ func outcome() -> Dictionary:
 	if blew_up:
 		return {"effects": {"scandal": 15, "rep": -8, "trust": -10},
 			"txt": "De persconferentie ontspoort. Grote imagoschade, voor jullie beiden."}
-	if tension <= 20.0:
+	if sympathy >= 80.0:
 		return {"effects": {"rep": 8, "trust": 6},
 			"txt": "Meesterlijk gehanteerd. De pers roemt zijn kalmte — en jouw coaching."}
-	if tension <= 50.0:
+	if sympathy >= 50.0:
 		return {"effects": {"rep": 3},
 			"txt": "Prima doorstaan. Geen kop, geen gedoe."}
-	if tension <= 80.0:
+	if sympathy >= 20.0:
 		return {"effects": {"rep": -2},
 			"txt": "Wat rommelig, maar overleefd."}
 	return {"effects": {"scandal": 6, "rep": -4},

@@ -1372,8 +1372,8 @@ func show_event(ev: Dictionary) -> void:
 			btn(label + suffix, func(): _resolve(ev, opt), enabled)
 			var succ_eff := Game.scale_money_effects(opt.get("success", {}))
 			var fail_eff := Game.scale_money_effects(opt.get("fail", {}))
-			var succ_rows := _effect_rows(succ_eff, "", false, _emphasis_for(succ_eff, em_ctx.max_abs, em_ctx.distinct_counts))
-			var fail_rows := _effect_rows(fail_eff, "", false, _emphasis_for(fail_eff, em_ctx.max_abs, em_ctx.distinct_counts))
+			var succ_rows := _effect_rows(succ_eff, "", false, _emphasis_for(succ_eff, em_ctx.max_abs, em_ctx.distinct_counts, em_ctx.min_abs))
+			var fail_rows := _effect_rows(fail_eff, "", false, _emphasis_for(fail_eff, em_ctx.max_abs, em_ctx.distinct_counts, em_ctx.min_abs))
 			if not succ_rows.is_empty():
 				lbl("Bij succes:", 18)
 				for row in succ_rows:
@@ -1387,7 +1387,7 @@ func show_event(ev: Dictionary) -> void:
 		else:
 			btn(label + suffix, func(): _resolve(ev, opt), enabled)
 			var eff := Game.scale_money_effects(opt.get("effects", {}))
-			_show_effect_rows(eff, "", false, _emphasis_for(eff, em_ctx.max_abs, em_ctx.distinct_counts))
+			_show_effect_rows(eff, "", false, _emphasis_for(eff, em_ctx.max_abs, em_ctx.distinct_counts, em_ctx.min_abs))
 
 
 func _resolve(ev: Dictionary, opt: Dictionary) -> void:
@@ -1453,19 +1453,26 @@ const EFFECT_GOOD_HIGH := {
 }
 
 
+const EMPHASIS_MIN_RATIO := 2.0   # pas 4 tekens als de waarde ÉCHT ≥2× de kleinste is
+
+
 func _emphasis_symbol(key: String, emphasize: Dictionary, v: int) -> String:
 	var sym := "+" if v > 0 else "-"
-	var reps := 3 if bool(emphasize.get(key, false)) else 2
+	# 2 tekens = normaal, 4 tekens = dubbel zo zwaar. Was 3, maar het verschil
+	# tussen "++" en "+++" was visueel én inhoudelijk te klein: de markering
+	# betekende alleen "grootste binnen dit event", ook als dat 5 vs. 6 was.
+	var reps := 4 if bool(emphasize.get(key, false)) else 2
 	return sym.repeat(reps)
 
 
 func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: bool = true, emphasize: Dictionary = {}) -> Array:
 	# Eén rij per gewijzigde variabele, altijd gekleurd (groen = goed voor
 	# jou, rood = slecht). show_numbers=false geeft de kwalitatieve preview
-	# (++/-- , of +++/---- als `emphasize` deze variabele als grootste
-	# impact aanmerkt — vergeleken met de andere opties van hetzelfde
-	# event) voor vóór een keuze; show_numbers=true geeft de exacte
-	# bedragen voor het uitkomstscherm ná een keuze.
+	# (++/-- normaal, of ++++/---- als `emphasize` deze variabele als de
+	# zwaarste impact aanmerkt — dat vereist zowel de grootste waarde binnen
+	# dit event ALS minstens 2× de kleinste variant, zie _emphasis_for());
+	# show_numbers=true geeft de exacte bedragen voor het uitkomstscherm ná
+	# een keuze.
 	var rows: Array = []
 	for key in ["money", "rep", "scandal", "favors", "scout_points", "scout_points_permanent"]:
 		if effects.has(key) and int(effects[key]) != 0:
@@ -1537,30 +1544,40 @@ func _collect_branches(ev: Dictionary) -> Array:
 	return branches
 
 
-func _emphasis_for(effects: Dictionary, max_abs: Dictionary, distinct_counts: Dictionary) -> Dictionary:
+func _emphasis_for(effects: Dictionary, max_abs: Dictionary, distinct_counts: Dictionary, min_abs: Dictionary = {}) -> Dictionary:
 	var em := {}
 	for key in EFFECT_KEYS_FOR_EMPHASIS:
 		if not effects.has(key) or int(effects[key]) == 0:
 			continue
 		var av := absi(int(effects[key]))
 		var seen: Dictionary = distinct_counts.get(key, {})
-		if av == int(max_abs.get(key, 0)) and seen.size() > 1:
-			em[key] = true
+		if av != int(max_abs.get(key, 0)) or seen.size() <= 1:
+			continue
+		# Alleen de zwaarste markering als die ook ÉCHT minstens dubbel zo
+		# groot is als de kleinste variant binnen dit event — anders zou
+		# "++++" naast "++" staan bij een verschil van bijv. 5 vs. 6, wat de
+		# markering betekenisloos maakt.
+		var lo := int(min_abs.get(key, av))
+		if lo > 0 and float(av) < EMPHASIS_MIN_RATIO * float(lo):
+			continue
+		em[key] = true
 	return em
 
 
 func _event_emphasis_context(ev: Dictionary) -> Dictionary:
 	var max_abs: Dictionary = {}
+	var min_abs: Dictionary = {}
 	var distinct_counts: Dictionary = {}
 	for eff in _collect_branches(ev):
 		for key in EFFECT_KEYS_FOR_EMPHASIS:
 			if eff.has(key) and int(eff[key]) != 0:
 				var av := absi(int(eff[key]))
 				max_abs[key] = maxi(int(max_abs.get(key, 0)), av)
+				min_abs[key] = av if not min_abs.has(key) else mini(int(min_abs[key]), av)
 				var seen: Dictionary = distinct_counts.get(key, {})
 				seen[av] = true
 				distinct_counts[key] = seen
-	return {"max_abs": max_abs, "distinct_counts": distinct_counts}
+	return {"max_abs": max_abs, "min_abs": min_abs, "distinct_counts": distinct_counts}
 
 
 func _show_effect_lines(effects: Dictionary, client_name: String = "") -> void:
@@ -1703,12 +1720,19 @@ func show_press() -> void:
 	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
 	lbl("PERSCONFERENTIE", 32)
-	_name_row("", cid, "   |   Spanning: %d/100" % int(press.tension), 24)
-	_set_turn_bar("Vragen:", press.questions_left, 5)
+	_name_row("", cid, "", 24)
+	var sym_lbl := lbl("Publiekssympathie: %d/100" % int(press.sympathy), 24)
+	sym_lbl.add_theme_color_override("font_color",
+		Color(0.35, 0.9, 0.4) if press.sympathy >= 50.0 else Color(1.0, 0.55, 0.3))
+	_set_turn_bar("Vragen:", press.questions_left, PressConference.TARGET_QUESTIONS)
 	if not press.log.is_empty():
 		sep()
-		for line in press.log:
-			lbl("· " + str(line), 20)
+		# Alleen de meest recente uitkomst (vraag + antwoord + resultaat, 3
+		# regels per zet) i.p.v. de hele geschiedenis — zelfde principe als
+		# bij de onderhandeling.
+		var start := maxi(press.log.size() - 3, 0)
+		for i in range(start, press.log.size()):
+			lbl("· " + str(press.log[i]), 20)
 	sep()
 	if press.finished:
 		var o := press.outcome()
@@ -1716,6 +1740,17 @@ func show_press() -> void:
 		_show_effect_lines(o.effects, str(Game.state.players[cid].name))
 		btn("Verder →", func(): _finish_press(o))
 	else:
+		var jid := press.current_journalist()
+		var j: Dictionary = PressConference.JOURNALISTS[jid]
+		if press.is_final_question():
+			var final_lbl := lbl("⚡ SLOTVRAAG — dubbele inzet", 22)
+			final_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
+		var j_lbl := lbl("%s %s" % [str(j.icon), str(j.name)], 24)
+		j_lbl.add_theme_color_override("font_color", Color(0.75, 0.82, 0.95))
+		lbl(str(j.hint), 19)
+		if press.has_momentum():
+			var mom_lbl := lbl("MOMENTUM: je volgende succesvolle antwoord telt +50%% zwaarder!", 19)
+			mom_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 		var q := lbl(press.current_question(), 26)
 		q.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
 		sep()

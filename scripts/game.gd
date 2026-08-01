@@ -40,6 +40,24 @@ const SCANDAL_TIER1_MAX_PENALTY := 0.20   # tekenkans tot -20% bij schandaal 100
 const SCANDAL_TIER2_MAX_POACH := 0.20     # kaapkans tot +20% bij schandaal 100
 const SCANDAL_TIER2_MAX_INTEREST_PENALTY := 0.5   # clubinteresse-kans tot -50% bij schandaal 100
 
+# Spelerontwikkeling: de groei per seizoen is een FUNCTIE van het gat tussen
+# rating en potentieel, gedeeld door het aantal seizoenen dat deze speler nog
+# "nodig heeft". Dat aantal wordt per speler één keer getrokken uit een
+# normale verdeling (gemiddeld 15 seizoenen, standaarddeviatie 4), zodat een
+# speler gemiddeld precies een volledige run over zijn ontwikkeling doet —
+# de een is er in 8 seizoenen, de ander haalt het net niet.
+# Een groter gat betekent dus automatisch snellere groei per seizoen, en de
+# `dev_left`-noemer zorgt dat het altijd exact op tijd landt (ook als de
+# stochastische afronding een seizoen mee- of tegenzit).
+const DEV_SEASONS_MEAN := 15.0
+const DEV_SEASONS_SD := 4.0
+const DEV_SEASONS_MIN := 4
+const DEV_SEASONS_MAX := 30
+
+
+func _draw_dev_seasons() -> int:
+	return clampi(int(round(rng.randfn(DEV_SEASONS_MEAN, DEV_SEASONS_SD))), DEV_SEASONS_MIN, DEV_SEASONS_MAX)
+
 
 func _scandal_tier_factor(tier: float) -> float:
 	# 0.0 onder de drempel, oplopend naar 1.0 bij schandaal 100.
@@ -1158,15 +1176,29 @@ func end_of_season() -> Array:
 	for cid in state.clients:
 		var p: Dictionary = state.players[cid]
 		var perf := rng.randi_range(1, 10)
-		# Groei richting (verborgen) potentieel; vanaf 27 is de rek eruit.
-		# Ontwikkeling ~30% sneller dan voorheen (was randi 0..3): spelers
-		# groeien merkbaar vlotter naar hun potentieel toe.
-		if int(p.age) <= 26 and int(p.rating) < int(p.pot):
-			var growth := int(round(float(rng.randi_range(0, 3)) * 1.3))
+		# Groei richting (verborgen) potentieel, geschaald op het GAT tussen
+		# rating en potentieel: growth = gat / resterende ontwikkelseizoenen
+		# (zie DEV_SEASONS_*). Geen leeftijdsgrens meer — die maakte de
+		# 15-seizoenen-kalibratie onhaalbaar voor spelers die op hun 20e
+		# instroomden (age<=26 gaf hen maar 7 seizoenen rek).
+		if int(p.rating) < int(p.pot):
+			var left := int(p.get("dev_left", 0))
+			if left <= 0:
+				left = _draw_dev_seasons()   # lazy: ook voor saves van vóór dit veld
+			var gap := int(p.pot) - int(p.rating)
+			# Stochastische afronding: onvertekend, zodat de verwachte groei
+			# exact gat/left is i.p.v. systematisch naar boven/onder af te wijken.
+			var per := float(gap) / float(left)
+			var growth := int(floor(per))
+			if rng.randf() < per - floor(per):
+				growth += 1
 			if growth > 0:
 				var oud := int(p.rating)
 				p["rating"] = mini(oud + growth, int(p.pot))
 				lines.append("%s ontwikkelt zich: rating %d → %d." % [p.name, oud, int(p.rating)])
+			# Nooit onder 1: bij left==1 is growth == het volledige restgat,
+			# dus dan landt hij dat seizoen precies op zijn potentieel.
+			p["dev_left"] = maxi(left - 1, 1)
 		# Vertrouwen drift op basis van het seizoen (licht negatief zonder aandacht).
 		# Het seizoensresultaat past nog wel het vertrouwen aan, maar zonder losse
 		# meldingsregel — die voegde niets toe.
