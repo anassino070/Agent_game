@@ -54,8 +54,16 @@ const SCANDAL_TIER2_MAX_INTEREST_PENALTY := 0.5   # clubinteresse-kans tot -50% 
 # dus ook echt ~10 blijft in plaats van omhoog te schuiven).
 const DEV_SEASONS_MEAN := 10.0
 const DEV_SEASONS_SD := 4.0
-const DEV_SEASONS_MIN := 3
+const DEV_SEASONS_MIN := 5
 const DEV_SEASONS_MAX := 22
+
+# Harde bovengrens op de groei per seizoen. Zonder deze grens kon een speler met
+# een enorm gat (bijv. rating 18 → potentieel 85 = gat 67) én een lage trekking
+# uit _draw_dev_seasons() meer dan 20 rating in één seizoen winnen, waarmee de
+# run in één klap gewonnen was. Niemand wordt in één jaar 20 punten beter; deze
+# cap knijpt alleen de extreme uitschieters af, de gemiddelde speler zit met
+# ~4 per seizoen ver eronder.
+const DEV_MAX_STEP := 7
 
 
 func _draw_dev_seasons() -> int:
@@ -1198,15 +1206,20 @@ func end_of_season() -> Array:
 			# daarna NIET meer als zijn rating stijgt. Eerder werd het gat elk
 			# seizoen opnieuw uit de huidige rating berekend; dat was
 			# zelfcorrigerend maar wel afhankelijk van de actuele rating.
-			# `dev_step` is lazy, dus ook saves van vóór dit veld pikken het op.
+			# Geschaald op `base_rating` — de rating zoals de speler GEGENEREERD
+			# is (world_gen.gd) — niet op zijn actuele rating en niet op de
+			# bandondergrens. `dev_step` is lazy, dus ook saves van vóór deze
+			# velden pikken het op (dan valt base_rating terug op de rating nu).
 			if not p.has("dev_step"):
-				p["dev_step"] = float(int(p.pot) - int(p.rating)) / float(_draw_dev_seasons())
+				var base := int(p.get("base_rating", p.rating))
+				p["dev_step"] = float(int(p.pot) - base) / float(_draw_dev_seasons())
 			var per := float(p.dev_step)
 			# Stochastische afronding: onvertekend, zodat de verwachte groei
 			# exact `dev_step` is i.p.v. systematisch naar boven/onder af te wijken.
 			var growth := int(floor(per))
 			if rng.randf() < per - floor(per):
 				growth += 1
+			growth = mini(growth, DEV_MAX_STEP)   # nooit een 20-punts sprong
 			if growth > 0:
 				var oud := int(p.rating)
 				p["rating"] = mini(oud + growth, int(p.pot))

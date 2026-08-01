@@ -69,6 +69,10 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 			"age": age,
 			"pos": POS[rng.randi_range(0, 3)],
 			"rating": rating,
+			# Rating zoals hij GEGENEREERD is. De ontwikkelstap wordt hierop
+			# geschaald (zie DEV_* in game.gd), niet op de bandondergrens en niet
+			# op zijn actuele rating — zo staat het tempo van dag één vast.
+			"base_rating": rating,
 			"pot": pot,          # verborgen echt potentieel
 			"est": est,          # publieke schatting; middelpunt van de band
 			"unc": unc,          # onzekerheid; scouting verlaagt dit
@@ -129,6 +133,7 @@ static func make_candidate(rng: RandomNumberGenerator, pid: String, rating: int,
 		"age": age,
 		"pos": POS[rng.randi_range(0, 3)],
 		"rating": rating,
+		"base_rating": rating,   # zie generate(): schaalt de ontwikkelstap
 		"pot": pot,
 		"est": est,
 		"unc": unc,
