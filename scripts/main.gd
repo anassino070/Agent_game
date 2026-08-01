@@ -1113,6 +1113,15 @@ func _player_card(pid: String, sub_text := "", highlighted := false, client_tag 
 		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		sub.add_theme_color_override("font_color", Color(0.75, 0.75, 0.78))
 		info.add_child(sub)
+	# Tags: puur visuele markeringen (favoriet / slot) om je eigen plannen te
+	# onthouden — geen mechanisch effect. Op een eigen compacte rij i.p.v. naast
+	# de naam, want in een halve kolom houdt de naam dan zijn volle breedte.
+	var tag_row := HBoxContainer.new()
+	tag_row.add_theme_constant_override("separation", 4)
+	tag_row.size_flags_horizontal = Control.SIZE_SHRINK_BEGIN
+	info.add_child(tag_row)
+	tag_row.add_child(_tag_btn(pid, "fav", "★"))
+	tag_row.add_child(_tag_btn(pid, "lock", "🔒"))
 	# Compactere badges dan voorheen (was 96x52 / 64x64): in een halve kolom
 	# moet er naast de badges nog genoeg breedte over zijn voor naam en subregel.
 	var badges := VBoxContainer.new()
@@ -1155,6 +1164,34 @@ func _player_card(pid: String, sub_text := "", highlighted := false, client_tag 
 		badges.add_child(_stat_badge("RAT", str(int(p.rating)), Color(0.18, 0.42, 0.78), Vector2(54, 54), Control.SIZE_SHRINK_END))
 	card.set_meta("info_col", info)
 	return card
+
+
+const TAG_ON_COLOR := Color(1.0, 0.85, 0.2)
+const TAG_OFF_COLOR := Color(1.0, 1.0, 1.0, 0.28)
+
+
+func _tag_btn(pid: String, key: String, icon: String) -> Button:
+	# Aan/uit-tag op een speler (`fav` / `lock` op de speler-dictionary, dus hij
+	# gaat mee in de save). Werkt zichzelf bij i.p.v. het hele scherm te
+	# hertekenen — zo hoeft deze knop niet te weten op welk scherm hij staat, en
+	# blijft je scrollpositie staan.
+	var b := Button.new()
+	b.text = icon
+	b.add_theme_font_size_override("font_size", 18)
+	b.custom_minimum_size = Vector2(40, 34)
+	b.modulate = TAG_ON_COLOR if bool(Game.state.players[pid].get(key, false)) else TAG_OFF_COLOR
+	b.pressed.connect(_toggle_player_tag.bind(pid, key, b))
+	return b
+
+
+func _toggle_player_tag(pid: String, key: String, b: Button) -> void:
+	if not Game.state.players.has(pid):
+		return
+	var p: Dictionary = Game.state.players[pid]
+	var now := not bool(p.get(key, false))
+	p[key] = now
+	b.modulate = TAG_ON_COLOR if now else TAG_OFF_COLOR
+	Game.save_game()
 
 
 func _card_grid() -> GridContainer:
@@ -2086,16 +2123,22 @@ func show_anagram() -> void:
 		anagram_timer_label = lbl("Tijd: %ds" % int(ceil(anagram_time_left)), 22)
 		lbl("Getypt: %s" % (str(anagram.typed) if str(anagram.typed) != "" else "_"), 26)
 		sep()
+		# 5 kolommen → 6 rijen voor 26 letters (was 13 kolommen / 2 rijen met
+		# 40×40-toetsen). Veel grotere, beter aan te tikken toetsen die de volle
+		# schermbreedte gebruiken.
 		var kb := GridContainer.new()
-		kb.columns = 13
-		kb.add_theme_constant_override("h_separation", 4)
-		kb.add_theme_constant_override("v_separation", 4)
+		kb.columns = 5
+		kb.add_theme_constant_override("h_separation", 6)
+		kb.add_theme_constant_override("v_separation", 6)
+		kb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		content.add_child(kb)
 		for code in range(65, 91):
 			var ch := char(code)
 			var kbtn := Button.new()
 			kbtn.text = ch
-			kbtn.custom_minimum_size = Vector2(40, 40)
+			kbtn.add_theme_font_size_override("font_size", 32)
+			kbtn.custom_minimum_size = Vector2(0, 72)
+			kbtn.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 			kbtn.pressed.connect(func(): _type_anagram_letter(ch))
 			kb.add_child(kbtn)
 		sep()
