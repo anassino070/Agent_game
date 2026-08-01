@@ -43,16 +43,19 @@ const SCANDAL_TIER2_MAX_INTEREST_PENALTY := 0.5   # clubinteresse-kans tot -50% 
 # Spelerontwikkeling: de groei per seizoen (`dev_step` op de speler) wordt ÉÉN
 # KEER vastgelegd als (potentieel - basisrating) / aantal ontwikkelseizoenen.
 # Dat aantal wordt per speler getrokken uit een normale verdeling (gemiddeld
-# 15 seizoenen, standaarddeviatie 4), zodat een speler gemiddeld precies een
-# volledige run over zijn ontwikkeling doet — de een is er in 8 seizoenen, de
-# ander haalt het net niet.
+# 10 seizoenen, standaarddeviatie 4), dus een speler is gemiddeld twee derde van
+# een run onderweg naar zijn potentieel — de een is er in 5 seizoenen, de ander
+# heeft er 15 voor nodig. Was 15 seizoenen (een volledige run).
 # Een groter gat bij de start betekent dus een grotere stap per seizoen, maar
 # die stap blijft daarna CONSTANT: hij wordt niet herberekend als de rating
 # stijgt, zodat de groei puur op de basisrating van het eerste seizoen berust.
-const DEV_SEASONS_MEAN := 15.0
+# MIN/MAX zijn de clamps op de trekking; met gemiddelde 10 en SD 4 ligt MIN op
+# ~1,75 SD eronder, zodat er nauwelijks kans wordt afgekapt (en het gemiddelde
+# dus ook echt ~10 blijft in plaats van omhoog te schuiven).
+const DEV_SEASONS_MEAN := 10.0
 const DEV_SEASONS_SD := 4.0
-const DEV_SEASONS_MIN := 4
-const DEV_SEASONS_MAX := 30
+const DEV_SEASONS_MIN := 3
+const DEV_SEASONS_MAX := 22
 
 
 func _draw_dev_seasons() -> int:
