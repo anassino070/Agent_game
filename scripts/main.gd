@@ -1068,7 +1068,7 @@ func _candidate_card(pid: String) -> Control:
 	return card
 
 
-func _player_card(pid: String, sub_text := "", highlighted := false, client_tag := false, prev_rating := -1) -> PanelContainer:
+func _player_card(pid: String, sub_text := "", highlighted := false, client_tag := false, prev_rating := -1, known_pot := false) -> PanelContainer:
 	# DÉ spelerkaart — één centrale opmaak die overal wordt hergebruikt waar een
 	# speler genoemd wordt: scouting, je stal (voorbereiding), stalbeheer, het
 	# infopaneel bij events/minigames en het weggekaapt-nieuwsscherm. Naam +
@@ -1129,7 +1129,7 @@ func _player_card(pid: String, sub_text := "", highlighted := false, client_tag 
 	badges.custom_minimum_size = Vector2((144 if prev_rating >= 0 else 74), 0)
 	badges.add_theme_constant_override("separation", 6)
 	hb.add_child(badges)
-	badges.add_child(_stat_badge("POT", _pot_badge_text(pid), Color(0.16, 0.55, 0.28), Vector2(74, 46), Control.SIZE_SHRINK_END))
+	badges.add_child(_stat_badge("POT", _pot_badge_text(pid, known_pot), Color(0.16, 0.55, 0.28), Vector2(74, 46), Control.SIZE_SHRINK_END))
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	badges.add_child(spacer)
@@ -1215,12 +1215,16 @@ func _stat_card(pid: String, sub_text: String, highlighted := false, parent: Nod
 	return card.get_meta("info_col") as VBoxContainer
 
 
-func _pot_badge_text(pid: String) -> String:
+func _pot_badge_text(pid: String, force_known := false) -> String:
 	# Potentieel voor de badge: exact bekend zodra iemand in je stal zit, anders
 	# de geschatte band (est ± onzekerheid). Gedeeld door scoutingkaart,
 	# stalbeheer en het infobalkje, zodat de weergave overal identiek is.
+	# `force_known` is voor kaarten over spelers die dit seizoen NOG van jou
+	# waren maar inmiddels uit state.clients zijn gehaald (ontwikkeling van
+	# iemand die daarna vertrok/weggekaapt werd, en het wegkaap-nieuwsscherm):
+	# je kende zijn potentieel, dus daar hoort geen vage band te staan.
 	var p: Dictionary = Game.state.players[pid]
-	if pid in Game.state.clients:
+	if force_known or pid in Game.state.clients:
 		return str(int(p.pot))
 	var est := Game.estimate(pid)
 	var lo := maxi(est - int(p.unc), int(p.rating))
@@ -2750,9 +2754,13 @@ func _show_wrapup_report(report: Array) -> void:
 			var p: Dictionary = Game.state.players[pid]
 			# Geen "+X rating"-zin in de subregel: dat cijfer staat nu boven de
 			# pijl tussen de WAS- en RAT-badge (zie _player_card()).
+			# known_pot: hij was dit seizoen jouw cliënt (anders was er geen
+			# ontwikkeling), dus het exacte potentieel hoort er te staan — ook
+			# als hij ná zijn groei alsnog vertrok of weggekaapt werd en dus
+			# niet meer in state.clients zit.
 			content.add_child(_player_card(
 				pid, "%s, %d jr" % [str(p.pos), int(p.age)],
-				false, false, int(d.get("old", 0))))
+				false, false, int(d.get("old", 0)), true))
 	sep()
 	# Wegkapingen zijn hier al langs geweest (show_poach_news() komt vóór dit
 	# rapport, zie _goto_wrapup()), dus dit rapport eindigt gewoon.
@@ -2788,9 +2796,11 @@ func show_poach_news(poached: Array, report: Array) -> void:
 		var pid := str(entry.get("pid", ""))
 		if pid != "" and Game.state.players.has(pid):
 			var p: Dictionary = Game.state.players[pid]
+			# known_pot: hij wás je cliënt, dus je kende zijn exacte potentieel —
+			# dat verdwijnt niet op het moment dat een rivaal hem overneemt.
 			content.add_child(_player_card(pid, "%s, %d jr · vertrouwen was %d · waarde %s" % [
 				str(p.pos), int(p.age), int(entry.get("trust", 0)), eur(Game.value(p)),
-			]))
+			], false, false, -1, true))
 		lbl("Vertrouwen is je enige verdediging: een cliënt die zich gezien voelt, luistert niet naar een rivaal.", 19)
 	sep()
 	btn("Verder →", func(): _after_poach_news(report))
