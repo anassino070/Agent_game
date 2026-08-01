@@ -363,10 +363,28 @@ func tier_levels(branch: Dictionary, tier_idx: int) -> int:
 	return total
 
 
+func tier_max_levels(branch: Dictionary, tier_idx: int) -> int:
+	# Hoeveel niveaus er in deze rij MAXIMAAL te koop zijn (som van max_level).
+	var total := 0
+	for id in branch.tiers[tier_idx]:
+		total += int(PERKS[str(id)].max_level)
+	return total
+
+
+func tier_req_for(branch: Dictionary, tier_idx: int) -> int:
+	# Wat je in rij `tier_idx` moet halen om de rij eronder te ontgrendelen.
+	# Geclampt op wat die rij überhaupt KAN opleveren: KAPITAAL rij 3 heeft
+	# samen maar 4 niveaus (kantoor 2 + reserves 1 + laatste_redmiddel 1),
+	# waardoor rij 4 met een vaste eis van 5 permanent onbereikbaar was. Door de
+	# eis datagestuurd te clampen kan dat bij een toekomstige perk-aanpassing
+	# ook niet meer stilletjes opnieuw gebeuren.
+	return mini(TIER_REQ, tier_max_levels(branch, tier_idx))
+
+
 func tier_unlocked(branch: Dictionary, tier_idx: int) -> bool:
 	if tier_idx == 0:
 		return true
-	return tier_levels(branch, tier_idx - 1) >= TIER_REQ
+	return tier_levels(branch, tier_idx - 1) >= tier_req_for(branch, tier_idx - 1)
 
 
 func is_unlocked(id: String) -> bool:

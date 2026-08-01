@@ -624,7 +624,7 @@ func show_perks() -> void:
 		("%.1f" % (Meta.tree_progress() * 100.0)).replace(".", ","),
 		_pts(Meta.tree_spent()), _pts(Meta.tree_total_cost()),
 	], 26)
-	lbl("Permanente upgrades voor elke volgende run. Je verdient legacy points door te spelen — hoe verder je komt, hoe exponentieel meer (een gewonnen run = 1%% van de boom). Elke rij biedt 3 opties; koop %d niveaus in een rij om de rij eronder te ontgrendelen." % Meta.TIER_REQ, 22)
+	lbl("Permanente upgrades voor elke volgende run. Je verdient legacy points door te spelen — hoe verder je komt, hoe exponentieel meer (een gewonnen run = 1%% van de boom). Elke rij biedt 3 opties; koop %d niveaus in een rij om de rij eronder te ontgrendelen (of alles wat die rij te bieden heeft, als dat er minder zijn)." % Meta.TIER_REQ, 22)
 	for branch in Meta.TREE:
 		sep()
 		lbl("◆ TAK: %s" % str(branch.name), 30)
@@ -638,8 +638,12 @@ func show_perks() -> void:
 				var names: Array = []
 				for id in branch.tiers[tier_idx]:
 					names.append(str(Meta.PERKS[id].name))
+				# De échte eis opvragen i.p.v. de kale TIER_REQ: in een rij met
+				# minder dan 5 koopbare niveaus is de eis lager (zie
+				# Meta.tier_req_for()), en dan moet de melding dat ook zeggen.
 				lbl("🔒 Rij %d (%s) — vereist %d niveaus in rij %d (nu %d)." % [
-					tier_idx + 1, ", ".join(names), Meta.TIER_REQ, tier_idx,
+					tier_idx + 1, ", ".join(names),
+					Meta.tier_req_for(branch, tier_idx - 1), tier_idx,
 					Meta.tier_levels(branch, tier_idx - 1),
 				], 20)
 	sep()
