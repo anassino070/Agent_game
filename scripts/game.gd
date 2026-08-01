@@ -40,15 +40,15 @@ const SCANDAL_TIER1_MAX_PENALTY := 0.20   # tekenkans tot -20% bij schandaal 100
 const SCANDAL_TIER2_MAX_POACH := 0.20     # kaapkans tot +20% bij schandaal 100
 const SCANDAL_TIER2_MAX_INTEREST_PENALTY := 0.5   # clubinteresse-kans tot -50% bij schandaal 100
 
-# Spelerontwikkeling: de groei per seizoen is een FUNCTIE van het gat tussen
-# rating en potentieel, gedeeld door het aantal seizoenen dat deze speler nog
-# "nodig heeft". Dat aantal wordt per speler één keer getrokken uit een
-# normale verdeling (gemiddeld 15 seizoenen, standaarddeviatie 4), zodat een
-# speler gemiddeld precies een volledige run over zijn ontwikkeling doet —
-# de een is er in 8 seizoenen, de ander haalt het net niet.
-# Een groter gat betekent dus automatisch snellere groei per seizoen, en de
-# `dev_left`-noemer zorgt dat het altijd exact op tijd landt (ook als de
-# stochastische afronding een seizoen mee- of tegenzit).
+# Spelerontwikkeling: de groei per seizoen (`dev_step` op de speler) wordt ÉÉN
+# KEER vastgelegd als (potentieel - basisrating) / aantal ontwikkelseizoenen.
+# Dat aantal wordt per speler getrokken uit een normale verdeling (gemiddeld
+# 15 seizoenen, standaarddeviatie 4), zodat een speler gemiddeld precies een
+# volledige run over zijn ontwikkeling doet — de een is er in 8 seizoenen, de
+# ander haalt het net niet.
+# Een groter gat bij de start betekent dus een grotere stap per seizoen, maar
+# die stap blijft daarna CONSTANT: hij wordt niet herberekend als de rating
+# stijgt, zodat de groei puur op de basisrating van het eerste seizoen berust.
 const DEV_SEASONS_MEAN := 15.0
 const DEV_SEASONS_SD := 4.0
 const DEV_SEASONS_MIN := 4
@@ -1189,13 +1189,17 @@ func end_of_season() -> Array:
 		# 15-seizoenen-kalibratie onhaalbaar voor spelers die op hun 20e
 		# instroomden (age<=26 gaf hen maar 7 seizoenen rek).
 		if int(p.rating) < int(p.pot):
-			var left := int(p.get("dev_left", 0))
-			if left <= 0:
-				left = _draw_dev_seasons()   # lazy: ook voor saves van vóór dit veld
-			var gap := int(p.pot) - int(p.rating)
+			# De groei per seizoen wordt ÉÉN KEER vastgelegd, op basis van het gat
+			# bij de start (de basisrating van het eerste seizoen), en verandert
+			# daarna NIET meer als zijn rating stijgt. Eerder werd het gat elk
+			# seizoen opnieuw uit de huidige rating berekend; dat was
+			# zelfcorrigerend maar wel afhankelijk van de actuele rating.
+			# `dev_step` is lazy, dus ook saves van vóór dit veld pikken het op.
+			if not p.has("dev_step"):
+				p["dev_step"] = float(int(p.pot) - int(p.rating)) / float(_draw_dev_seasons())
+			var per := float(p.dev_step)
 			# Stochastische afronding: onvertekend, zodat de verwachte groei
-			# exact gat/left is i.p.v. systematisch naar boven/onder af te wijken.
-			var per := float(gap) / float(left)
+			# exact `dev_step` is i.p.v. systematisch naar boven/onder af te wijken.
 			var growth := int(floor(per))
 			if rng.randf() < per - floor(per):
 				growth += 1
@@ -1206,9 +1210,6 @@ func end_of_season() -> Array:
 				# seizoensrapport als spelerkaart getoond, met een badge voor de
 				# oude rating en een pijl naar de nieuwe (zie _show_wrapup_report()).
 				developed.append({"pid": cid, "old": oud, "new": int(p.rating)})
-			# Nooit onder 1: bij left==1 is growth == het volledige restgat,
-			# dus dan landt hij dat seizoen precies op zijn potentieel.
-			p["dev_left"] = maxi(left - 1, 1)
 		# Vertrouwen drift op basis van het seizoen (licht negatief zonder aandacht).
 		# Het seizoensresultaat past nog wel het vertrouwen aan, maar zonder losse
 		# meldingsregel — die voegde niets toe.
