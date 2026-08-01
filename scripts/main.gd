@@ -1116,8 +1116,8 @@ func _player_card(pid: String, sub_text := "", highlighted := false, client_tag 
 	# Compactere badges dan voorheen (was 96x52 / 64x64): in een halve kolom
 	# moet er naast de badges nog genoeg breedte over zijn voor naam en subregel.
 	var badges := VBoxContainer.new()
-	# Breder als er een "was"-badge met pijl bij komt (48 + pijl + 54).
-	badges.custom_minimum_size = Vector2((132 if prev_rating >= 0 else 74), 0)
+	# Breder als er een "was"-badge met pijl bij komt (48 + pijl/groeicijfer + 54).
+	badges.custom_minimum_size = Vector2((144 if prev_rating >= 0 else 74), 0)
 	badges.add_theme_constant_override("separation", 6)
 	hb.add_child(badges)
 	badges.add_child(_stat_badge("POT", _pot_badge_text(pid), Color(0.16, 0.55, 0.28), Vector2(74, 46), Control.SIZE_SHRINK_END))
@@ -1130,12 +1130,25 @@ func _player_card(pid: String, sub_text := "", highlighted := false, client_tag 
 		rat_row.add_theme_constant_override("separation", 4)
 		rat_row.size_flags_horizontal = Control.SIZE_SHRINK_END
 		rat_row.add_child(_stat_badge("WAS", str(prev_rating), Color(0.30, 0.30, 0.34), Vector2(48, 54)))
+		# Het groeicijfer staat BOVEN de pijl (i.p.v. als losse zin in de
+		# subregel): "+3" met daaronder "→", zodat je in één blik ziet hoeveel
+		# hij vooruit is gegaan.
+		var arrow_col := VBoxContainer.new()
+		arrow_col.add_theme_constant_override("separation", 0)
+		arrow_col.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		var gain_lbl := Label.new()
+		gain_lbl.text = "+%d" % (int(p.rating) - prev_rating)
+		gain_lbl.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
+		gain_lbl.add_theme_font_size_override("font_size", 20)
+		gain_lbl.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4))
+		arrow_col.add_child(gain_lbl)
 		var arrow := Label.new()
 		arrow.text = "→"
+		arrow.horizontal_alignment = HORIZONTAL_ALIGNMENT_CENTER
 		arrow.add_theme_font_size_override("font_size", 22)
 		arrow.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4))
-		arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-		rat_row.add_child(arrow)
+		arrow_col.add_child(arrow)
+		rat_row.add_child(arrow_col)
 		rat_row.add_child(_stat_badge("RAT", str(int(p.rating)), Color(0.18, 0.42, 0.78), Vector2(54, 54)))
 		badges.add_child(rat_row)
 	else:
@@ -1839,8 +1852,22 @@ func show_tax() -> void:
 				if opt_i != chosen:
 					var post_idx := i
 					var option_idx := opt_i
-					var preview := tax.preview_text(opt_i, scaled_amount)
-					btn("%s  [%s]" % [labels[opt_i], preview], func(): _choose_tax(post_idx, option_idx))
+					btn(str(labels[opt_i]), func(): _choose_tax(post_idx, option_idx))
+					# Geen percentages meer op de knop — alleen de bedragen, groen
+					# bij succes en rood bij mislukking (zelfde kleurconventie als
+					# de event-previews).
+					var amounts: Array = tax.preview_amounts(opt_i, scaled_amount)
+					var good := int(amounts[0])
+					var bad := int(amounts[1])
+					if good == bad:
+						# Eén zekere uitkomst (open aangeven): geen succes/mislukking.
+						var lc := lbl("    %s" % eur(good), 19)
+						lc.add_theme_color_override("font_color", Color(1.0, 0.45, 0.35))
+					else:
+						var lg := lbl("    lukt: %s" % eur(good), 19)
+						lg.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4))
+						var lb := lbl("    mislukt: %s" % eur(bad), 19)
+						lb.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35))
 		sep()
 		btn("Regelen →", _resolve_tax, tax.all_chosen())
 	else:
@@ -2666,9 +2693,10 @@ func _show_wrapup_report(report: Array) -> void:
 			if pid == "" or not Game.state.players.has(pid):
 				continue
 			var p: Dictionary = Game.state.players[pid]
-			var gained := int(d.get("new", 0)) - int(d.get("old", 0))
+			# Geen "+X rating"-zin in de subregel: dat cijfer staat nu boven de
+			# pijl tussen de WAS- en RAT-badge (zie _player_card()).
 			content.add_child(_player_card(
-				pid, "%s, %d jr · +%d rating dit seizoen" % [str(p.pos), int(p.age), gained],
+				pid, "%s, %d jr" % [str(p.pos), int(p.age)],
 				false, false, int(d.get("old", 0))))
 	sep()
 	# Weggekaapte cliënten krijgen een eigen scherm ná dit rapport — groot

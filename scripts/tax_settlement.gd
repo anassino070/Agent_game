@@ -72,17 +72,20 @@ func resolve(rng: RandomNumberGenerator, money_scale: float = 1.0) -> void:
 		total_scandal += int(r.scandal)
 
 
-func preview_text(option: int, amount: int) -> String:
-	# Compacte preview van wat een optie kost bij mislukking/succes, voor op
-	# de keuzeknop zelf — zodat je niet blind hoeft te kiezen. Percentages
-	# hier moeten in de pas blijven met resolve() hierboven.
+func preview_amounts(option: int, amount: int) -> Array:
+	# [bedrag bij succes, bedrag bij mislukking] — beide 0 of negatief, want
+	# het zijn kosten. Bij "open aangeven" is er maar één uitkomst, dan zijn
+	# beide gelijk (de UI toont dat als één regel). De percentages hieronder
+	# moeten in de pas blijven met resolve() hierboven; ze worden NIET meer op
+	# de knop getoond, alleen de bedragen zelf.
 	match option:
 		0:
-			return _eur(-int(amount * 0.40))
+			var m := -int(amount * 0.40)
+			return [m, m]
 		1:
-			return "65%%: %s / 35%%: %s" % [_eur(-int(amount * 0.08)), _eur(-int(amount * 0.55))]
+			return [-int(amount * 0.08), -int(amount * 0.55)]
 		_:
-			return "50%%: %s / 50%%: %s" % [_eur(0), _eur(-int(amount * 1.1))]
+			return [0, -int(amount * 1.1)]
 
 
 func _eur(n: int) -> String:
