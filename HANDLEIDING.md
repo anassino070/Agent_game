@@ -98,7 +98,7 @@ Een groter gat bij de start betekent dus een grotere stap per seizoen (een ratin
 - **Nog groter kantoor** (€44k) — nog eens +1 stalplek (stapelt met Groter kantoor).
 - **PR-bureau** (€28k) — +2 extra schandaalverval per seizoen.
 - **Eigen jeugdscout** (€42k) — +1 scoutpunt per seizoen.
-- **Extra scoutingbudget** (€22k) — eenmalig +3 scoutpunten.
+- **Extra scoutingbudget** (€22k) — +2 scoutpunten per seizoen, de rest van de run (via `scout_points_per_season()`, net als Eigen jeugdscout — niet meer eenmalig).
 - **Juridisch adviseur** (€32k) — schandaal-stijgingen 1 lager (min. 1).
 - **Risicomanager** (€30k) — schandaal kan niet meer boven de 80 uitkomen.
 - **Clubarts-netwerk** (€26k) — eenmalig -15 schandaal.

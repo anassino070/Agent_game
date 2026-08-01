@@ -323,7 +323,7 @@ const SHOP_UPGRADES := {
 	},
 	"scoutingbudget": {
 		"name": "Extra scoutingbudget", "price": 22000,
-		"desc": "Eenmalig: +3 scoutpunten.",
+		"desc": "+2 scoutpunten per seizoen, de rest van de run.",
 	},
 	"pr_campagne": {
 		"name": "PR-campagne", "price": 24000,
@@ -377,8 +377,6 @@ func buy_shop_upgrade(id: String) -> bool:
 				p["trust"] = clampi(int(p.trust) + 15, 0, 100)
 		"kantoorrenovatie":
 			state.rep = maxi(int(state.rep) + 8, 0)
-		"scoutingbudget":
-			state.scout_points = int(state.scout_points) + 3
 		"pr_campagne":
 			state.rep = maxi(int(state.rep) + 10, 0)
 		"clubarts_netwerk":
@@ -498,7 +496,10 @@ func value(p: Dictionary) -> int:
 
 
 func scout_points_per_season() -> int:
-	return SCOUT_POINTS + Meta.perk_bonus("scouting") + (1 if has_shop("jeugdscout") else 0) + int(state.get("bonus_scout_points", 0))
+	return SCOUT_POINTS + Meta.perk_bonus("scouting") \
+		+ (1 if has_shop("jeugdscout") else 0) \
+		+ (2 if has_shop("scoutingbudget") else 0) \
+		+ int(state.get("bonus_scout_points", 0))
 
 
 func client_cap() -> int:
