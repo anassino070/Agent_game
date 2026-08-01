@@ -2689,18 +2689,18 @@ func _wrapup_color(line: String) -> Variant:
 func _goto_wrapup() -> void:
 	var report: Array = Game.end_of_season()
 	Game.save_game()
-	# Weggekaapte cliënten komen als EERSTE, direct na de transferperiode: dat
-	# is groot nieuws en moet je in het gezicht slaan vóór de boekhouding van
-	# het seizoensrapport. Alleen zichtbaar als er daadwerkelijk iemand weg is.
-	var poached: Array = Game.state.get("last_poached", []).duplicate()
-	Game.state["last_poached"] = []
-	if not poached.is_empty():
-		show_poach_news(poached, report)
+	# Vertrokken cliënten komen als EERSTE, direct na de transferperiode: dat is
+	# groot nieuws en moet je in het gezicht slaan vóór de boekhouding van het
+	# seizoensrapport. Alleen zichtbaar als er daadwerkelijk iemand weg is.
+	var departures: Array = Game.state.get("last_departures", []).duplicate()
+	Game.state["last_departures"] = []
+	if not departures.is_empty():
+		show_departures_news(departures, report)
 		return
-	_after_poach_news(report)
+	_after_departures_news(report)
 
 
-func _after_poach_news(report: Array) -> void:
+func _after_departures_news(report: Array) -> void:
 	var prepped: Array = Game.state.get("last_prepared_results", []).duplicate()
 	Game.state["last_prepared_results"] = []
 	if not prepped.is_empty():
@@ -2762,7 +2762,7 @@ func _show_wrapup_report(report: Array) -> void:
 				pid, "%s, %d jr" % [str(p.pos), int(p.age)],
 				false, false, int(d.get("old", 0)), true))
 	sep()
-	# Wegkapingen zijn hier al langs geweest (show_poach_news() komt vóór dit
+	# Vertrekken zijn hier al langs geweest (show_departures_news() komt vóór dit
 	# rapport, zie _goto_wrapup()), dus dit rapport eindigt gewoon.
 	_wrapup_continue_button()
 
@@ -2776,34 +2776,43 @@ func _wrapup_continue_button() -> void:
 		btn("🪙 Naar de shop →", _enter_shop)
 
 
-func show_poach_news(poached: Array, report: Array) -> void:
-	# Groot-nieuws-scherm direct na de transferperiode: een rivaal-makelaar heeft
-	# een of meer cliënten overgenomen. Alleen zichtbaar als dat gebeurd is.
-	# De speler staat er als volledige spelerkaart bij, zodat je precies ziet
-	# wát je kwijt bent (hij bestaat nog in state.players, alleen niet meer
-	# in state.clients). Daarna gaat de normale afsluiting verder.
+func show_departures_news(departures: Array, report: Array) -> void:
+	# Groot-nieuws-scherm direct na de transferperiode: je bent een of meer
+	# cliënten kwijt. Dekt BEIDE oorzaken (`reason`): "left" = uit zichzelf weg
+	# door te laag vertrouwen (veruit het meest voorkomend), "poached" = een
+	# rivaal-makelaar nam hem over. Alleen zichtbaar als er echt iemand weg is.
+	# Elke speler staat er als volledige spelerkaart bij, zodat je precies ziet
+	# wát je kwijt bent (hij bestaat nog in state.players, alleen niet meer in
+	# state.clients). Daarna gaat de normale afsluiting verder.
 	refresh_header()
 	clear()
-	var title := lbl("💥 WEGGEKAAPT", 38)
+	var n := departures.size()
+	var title := lbl("💥 JE RAAKT %s KWIJT" % ("EEN CLIËNT" if n == 1 else "%d CLIËNTEN" % n), 38)
 	title.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
-	lbl("Een rivaal heeft toegeslagen. Dit staat morgen in elke krant.", 24)
-	for entry in poached:
+	for entry in departures:
 		sep()
 		var nm := str(entry.get("name", "Een cliënt"))
-		var rival := str(entry.get("rival", "een rivaal"))
-		var l := lbl("%s vertrekt naar %s. 'Zij beloven me meer.'" % [nm, rival], 26)
+		var reason := str(entry.get("reason", "left"))
+		var trust := int(entry.get("trust", 0))
+		var line := ""
+		if reason == "poached":
+			line = "%s wordt weggekaapt door %s. 'Zij beloven me meer.'" % [nm, str(entry.get("rival", "een rivaal"))]
+		else:
+			line = "%s stapt zelf op. Het vertrouwen was op (%d)." % [nm, trust]
+		var l := lbl(line, 26)
 		l.add_theme_color_override("font_color", Color(1.0, 0.5, 0.45))
 		var pid := str(entry.get("pid", ""))
 		if pid != "" and Game.state.players.has(pid):
 			var p: Dictionary = Game.state.players[pid]
 			# known_pot: hij wás je cliënt, dus je kende zijn exacte potentieel —
-			# dat verdwijnt niet op het moment dat een rivaal hem overneemt.
+			# dat verdwijnt niet op het moment dat hij vertrekt.
 			content.add_child(_player_card(pid, "%s, %d jr · vertrouwen was %d · waarde %s" % [
-				str(p.pos), int(p.age), int(entry.get("trust", 0)), eur(Game.value(p)),
+				str(p.pos), int(p.age), trust, eur(Game.value(p)),
 			], false, false, -1, true))
-		lbl("Vertrouwen is je enige verdediging: een cliënt die zich gezien voelt, luistert niet naar een rivaal.", 19)
 	sep()
-	btn("Verder →", func(): _after_poach_news(report))
+	lbl("Vertrouwen is je enige verdediging: onder de 60 loopt het vertrekrisico elk punt verder op. Een cliënt die zich gezien voelt, blijft — en luistert niet naar een rivaal.", 19)
+	sep()
+	btn("Verder →", func(): _after_departures_news(report))
 
 
 # ---------------------------------------------------------------- de shop

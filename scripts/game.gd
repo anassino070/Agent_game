@@ -1187,9 +1187,11 @@ func end_of_season() -> Array:
 	state["last_prepared_results"] = prepared_results
 
 	var leavers: Array = []
-	# Weggekaapte cliënten komen NIET in `lines` (het seizoensrapport) maar op
-	# een eigen scherm erna — groot nieuws hoort niet tussen de boekhoudregels.
-	var poached: Array = []
+	# Vertrokken cliënten komen NIET in `lines` (het seizoensrapport) maar op een
+	# eigen scherm — groot nieuws hoort niet tussen de boekhoudregels. Bevat
+	# BEIDE manieren om iemand te verliezen, met een `reason`-veld: "left"
+	# (uit zichzelf weg door laag vertrouwen) en "poached" (rivaal kaapte hem).
+	var departures: Array = []
 	# Ontwikkeling wordt óók als kaart getoond i.p.v. als tekstregel.
 	var developed: Array = []
 	for cid in state.clients:
@@ -1248,21 +1250,26 @@ func end_of_season() -> Array:
 				state.total_fees = int(state.total_fees) + tg
 				lines.append("%s verlengt bij zijn club; tekengeld €%s voor jou." % [p.name, fmt_thousands(tg)])
 		if Meta.perk_level("ijzeren_stal") == 0 and rng.randf() < leave_chance(p):
+			# Ook dit vertrek gaat NAAR HET NIEUWSSCHERM en niet meer als losse
+			# tekstregel het rapport in: uit zichzelf weglopen door laag
+			# vertrouwen is veruit de meest voorkomende manier om een cliënt te
+			# verliezen (leave_chance is ~48% bij vertrouwen 30, tegenover ~3%
+			# voor wegkapen), en juist die verdween tussen de boekhoudregels.
 			leavers.append(cid)
-			lines.append("!! %s VERTREKT naar een andere makelaar. Het vertrouwen was op (%d)." % [p.name, int(p.trust)])
+			departures.append({"pid": cid, "name": str(p.name), "trust": int(p.trust), "reason": "left"})
 		elif rng.randf() < poach_chance(p):
 			# Rivaal-makelaars azen op je stal; toppers zijn extra gewild, hoog
 			# vertrouwen beschermt (zie poach_chance()) — vandaar dat cijfer erbij.
 			var rivaal: String = RIVAL_NAMES[rng.randi_range(0, RIVAL_NAMES.size() - 1)]
 			leavers.append(cid)
-			poached.append({"pid": cid, "name": str(p.name), "trust": int(p.trust), "rival": rivaal})
+			departures.append({"pid": cid, "name": str(p.name), "trust": int(p.trust), "reason": "poached", "rival": rivaal})
 
 	for cid in leavers:
 		state.clients.erase(cid)
-	# Opgepikt door main.gd's _goto_wrapup(), dat show_poach_news() als EERSTE
-	# scherm na de transferperiode opent als deze lijst niet leeg is (zelfde
-	# patroon als last_prepared_results).
-	state["last_poached"] = poached
+	# Opgepikt door main.gd's _goto_wrapup(), dat show_departures_news() als
+	# EERSTE scherm na de transferperiode opent als deze lijst niet leeg is
+	# (zelfde patroon als last_prepared_results).
+	state["last_departures"] = departures
 	state["last_developed"] = developed
 
 	var scandal_decay := 3 + Meta.perk_bonus("mediatraining") + (2 if has_shop("pr_bureau") else 0)
