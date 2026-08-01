@@ -70,8 +70,7 @@ var confirm_legacy_reset := false  # tweestaps-bevestiging voor het resetten van
 # touch/mobiel), dus toont dit gewoon altijd de stats van de relevante
 # cliënt zodra een event/minigame een speler noemt.
 var player_info_panel: PanelContainer
-var player_info_label: Label
-var player_info_badges: HBoxContainer
+var player_info_holder: VBoxContainer
 
 # Vaste (niet-scrollende) balk vlak boven de scrollende content: toont de
 # beurten/pogingen/scoutpunten-blokjes zodat ze altijd zichtbaar blijven,
@@ -193,7 +192,9 @@ func _ready() -> void:
 	player_info_panel.set_anchors_preset(Control.PRESET_BOTTOM_WIDE)
 	player_info_panel.offset_left = 12
 	player_info_panel.offset_right = -140
-	player_info_panel.offset_top = -100
+	# Hoger dan voorheen (was -100): er staat nu een volledige spelerkaart in
+	# i.p.v. één regel tekst met twee kleine badges.
+	player_info_panel.offset_top = -156
 	player_info_panel.offset_bottom = -12
 	player_info_panel.visible = false
 	player_info_panel.mouse_filter = Control.MOUSE_FILTER_IGNORE
@@ -207,23 +208,11 @@ func _ready() -> void:
 	player_info_panel.add_theme_stylebox_override("panel", info_style)
 	add_child(player_info_panel)
 
-	# Tekst links, rating/potentieel-badges rechts — dezelfde weergave als in
-	# de scoutinglijst, zodat je overal dezelfde stat-blokjes herkent.
-	var info_hb := HBoxContainer.new()
-	info_hb.add_theme_constant_override("separation", 10)
-	player_info_panel.add_child(info_hb)
-
-	player_info_label = Label.new()
-	player_info_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	player_info_label.add_theme_font_size_override("font_size", 19)
-	player_info_label.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	player_info_label.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	info_hb.add_child(player_info_label)
-
-	player_info_badges = HBoxContainer.new()
-	player_info_badges.add_theme_constant_override("separation", 6)
-	player_info_badges.size_flags_vertical = Control.SIZE_SHRINK_CENTER
-	info_hb.add_child(player_info_badges)
+	# Houder waarin _show_player_info() de échte spelerkaart (_player_card())
+	# neerzet, zodat een speler er bij een event/minigame precies zo uitziet
+	# als in de scoutinglijst en je stal.
+	player_info_holder = VBoxContainer.new()
+	player_info_panel.add_child(player_info_holder)
 
 	# ∞-upgrade: klein vierkantje rechtsboven, alleen zichtbaar op het
 	# perkscherm. Vaste prijs, oneindig te kopen, +0,1% punten per niveau.
@@ -339,14 +328,20 @@ func _show_player_info(pid: String) -> void:
 		player_info_panel.visible = false
 		return
 	player_info_panel.visible = true
-	player_info_label.text = _player_tooltip(pid).replace("\n", "   ·   ")
-	# Rating/potentieel-badges rechts in het balkje (opnieuw opbouwen).
-	if player_info_badges != null:
-		for c in player_info_badges.get_children():
-			c.queue_free()
-		var p: Dictionary = Game.state.players[pid]
-		player_info_badges.add_child(_stat_badge("RAT", str(int(p.rating)), Color(0.18, 0.42, 0.78), Vector2(52, 50)))
-		player_info_badges.add_child(_stat_badge("POT", _pot_badge_text(pid), Color(0.16, 0.55, 0.28), Vector2(72, 50)))
+	if player_info_holder == null:
+		return
+	# Kaart opnieuw opbouwen. remove_child vóór queue_free(): queue_free is
+	# uitgesteld tot einde frame, dus zonder remove zou de oude kaart deze
+	# frame nog meetellen voor de layout en het paneel opblazen.
+	for c in player_info_holder.get_children():
+		player_info_holder.remove_child(c)
+		c.queue_free()
+	var p: Dictionary = Game.state.players[pid]
+	var sub := "%s, %d jr" % [str(p.pos), int(p.age)]
+	if pid in Game.state.clients:
+		sub += " · vertrouwen %d" % int(p.trust)
+	sub += " · waarde %s" % eur(Game.value(p))
+	player_info_holder.add_child(_player_card(pid, sub))
 
 
 # Rij tekst met de spelernaam als apart, gekleurd Label tussen een voor- en
@@ -843,16 +838,18 @@ func show_prep() -> void:
 		l.add_theme_color_override("font_color", Color(1.0, 0.7, 0.3))
 	sep()
 	lbl("Jouw stal (%d/%d):" % [Game.state.clients.size(), Game.client_cap()], 28)
+	var stal_grid := _card_grid()
 	for cid in Game.state.clients:
 		var p: Dictionary = Game.state.players[cid]
 		# Clubs staan voorlopig buiten beeld (cosmetisch) — contractstatus
 		# blijft wel zichtbaar (relevant voor tekengeld-timing), los van de
-		# clubnaam zelf.
-		var sub := "%s, %d jr · vertrouwen %d" % [str(p.pos), int(p.age), int(p.trust)]
+		# clubnaam zelf. Compacte subregel: in een halve kolom is er geen ruimte
+		# voor een lange opsomming.
+		var sub := "%s, %d jr · vert. %d" % [str(p.pos), int(p.age), int(p.trust)]
 		if str(p.club) != "":
-			sub += " · contract nog %d jr" % int(p.contract)
-		sub += " · waarde %s" % eur(Game.value(p))
-		_stat_card(cid, sub)
+			sub += " · %d jr contract" % int(p.contract)
+		sub += "\n%s" % eur(Game.value(p))
+		_stat_card(cid, sub, false, stal_grid)
 	sep()
 	# ---- Het kantoor: niveau, band en upgrade ----
 	var band: Dictionary = Game.office_band()
@@ -956,14 +953,15 @@ func show_release() -> void:
 	lbl("Selecteer wie je wegstuurt (je mag er zoveel kwijt als je wilt, zolang er minstens 1 overblijft — handig als je meteen plek wilt maken voor een kantoorupgrade) en bevestig onderaan. De rest van je stal verliest 2 vertrouwen per weggestuurde cliënt.", 22)
 	show_flash()
 	sep()
+	var rel_grid := _card_grid()
 	for cid in Game.state.clients:
 		var p: Dictionary = Game.state.players[cid]
 		var selected: bool = cid in release_selection
-		var sub := "%s, %d jr · vertrouwen %d · waarde %s" % [
+		var sub := "%s, %d jr · vert. %d\n%s" % [
 			str(p.pos), int(p.age), int(p.trust), eur(Game.value(p)),
 		]
-		var info := _stat_card(cid, sub, selected)
-		info.add_child(_mini_btn("✗ Wegsturen" if not selected else "✔ Blijft toch (ongedaan maken)", func(): _toggle_release(cid)))
+		var info := _stat_card(cid, sub, selected, rel_grid)
+		info.add_child(_mini_btn("✗ Wegsturen" if not selected else "✔ Blijft toch", func(): _toggle_release(cid)))
 	sep()
 	var remaining: int = Game.state.clients.size() - release_selection.size()
 	var confirm_txt := ("Bevestig: stuur %d weg (%d blijft over)" % [release_selection.size(), remaining]) if not release_selection.is_empty() else "Niemand geselecteerd"
@@ -1027,50 +1025,21 @@ func show_scouting() -> void:
 	sort_row.add_child(sl)
 	sort_row.add_child(_sort_button("Rating", "rating"))
 	sort_row.add_child(_sort_button("Leeftijd", "age"))
+	var cand_grid := _card_grid()
 	for pid in _sorted_candidates():
-		content.add_child(_candidate_card(pid))
+		cand_grid.add_child(_candidate_card(pid))
 	sep()
 	btn("Naar events →", _goto_events)
 
 
 func _candidate_card(pid: String) -> Control:
-	# Eén speler als kaartje: info links, en rechts twee badges — potentieel
-	# (groene rechthoek, rechtsboven) en rating (blauw vierkant, rechtsonder).
+	# Scoutingvariant van de spelerkaart: dezelfde basisopmaak als overal
+	# (_player_card), met de tekenkans en de Scout/Benader-knoppen eronder.
 	var p: Dictionary = Game.state.players[pid]
 	var is_client: bool = pid in Game.state.clients
-	var rating := int(p.rating)
-	var pot_text := _pot_badge_text(pid)
-
-	var card := PanelContainer.new()
-	var card_style := StyleBoxFlat.new()
-	card_style.bg_color = Color(0.13, 0.13, 0.17, 0.85)
-	card_style.set_corner_radius_all(10)
-	card_style.content_margin_left = 12
-	card_style.content_margin_right = 10
-	card_style.content_margin_top = 8
-	card_style.content_margin_bottom = 8
-	card.add_theme_stylebox_override("panel", card_style)
-
-	var hb := HBoxContainer.new()
-	hb.add_theme_constant_override("separation", 10)
-	card.add_child(hb)
-
-	# --- Links: info + knoppen ---
-	var info := VBoxContainer.new()
-	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	info.add_theme_constant_override("separation", 4)
-	hb.add_child(info)
-
-	var name_lbl := Label.new()
-	name_lbl.text = "%s%s" % [str(p.name), "   [CLIËNT]" if is_client else ""]
-	name_lbl.add_theme_font_size_override("font_size", 24)
-	info.add_child(name_lbl)
-
-	var sub := Label.new()
-	sub.text = "%s, %d jr" % [str(p.pos), int(p.age)]   # club staat voorlopig buiten beeld (cosmetisch)
-	sub.add_theme_font_size_override("font_size", 18)
-	sub.add_theme_color_override("font_color", Color(0.75, 0.75, 0.78))
-	info.add_child(sub)
+	# club staat voorlopig buiten beeld (cosmetisch)
+	var card := _player_card(pid, "%s, %d jr" % [str(p.pos), int(p.age)], false, true)
+	var info: VBoxContainer = card.get_meta("info_col")
 
 	if not is_client and not approached.has(pid):
 		var chance := Label.new()
@@ -1096,27 +1065,23 @@ func _candidate_card(pid: String) -> Control:
 		if Game.state.clients.size() < Game.client_cap():
 			btn_row.add_child(_mini_btn("Benader", func(): _try_sign(pid)))
 
-	# --- Rechts: badges (potentieel boven, rating onder) ---
-	var badges := VBoxContainer.new()
-	badges.custom_minimum_size = Vector2(96, 0)
-	badges.add_theme_constant_override("separation", 6)
-	hb.add_child(badges)
-	badges.add_child(_stat_badge("POT", pot_text, Color(0.16, 0.55, 0.28), Vector2(96, 52), Control.SIZE_SHRINK_END))
-	var spacer := Control.new()
-	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
-	badges.add_child(spacer)
-	badges.add_child(_stat_badge("RAT", str(rating), Color(0.18, 0.42, 0.78), Vector2(64, 64), Control.SIZE_SHRINK_END))
-
 	return card
 
 
-func _stat_card(pid: String, sub_text: String, highlighted := false) -> VBoxContainer:
-	# Gedeeld kaartje: naam + subregel links, rating/potentieel-badges rechts
-	# (zelfde POT-boven/RAT-onder layout als de scoutinglijst). Geeft de info-
-	# kolom terug, zodat de aanroeper er nog een knop aan kan hangen.
-	# `highlighted` kleurt de kaart (bijv. rood-ish) om een selectie te tonen.
+func _player_card(pid: String, sub_text := "", highlighted := false, client_tag := false, prev_rating := -1) -> PanelContainer:
+	# DÉ spelerkaart — één centrale opmaak die overal wordt hergebruikt waar een
+	# speler genoemd wordt: scouting, je stal (voorbereiding), stalbeheer, het
+	# infopaneel bij events/minigames en het weggekaapt-nieuwsscherm. Naam +
+	# subregel links, POT-badge rechtsboven en RAT-badge rechtsonder.
+	# De info-kolom hangt als meta "info_col" aan de kaart, zodat een aanroeper
+	# er nog eigen regels/knoppen aan kan toevoegen zonder dat deze functie
+	# elke variant hoeft te kennen. Voegt zelf NIETS toe aan `content` — de
+	# aanroeper bepaalt waar de kaart terechtkomt.
 	var p: Dictionary = Game.state.players[pid]
 	var card := PanelContainer.new()
+	# Vult de beschikbare breedte — in een 2-kolomsraster dus precies een halve
+	# kolom, buiten een raster de volle breedte.
+	card.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	var st := StyleBoxFlat.new()
 	st.bg_color = Color(0.45, 0.15, 0.15, 0.85) if highlighted else Color(0.13, 0.13, 0.17, 0.85)
 	st.set_corner_radius_all(10)
@@ -1125,34 +1090,79 @@ func _stat_card(pid: String, sub_text: String, highlighted := false) -> VBoxCont
 	st.content_margin_top = 8
 	st.content_margin_bottom = 8
 	card.add_theme_stylebox_override("panel", st)
-	content.add_child(card)
 	var hb := HBoxContainer.new()
-	hb.add_theme_constant_override("separation", 10)
+	hb.add_theme_constant_override("separation", 8)
 	card.add_child(hb)
 	var info := VBoxContainer.new()
 	info.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	info.add_theme_constant_override("separation", 4)
 	hb.add_child(info)
 	var name_lbl := Label.new()
-	name_lbl.text = str(p.name)
-	name_lbl.add_theme_font_size_override("font_size", 24)
+	# De [CLIËNT]-tag alleen waar hij informatie toevoegt (scoutinglijst) — in
+	# je eigen stal is het overbodige ruis.
+	name_lbl.text = "%s%s" % [str(p.name), "   [CLIËNT]" if (client_tag and pid in Game.state.clients) else ""]
+	name_lbl.add_theme_font_size_override("font_size", 22)
+	# Wrappen is nodig sinds de kaarten in een halve kolom staan: een lange naam
+	# of subregel past daar niet meer op één regel.
+	name_lbl.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 	info.add_child(name_lbl)
 	if sub_text != "":
 		var sub := Label.new()
 		sub.text = sub_text
-		sub.add_theme_font_size_override("font_size", 18)
+		sub.add_theme_font_size_override("font_size", 17)
+		sub.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		sub.add_theme_color_override("font_color", Color(0.75, 0.75, 0.78))
 		info.add_child(sub)
+	# Compactere badges dan voorheen (was 96x52 / 64x64): in een halve kolom
+	# moet er naast de badges nog genoeg breedte over zijn voor naam en subregel.
 	var badges := VBoxContainer.new()
-	badges.custom_minimum_size = Vector2(96, 0)
+	# Breder als er een "was"-badge met pijl bij komt (48 + pijl + 54).
+	badges.custom_minimum_size = Vector2((132 if prev_rating >= 0 else 74), 0)
 	badges.add_theme_constant_override("separation", 6)
 	hb.add_child(badges)
-	badges.add_child(_stat_badge("POT", _pot_badge_text(pid), Color(0.16, 0.55, 0.28), Vector2(96, 52), Control.SIZE_SHRINK_END))
+	badges.add_child(_stat_badge("POT", _pot_badge_text(pid), Color(0.16, 0.55, 0.28), Vector2(74, 46), Control.SIZE_SHRINK_END))
 	var spacer := Control.new()
 	spacer.size_flags_vertical = Control.SIZE_EXPAND_FILL
 	badges.add_child(spacer)
-	badges.add_child(_stat_badge("RAT", str(int(p.rating)), Color(0.18, 0.42, 0.78), Vector2(64, 64), Control.SIZE_SHRINK_END))
-	return info
+	if prev_rating >= 0:
+		# Ontwikkeling zichtbaar maken: [oude rating] → [nieuwe rating].
+		var rat_row := HBoxContainer.new()
+		rat_row.add_theme_constant_override("separation", 4)
+		rat_row.size_flags_horizontal = Control.SIZE_SHRINK_END
+		rat_row.add_child(_stat_badge("WAS", str(prev_rating), Color(0.30, 0.30, 0.34), Vector2(48, 54)))
+		var arrow := Label.new()
+		arrow.text = "→"
+		arrow.add_theme_font_size_override("font_size", 22)
+		arrow.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4))
+		arrow.size_flags_vertical = Control.SIZE_SHRINK_CENTER
+		rat_row.add_child(arrow)
+		rat_row.add_child(_stat_badge("RAT", str(int(p.rating)), Color(0.18, 0.42, 0.78), Vector2(54, 54)))
+		badges.add_child(rat_row)
+	else:
+		badges.add_child(_stat_badge("RAT", str(int(p.rating)), Color(0.18, 0.42, 0.78), Vector2(54, 54), Control.SIZE_SHRINK_END))
+	card.set_meta("info_col", info)
+	return card
+
+
+func _card_grid() -> GridContainer:
+	# 2-kolomsraster voor spelerkaarten (scouting, stal, stalbeheer), zodat elke
+	# kaart een halve schermbreedte krijgt i.p.v. een volle rij.
+	var g := GridContainer.new()
+	g.columns = 2
+	g.add_theme_constant_override("h_separation", 10)
+	g.add_theme_constant_override("v_separation", 10)
+	g.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	content.add_child(g)
+	return g
+
+
+func _stat_card(pid: String, sub_text: String, highlighted := false, parent: Node = null) -> VBoxContainer:
+	# Spelerkaart in `parent` (of `content` als die niet is opgegeven) — stal en
+	# stalbeheer geven hun 2-kolomsraster mee. Geeft de info-kolom terug, zodat
+	# de aanroeper er nog een knop aan kan hangen.
+	var card := _player_card(pid, sub_text, highlighted)
+	(parent if parent != null else content).add_child(card)
+	return card.get_meta("info_col") as VBoxContainer
 
 
 func _pot_badge_text(pid: String) -> String:
@@ -1236,12 +1246,17 @@ func _sorted_candidates() -> Array:
 
 
 func _mini_btn(text: String, cb: Callable, enabled := true) -> Button:
-	# Compacte knop (voor de scoutinglijst) — kleiner dan de standaard btn().
+	# Compacte knop binnen een spelerkaart — kleiner dan de standaard btn().
+	# Geen vaste breedte (was 130px): sinds de kaarten in een halve kolom staan
+	# moeten twee knoppen naast elkaar (Scout + Benader) in ~200px passen, dus
+	# laten we ze de beschikbare ruimte verdelen i.p.v. buiten de kaart te lopen.
 	var b := Button.new()
 	b.text = text
 	b.disabled = not enabled
-	b.add_theme_font_size_override("font_size", 20)
-	b.custom_minimum_size = Vector2(130, 46)
+	b.add_theme_font_size_override("font_size", 19)
+	b.custom_minimum_size = Vector2(0, 46)
+	b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	b.clip_text = true
 	b.pressed.connect(cb)
 	return b
 
@@ -1355,6 +1370,7 @@ func show_event(ev: Dictionary) -> void:
 		btn("Beginnen →", func(): _start_minigame(ev))
 		return
 	var em_ctx := _event_emphasis_context(ev)
+	var any_enabled := false
 	for opt in ev.options:
 		var enabled := true
 		var suffix := ""
@@ -1364,6 +1380,13 @@ func show_event(ev: Dictionary) -> void:
 		if opt.has("req_favors") and int(Game.state.favors) < int(opt.req_favors):
 			enabled = false
 			suffix = "  (geen gunst beschikbaar)"
+		# Generieke vangnet bovenop req_money: nooit een optie kunnen kiezen die
+		# je gegarandeerd onder €0 zet (zie _option_certain_bankrupt()).
+		if enabled and _option_certain_bankrupt(opt):
+			enabled = false
+			suffix = "  (te weinig geld)"
+		if enabled:
+			any_enabled = true
 		var label := str(opt.label)
 		if opt.has("chance"):
 			# Geluksvogel-perk telt mee in de getoonde én de echte kans.
@@ -1388,6 +1411,13 @@ func show_event(ev: Dictionary) -> void:
 			btn(label + suffix, func(): _resolve(ev, opt), enabled)
 			var eff := Game.scale_money_effects(opt.get("effects", {}))
 			_show_effect_rows(eff, "", false, _emphasis_for(eff, em_ctx.max_abs, em_ctx.distinct_counts, em_ctx.min_abs))
+	# Anti-softlock: zijn ALLE opties onbetaalbaar/geblokkeerd, dan moet je nog
+	# steeds verder kunnen. Zonder deze uitweg zou een event met uitsluitend
+	# geldkostende opties je bij een leeg saldo vastzetten op dit scherm.
+	if not any_enabled:
+		sep()
+		lbl("Je kunt geen van deze opties betalen. Er zit niets anders op dan het te laten lopen.", 20)
+		btn("Laten lopen →", _next_event)
 
 
 func _resolve(ev: Dictionary, opt: Dictionary) -> void:
@@ -1531,6 +1561,24 @@ func _show_effect_rows(effects: Dictionary, client_name: String = "", show_numbe
 # is "grootst" zinloos).
 
 const EFFECT_KEYS_FOR_EMPHASIS := ["money", "rep", "scandal", "favors", "scout_points", "scout_points_permanent", "trust", "all_trust"]
+
+
+func _option_certain_bankrupt(opt: Dictionary) -> bool:
+	# Zou deze optie je saldo ZEKER onder €0 duwen? Veel events hebben een
+	# negatief geldeffect zonder expliciete `req_money`-poortwachter (bijv.
+	# "Alvast een transfer voorbereiden"), waardoor je jezelf failliet kon
+	# klikken. Dit vangt dat generiek af voor élk event, zonder dat elke
+	# optie een eigen req_money hoeft te krijgen.
+	# Bij een gok geldt het alleen als BEIDE uitkomsten je eronder brengen: een
+	# gok die je pas bij mislukking kopt is een legitiem risico (en de preview
+	# toont dat bedrag), geen ontwerpfout.
+	var money := int(Game.state.money)
+	if opt.has("chance"):
+		var s := int(Game.scale_money_effects(opt.get("success", {})).get("money", 0))
+		var f := int(Game.scale_money_effects(opt.get("fail", {})).get("money", 0))
+		return money + s < 0 and money + f < 0
+	var e := int(Game.scale_money_effects(opt.get("effects", {})).get("money", 0))
+	return money + e < 0
 
 
 func _collect_branches(ev: Dictionary) -> Array:
@@ -2142,9 +2190,24 @@ func show_simon() -> void:
 		btn("Ik heb het onthouden →", _start_simon_input)
 	else:
 		lbl("Herhaal de reeks (stap %d/%d):" % [simon.player_progress + 1, simon.sequence.size()], 22)
+		# Raster van 2 kolommen i.p.v. één lange lijst: bij 8-10 reacties scrol
+		# je anders door het halve scherm, en naast elkaar zijn ze veel sneller
+		# te scannen tijdens het herhalen van een reeks.
+		var grid := GridContainer.new()
+		grid.columns = 2
+		grid.add_theme_constant_override("h_separation", 10)
+		grid.add_theme_constant_override("v_separation", 10)
+		grid.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		content.add_child(grid)
 		for i in range(simon.moves.size()):
 			var mv := i
-			btn(str(simon.moves[i]), func(): _play_simon(mv))
+			var b := Button.new()
+			b.text = str(simon.moves[i])
+			b.add_theme_font_size_override("font_size", 24)
+			b.custom_minimum_size = Vector2(0, 68)
+			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+			b.pressed.connect(func(): _play_simon(mv))
+			grid.add_child(b)
 
 
 func _start_simon_input() -> void:
@@ -2539,8 +2602,8 @@ func _close_nego(deal: bool) -> void:
 
 # Kleurt een seizoensrapport-regel op basis van het bedrag erin: "-€" is
 # altijd een uitgave (rood), "+€" of een kaal "€" (bank/tekengeld-stijl,
-# altijd inkomend in deze regels) is groen. Regels zonder bedrag (ontwikkeling,
-# vertrek, vertrouwen) blijven ongekleurd.
+# altijd inkomend in deze regels) is groen. Regels zonder bedrag (vertrek,
+# vertrouwen) blijven ongekleurd. Ontwikkeling is geen regel meer maar een kaart.
 func _wrapup_color(line: String) -> Variant:
 	if line.find("-€") != -1:
 		return Color(1.0, 0.4, 0.4)
@@ -2588,13 +2651,70 @@ func _show_wrapup_report(report: Array) -> void:
 		var c: Variant = _wrapup_color(str(line))
 		if c != null:
 			l.add_theme_color_override("font_color", c as Color)
+	# Ontwikkeling als spelerkaart i.p.v. een tekstregel: met een grijze
+	# "WAS"-badge voor de oude rating en een groene pijl naar de nieuwe, zodat je
+	# de groei ziet in plaats van hem uit een zin te moeten lezen.
+	var developed: Array = Game.state.get("last_developed", [])
+	if not developed.is_empty():
+		sep()
+		lbl("📈 ONTWIKKELING", 28)
+		# Volle breedte (géén 2-kolomsraster zoals stal/scouting): deze kaart
+		# heeft een derde badge, en in een halve kolom blijft er dan te weinig
+		# breedte over voor naam en subregel.
+		for d in developed:
+			var pid := str(d.get("pid", ""))
+			if pid == "" or not Game.state.players.has(pid):
+				continue
+			var p: Dictionary = Game.state.players[pid]
+			var gained := int(d.get("new", 0)) - int(d.get("old", 0))
+			content.add_child(_player_card(
+				pid, "%s, %d jr · +%d rating dit seizoen" % [str(p.pos), int(p.age), gained],
+				false, false, int(d.get("old", 0))))
 	sep()
+	# Weggekaapte cliënten krijgen een eigen scherm ná dit rapport — groot
+	# nieuws hoort niet weggemoffeld tussen de kantoorkosten- en tekengeldregels.
+	var poached: Array = Game.state.get("last_poached", []).duplicate()
+	if not poached.is_empty():
+		Game.state["last_poached"] = []
+		btn("Verder →", func(): show_poach_news(poached))
+		return
+	_wrapup_continue_button()
+
+
+func _wrapup_continue_button() -> void:
 	if str(Game.state.game_over) != "":
 		btn("Bekijk het einde →", show_gameover)
 	elif int(Game.state.season) > Game.MAX_SEASONS:
 		btn("Bekijk het einde →", show_win)
 	else:
 		btn("🪙 Naar de shop →", _enter_shop)
+
+
+func show_poach_news(poached: Array) -> void:
+	# Groot-nieuws-scherm: één rivaal-makelaar heeft een cliënt overgenomen.
+	# De speler staat er als volledige spelerkaart bij, zodat je precies ziet
+	# wát je kwijt bent (hij bestaat nog in state.players, alleen niet meer
+	# in state.clients).
+	refresh_header()
+	clear()
+	var title := lbl("💥 WEGGEKAAPT", 38)
+	title.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
+	lbl("Een rivaal heeft toegeslagen. Dit staat morgen in elke krant.", 24)
+	for entry in poached:
+		sep()
+		var nm := str(entry.get("name", "Een cliënt"))
+		var rival := str(entry.get("rival", "een rivaal"))
+		var l := lbl("%s vertrekt naar %s. 'Zij beloven me meer.'" % [nm, rival], 26)
+		l.add_theme_color_override("font_color", Color(1.0, 0.5, 0.45))
+		var pid := str(entry.get("pid", ""))
+		if pid != "" and Game.state.players.has(pid):
+			var p: Dictionary = Game.state.players[pid]
+			content.add_child(_player_card(pid, "%s, %d jr · vertrouwen was %d · waarde %s" % [
+				str(p.pos), int(p.age), int(entry.get("trust", 0)), eur(Game.value(p)),
+			]))
+		lbl("Vertrouwen is je enige verdediging: een cliënt die zich gezien voelt, luistert niet naar een rivaal.", 19)
+	sep()
+	_wrapup_continue_button()
 
 
 # ---------------------------------------------------------------- de shop

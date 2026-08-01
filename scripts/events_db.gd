@@ -453,7 +453,7 @@ static func get_events() -> Array:
 			"options": [
 				{"label": "Bemiddelen", "chance": 0.55,
 					"success": {"trust": 12}, "success_txt": "Je brengt de rust terug. Hij is je dankbaar.",
-					"fail": {"trust": -10}, "fail_txt": "Je kiest per ongeluk de verkeerde kant. Awkward etentjes voor jaren."},
+					"fail": {"trust": -20}, "fail_txt": "Je kiest per ongeluk de verkeerde kant. Awkward etentjes voor jaren."},
 				{"label": "Buiten blijven", "effects": {"trust": -4},
 					"txt": "'Dit is jullie zaak.' Hij had gehoopt dat je hem zou steunen."},
 			],

@@ -1173,6 +1173,11 @@ func end_of_season() -> Array:
 	state["last_prepared_results"] = prepared_results
 
 	var leavers: Array = []
+	# Weggekaapte cliënten komen NIET in `lines` (het seizoensrapport) maar op
+	# een eigen scherm erna — groot nieuws hoort niet tussen de boekhoudregels.
+	var poached: Array = []
+	# Ontwikkeling wordt óók als kaart getoond i.p.v. als tekstregel.
+	var developed: Array = []
 	for cid in state.clients:
 		var p: Dictionary = state.players[cid]
 		var perf := rng.randi_range(1, 10)
@@ -1195,7 +1200,10 @@ func end_of_season() -> Array:
 			if growth > 0:
 				var oud := int(p.rating)
 				p["rating"] = mini(oud + growth, int(p.pot))
-				lines.append("%s ontwikkelt zich: rating %d → %d." % [p.name, oud, int(p.rating)])
+				# NIET als tekstregel in `lines`: ontwikkeling wordt in het
+				# seizoensrapport als spelerkaart getoond, met een badge voor de
+				# oude rating en een pijl naar de nieuwe (zie _show_wrapup_report()).
+				developed.append({"pid": cid, "old": oud, "new": int(p.rating)})
 			# Nooit onder 1: bij left==1 is growth == het volledige restgat,
 			# dus dan landt hij dat seizoen precies op zijn potentieel.
 			p["dev_left"] = maxi(left - 1, 1)
@@ -1227,10 +1235,14 @@ func end_of_season() -> Array:
 			# vertrouwen beschermt (zie poach_chance()) — vandaar dat cijfer erbij.
 			var rivaal: String = RIVAL_NAMES[rng.randi_range(0, RIVAL_NAMES.size() - 1)]
 			leavers.append(cid)
-			lines.append("!! %s (vertrouwen %d) wordt WEGGEKAAPT door %s. 'Zij beloven me meer.'" % [p.name, int(p.trust), rivaal])
+			poached.append({"pid": cid, "name": str(p.name), "trust": int(p.trust), "rival": rivaal})
 
 	for cid in leavers:
 		state.clients.erase(cid)
+	# Opgepikt door main.gd's _show_wrapup_report(), dat hierna show_poach_news()
+	# opent als deze lijst niet leeg is (zelfde patroon als last_prepared_results).
+	state["last_poached"] = poached
+	state["last_developed"] = developed
 
 	var scandal_decay := 3 + Meta.perk_bonus("mediatraining") + (2 if has_shop("pr_bureau") else 0)
 	state.scandal = maxi(int(state.scandal) - scandal_decay, 0)
