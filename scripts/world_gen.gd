@@ -49,13 +49,11 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 		# waardeformule (zie value()) betekent dat eenzelfde transferfee nu
 		# bij een lagere rating hoort — de markt is duurder geworden.
 		var rating := clampi(rng.randi_range(35, 52) + int(float(age - 16) * 1.1) + rng.randi_range(-3, 3), 38, 82)
-		# Potentieel ligt gemiddeld een FLINKE marge boven de rating, voor
-		# IEDEREEN — niet meer alleen jonge spelers. Gemiddeld ~+40, zodat ook
-		# op een laag kantoorniveau (lage gemiddelde rating) het gemiddelde
-		# potentieel nog altijd rond de 68 uitkomt. Jongere spelers krijgen
-		# bovenop die vaste basis nog wat extra marge (headroom).
-		var headroom := maxi(27 - age, 0)
-		var pot := mini(rating + rng.randi_range(20, 56 + headroom), 94)
+		# Potentieel is omgekeerd gekoppeld aan de rating (zie _potential_for()):
+		# binnen de generatieband 38-82 krijgt een zwakke speler veel rek en een
+		# sterke weinig, zodat "hoogste rating" niet automatisch "beste speler"
+		# betekent. Zelfde regel als bij de scoutingkandidaten.
+		var pot := _potential_for(rng, rating, age, 38, 82)
 		var club_id := ""
 		if rng.randf() > 0.15:
 			club_id = "c%d" % rng.randi_range(0, 9)
@@ -84,16 +82,41 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 	return {"players": players, "clubs": clubs}
 
 
-static func make_candidate(rng: RandomNumberGenerator, pid: String, rating: int) -> Dictionary:
+const RATING_CAP := 94
+# Potentieel is OMGEKEERD gekoppeld aan de rating binnen de band: de zwakste
+# kandidaat gebruikt een groot deel van de resterende rek naar het plafond, de
+# sterkste maar een klein deel. Zo is de hoogste rating niet automatisch de
+# beste keuze — je kiest tussen "nu al bruikbaar" en "kan veel verder komen".
+const POT_FRAC_AT_BAND_LOW := 0.85   # onderkant van de band: ruwe diamant
+const POT_FRAC_AT_BAND_HIGH := 0.25  # bovenkant: al grotendeels "af"
+
+
+static func _potential_for(rng: RandomNumberGenerator, rating: int, age: int, band_lo: int, band_hi: int) -> int:
+	# Positie in de band (0 = zwakste kandidaat, 1 = sterkste).
+	var t := 0.5
+	if band_hi > band_lo:
+		t = clampf(float(rating - band_lo) / float(band_hi - band_lo), 0.0, 1.0)
+	# Fractie van de resterende rek tot het plafond. Werkt met de RESTERENDE
+	# ruimte (niet met een vast aantal punten), zodat potentieel nooit absurd
+	# door het RATING_CAP heen schiet bij een al hoge rating.
+	var frac := lerpf(POT_FRAC_AT_BAND_LOW, POT_FRAC_AT_BAND_HIGH, t)
+	frac += float(27 - age) * 0.01        # jonge spelers houden iets meer rek
+	frac += rng.randf_range(-0.12, 0.12)  # ruis: de regel mag niet exact af te lezen zijn
+	frac = clampf(frac, 0.05, 0.95)
+	var room := maxi(RATING_CAP - rating, 0)
+	return mini(rating + int(round(float(room) * frac)), RATING_CAP)
+
+
+static func make_candidate(rng: RandomNumberGenerator, pid: String, rating: int, band_lo := -1, band_hi := -1) -> Dictionary:
 	# Eén verse scoutingkandidaat met een OPGELEGDE rating (uit de band van je
-	# kantoorniveau). Leeftijd bepaalt de potentieel-marge en onzekerheid net
-	# als in generate(): jonge spelers hebben meer rek én meer ruis, oudere
-	# zijn "af". Zo blijft het scout-/potentieelspel intact op de nieuwe pool.
+	# kantoorniveau). `band_lo`/`band_hi` zijn die band: ze bepalen of deze
+	# speler onderaan of bovenaan zit, en dus hoeveel potentieel hij krijgt
+	# (zie _potential_for()). Zonder band vallen we terug op de rating zelf,
+	# wat neerkomt op "midden in de band".
 	var age := rng.randi_range(16, 30)
-	# Zelfde filosofie als in generate(): potentieel ligt gemiddeld ~+40 boven
-	# de rating, voor iedereen — niet alleen jonge spelers.
-	var headroom := maxi(27 - age, 0)
-	var pot := mini(rating + rng.randi_range(20, 56 + headroom), 94)
+	var lo := band_lo if band_lo >= 0 else rating
+	var hi := band_hi if band_hi >= 0 else rating
+	var pot := _potential_for(rng, rating, age, lo, hi)
 	var club_id := ""
 	if rng.randf() > 0.5:
 		club_id = "c%d" % rng.randi_range(0, 9)

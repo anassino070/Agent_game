@@ -895,7 +895,9 @@ func gen_candidates() -> Array:
 		var pid := "cand%d" % counter
 		counter += 1
 		var rating := rng.randi_range(lo, hi)
-		state.players[pid] = WorldGen.make_candidate(rng, pid, rating)
+		# Band meegeven: bepaalt of deze kandidaat onderaan of bovenaan zit, en
+		# dus hoeveel potentieel hij krijgt (omgekeerd gekoppeld aan de rating).
+		state.players[pid] = WorldGen.make_candidate(rng, pid, rating, lo, hi)
 		out.append(pid)
 	state.candidate_counter = counter
 	state.candidate_ids = out
