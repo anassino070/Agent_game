@@ -2685,6 +2685,18 @@ func _wrapup_color(line: String) -> Variant:
 func _goto_wrapup() -> void:
 	var report: Array = Game.end_of_season()
 	Game.save_game()
+	# Weggekaapte cliënten komen als EERSTE, direct na de transferperiode: dat
+	# is groot nieuws en moet je in het gezicht slaan vóór de boekhouding van
+	# het seizoensrapport. Alleen zichtbaar als er daadwerkelijk iemand weg is.
+	var poached: Array = Game.state.get("last_poached", []).duplicate()
+	Game.state["last_poached"] = []
+	if not poached.is_empty():
+		show_poach_news(poached, report)
+		return
+	_after_poach_news(report)
+
+
+func _after_poach_news(report: Array) -> void:
 	var prepped: Array = Game.state.get("last_prepared_results", []).duplicate()
 	Game.state["last_prepared_results"] = []
 	if not prepped.is_empty():
@@ -2742,13 +2754,8 @@ func _show_wrapup_report(report: Array) -> void:
 				pid, "%s, %d jr" % [str(p.pos), int(p.age)],
 				false, false, int(d.get("old", 0))))
 	sep()
-	# Weggekaapte cliënten krijgen een eigen scherm ná dit rapport — groot
-	# nieuws hoort niet weggemoffeld tussen de kantoorkosten- en tekengeldregels.
-	var poached: Array = Game.state.get("last_poached", []).duplicate()
-	if not poached.is_empty():
-		Game.state["last_poached"] = []
-		btn("Verder →", func(): show_poach_news(poached))
-		return
+	# Wegkapingen zijn hier al langs geweest (show_poach_news() komt vóór dit
+	# rapport, zie _goto_wrapup()), dus dit rapport eindigt gewoon.
 	_wrapup_continue_button()
 
 
@@ -2761,11 +2768,12 @@ func _wrapup_continue_button() -> void:
 		btn("🪙 Naar de shop →", _enter_shop)
 
 
-func show_poach_news(poached: Array) -> void:
-	# Groot-nieuws-scherm: één rivaal-makelaar heeft een cliënt overgenomen.
+func show_poach_news(poached: Array, report: Array) -> void:
+	# Groot-nieuws-scherm direct na de transferperiode: een rivaal-makelaar heeft
+	# een of meer cliënten overgenomen. Alleen zichtbaar als dat gebeurd is.
 	# De speler staat er als volledige spelerkaart bij, zodat je precies ziet
 	# wát je kwijt bent (hij bestaat nog in state.players, alleen niet meer
-	# in state.clients).
+	# in state.clients). Daarna gaat de normale afsluiting verder.
 	refresh_header()
 	clear()
 	var title := lbl("💥 WEGGEKAAPT", 38)
@@ -2785,7 +2793,7 @@ func show_poach_news(poached: Array) -> void:
 			]))
 		lbl("Vertrouwen is je enige verdediging: een cliënt die zich gezien voelt, luistert niet naar een rivaal.", 19)
 	sep()
-	_wrapup_continue_button()
+	btn("Verder →", func(): _after_poach_news(report))
 
 
 # ---------------------------------------------------------------- de shop

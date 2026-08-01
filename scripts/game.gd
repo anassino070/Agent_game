@@ -1246,8 +1246,9 @@ func end_of_season() -> Array:
 
 	for cid in leavers:
 		state.clients.erase(cid)
-	# Opgepikt door main.gd's _show_wrapup_report(), dat hierna show_poach_news()
-	# opent als deze lijst niet leeg is (zelfde patroon als last_prepared_results).
+	# Opgepikt door main.gd's _goto_wrapup(), dat show_poach_news() als EERSTE
+	# scherm na de transferperiode opent als deze lijst niet leeg is (zelfde
+	# patroon als last_prepared_results).
 	state["last_poached"] = poached
 	state["last_developed"] = developed
 
