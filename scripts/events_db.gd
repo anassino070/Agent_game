@@ -150,8 +150,8 @@ static func get_events() -> Array:
 			"text": "Een sportmerk wil {client} vastleggen. Het openingsbod is mager.",
 			"options": [
 				{"label": "Agressief onderhandelen", "chance": 0.65,
-					"success": {"money": 12000, "trust": 5},
-					"success_txt": "Ze gaan overstag. Dikke deal, dikke fee.",
+					"success": {"money": 12000, "trust": 10},
+					"success_txt": "Ze gaan overstag. Dikke deal, dikke fee — en hij ziet dat je voor hem knokt.",
 					"fail": {"trust": -8},
 					"fail_txt": "Het merk haakt af. Je cliënt baalt van je poker."},
 				{"label": "Veilig tekenen", "effects": {"money": 5000, "trust": 3},
