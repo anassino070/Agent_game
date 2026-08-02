@@ -62,9 +62,7 @@ var anagram_timer_label: Label = null
 
 var home_btn: Button
 var inf_btn: Button                # ∞-upgrade, klein vierkant rechtsboven op het perkscherm
-var confirm_reset := false         # tweestaps-bevestiging voor de perk-reset
 var confirm_prestige := false      # tweestaps-bevestiging voor prestigen (perkboom weg, GEEN refund)
-var confirm_legacy_reset := false  # tweestaps-bevestiging voor het resetten van Erfenis-perks (WEL refund)
 
 # Permanent info-schermpje onderaan: hover werkt niet betrouwbaar (o.a. op
 # touch/mobiel), dus toont dit gewoon altijd de stats van de relevante
@@ -324,7 +322,8 @@ func _player_tooltip(pid: String) -> String:
 func _show_player_info(pid: String) -> void:
 	if player_info_panel == null:
 		return
-	if pid == "" or not Game.state.players.has(pid):
+	# Uit te zetten via Instellingen: scheelt schermruimte bij events/minigames.
+	if pid == "" or not Game.state.players.has(pid) or not bool(Meta.setting("player_panel")):
 		player_info_panel.visible = false
 		return
 	player_info_panel.visible = true
@@ -399,6 +398,14 @@ func _update_office_background() -> void:
 	# anders de effen sfeerkleur van dat niveau.
 	if office_bg == null:
 		return
+	# Uit te zetten via Instellingen: dan een effen donkere achtergrond, geen
+	# beeld en geen sfeerkleur per niveau (rustiger te lezen).
+	if not bool(Meta.setting("office_bg")):
+		_bg_level = -1
+		office_bg.texture = null
+		office_bg.visible = false
+		office_bg_fallback.color = Color(0.07, 0.07, 0.09)
+		return
 	var lvl := Game.office_level()
 	if lvl == _bg_level:
 		return
@@ -465,10 +472,129 @@ func show_start() -> void:
 				cname if cname != "" else "Naamloze topper", eur(int(entry.total_fees)), int(entry.seasons),
 			], 20)
 	sep()
+	btn("⚙ Instellingen →", show_settings)
 	var dev_tap := btn("v1.0", _on_dev_tap)
 	dev_tap.add_theme_font_size_override("font_size", 14)
 	dev_tap.modulate = Color(1, 1, 1, 0.25)
 	dev_tap.custom_minimum_size = Vector2(0, 36)
+
+
+# ---------------------------------------------------------------- instellingen
+
+var settings_confirm := ""   # welke gevaarlijke actie op bevestiging wacht ("" = geen)
+
+
+func _setting_toggle_btn(key: String, label: String, hint := "") -> void:
+	var on := bool(Meta.setting(key))
+	var b := btn("%s  —  %s" % [label, "AAN" if on else "UIT"], func(): _toggle_setting(key))
+	b.add_theme_color_override("font_color", Color(0.85, 0.95, 0.85) if on else Color(0.7, 0.7, 0.72))
+	if hint != "":
+		lbl("    " + hint, 18)
+
+
+func _toggle_setting(key: String) -> void:
+	Meta.toggle_setting(key)
+	# Achtergrond direct toepassen, anders zie je de wissel pas een scherm later.
+	if key == "office_bg":
+		_bg_level = -1
+		_update_office_background()
+	show_settings()
+
+
+func show_settings() -> void:
+	clear()
+	home_btn.visible = false
+	header.text = "⚙ INSTELLINGEN"
+	lbl("Instellingen gelden voor alle runs en worden bewaard in je meta-save.", 20)
+	sep()
+
+	lbl("TAAL", 26)
+	lbl("Nederlands  (Engels volgt — nog niet beschikbaar)", 20)
+	var lang_btn := btn("English (nog niet beschikbaar)", func(): pass, false)
+	lang_btn.modulate = Color(1, 1, 1, 0.5)
+	sep()
+
+	lbl("WEERGAVE", 26)
+	_setting_toggle_btn("confetti", "Confetti & animaties",
+		"Confetti bij een combo of geslaagde tekening, en het rode puffje bij een afwijzing.")
+	_setting_toggle_btn("office_bg", "Kantoor-achtergrond",
+		"Het beeld/sfeerkleur per kantoorniveau. Uit = effen donkere achtergrond, rustiger te lezen.")
+	_setting_toggle_btn("player_panel", "Spelerkaart onderaan",
+		"Het paneel met de spelerkaart bij events en minigames. Uit = meer schermruimte.")
+	sep()
+
+	lbl("PROGRESSIE", 26)
+	var spent := Meta.spent_points()
+	if spent > 0:
+		if settings_confirm == "perks":
+			lbl("Weet je het zeker? Alle perks (ook de ★-extra's) gaan naar 0; je krijgt %s punten terug." % _pts(spent), 21)
+			btn("JA — reset perkboom", _do_settings_reset_perks)
+			btn("Annuleer", func(): _set_settings_confirm(""))
+		else:
+			btn("Reset perkboom (geeft %s punten terug)" % _pts(spent), func(): _set_settings_confirm("perks"))
+	else:
+		lbl("Perkboom: nog niets gekocht om te resetten.", 20)
+	var stars := Meta.spent_stars()
+	if stars > 0:
+		if settings_confirm == "legacy":
+			lbl("Weet je het zeker? Al je Erfenis-perks gaan naar 0; je krijgt %d ster%s terug." % [stars, "" if stars == 1 else "ren"], 21)
+			btn("JA — reset Erfenis-perks", _do_settings_reset_legacy)
+			btn("Annuleer", func(): _set_settings_confirm(""))
+		else:
+			btn("Reset Erfenis-perks (geeft %d ster%s terug)" % [stars, "" if stars == 1 else "ren"], func(): _set_settings_confirm("legacy"))
+	sep()
+
+	lbl("OPSLAG", 26)
+	if Game.has_save():
+		if settings_confirm == "run":
+			lbl("Je huidige run wordt definitief verwijderd. Je legacy points en perks blijven staan.", 21)
+			btn("JA — verwijder huidige run", _do_settings_delete_run)
+			btn("Annuleer", func(): _set_settings_confirm(""))
+		else:
+			btn("Verwijder huidige run", func(): _set_settings_confirm("run"))
+	else:
+		lbl("Geen lopende run opgeslagen.", 20)
+	if settings_confirm == "all":
+		var warn := lbl("ALLES WISSEN: punten, perks, Erfenis-perks, sterren, ∞-upgrade, carrièrestats, Hall of Fame én de niveau-6-ontgrendeling. Dit kan NIET ongedaan worden gemaakt. Je instellingen blijven staan.", 21)
+		warn.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
+		btn("JA, WIS ALLES", _do_settings_wipe_all)
+		btn("Annuleer", func(): _set_settings_confirm(""))
+	else:
+		var wipe := btn("Alles wissen (volledige reset)", func(): _set_settings_confirm("all"))
+		wipe.add_theme_color_override("font_color", Color(1.0, 0.55, 0.5))
+	sep()
+	btn("← Terug", func(): _set_settings_confirm_and_go(""))
+
+
+func _set_settings_confirm(v: String) -> void:
+	settings_confirm = v
+	show_settings()
+
+
+func _set_settings_confirm_and_go(v: String) -> void:
+	settings_confirm = v
+	show_start()
+
+
+func _do_settings_reset_perks() -> void:
+	Meta.reset_perks()
+	_set_settings_confirm("")
+
+
+func _do_settings_reset_legacy() -> void:
+	Meta.reset_legacy_perks()
+	_set_settings_confirm("")
+
+
+func _do_settings_delete_run() -> void:
+	Game.delete_save()
+	_set_settings_confirm("")
+
+
+func _do_settings_wipe_all() -> void:
+	Meta.wipe_everything()
+	Game.delete_save()
+	_set_settings_confirm("")
 
 
 # ---------------------------------------------------------------- developer-only
@@ -512,7 +638,7 @@ func show_dev_panel() -> void:
 	clear()
 	header.text = "DEVELOPER — puntenbeheer"
 	lbl("Huidig puntensaldo: %s legacy points." % _pts(Meta.state.legacy_points), 26)
-	lbl("Dit wist alleen het saldo, niet de gekochte perk-niveaus (gebruik daarvoor 'Reset alle perks' op het perkscherm).", 20)
+	lbl("Dit wist alleen het saldo, niet de gekochte perk-niveaus (gebruik daarvoor 'Reset perkboom' in ⚙ Instellingen).", 20)
 	sep()
 	if dev_confirm:
 		lbl("Weet je het zeker? Het puntensaldo gaat naar 0 en dit kan niet ongedaan worden.", 22)
@@ -667,23 +793,10 @@ func show_perks() -> void:
 			("%.0f" % (Meta.PRESTIGE_MIN_TREE_PROGRESS * 100.0)),
 			("%.1f" % (Meta.tree_progress() * 100.0)).replace(".", ","),
 		], 19)
-	var spent_stars := Meta.spent_stars()
-	if spent_stars > 0:
-		if confirm_legacy_reset:
-			lbl("Weet je het zeker? Al je Erfenis-perks gaan naar 0; je krijgt %d ster%s terug." % [spent_stars, "" if spent_stars == 1 else "ren"], 22)
-			btn("JA — reset Erfenis-perks", _do_legacy_reset)
-			btn("Annuleer", func(): _set_confirm_legacy_reset(false))
-		else:
-			btn("Reset Erfenis-perks (geeft %d ster%s terug)" % [spent_stars, "" if spent_stars == 1 else "ren"], func(): _set_confirm_legacy_reset(true))
 	sep()
-	var spent := Meta.spent_points()
-	if spent > 0:
-		if confirm_reset:
-			lbl("Weet je het zeker? Alle perks (ook de ★-extra's) gaan naar 0; je krijgt %s punten terug." % _pts(spent), 22)
-			btn("JA — reset alles", _do_reset)
-			btn("Annuleer", func(): _set_confirm(false))
-		else:
-			btn("Reset alle perks (geeft %s punten terug)" % _pts(spent), func(): _set_confirm(true))
+	# De reset-knoppen (perkboom én Erfenis-perks) staan in ⚙ Instellingen —
+	# dit scherm is al lang genoeg, en het zijn geen aankoop-acties.
+	lbl("Resetten kan via ⚙ Instellingen op het startscherm.", 19)
 	btn("← Terug", show_start)
 
 
@@ -716,31 +829,9 @@ func _do_prestige() -> void:
 	show_perks()
 
 
-func _set_confirm_legacy_reset(v: bool) -> void:
-	confirm_legacy_reset = v
-	show_perks()
-
-
-func _do_legacy_reset() -> void:
-	Meta.reset_legacy_perks()
-	confirm_legacy_reset = false
-	show_perks()
-
-
 func _pts(n) -> String:
 	# Zelfde duizendtal-notatie als eur(), zonder valutateken.
 	return eur(n).replace("€", "")
-
-
-func _set_confirm(v: bool) -> void:
-	confirm_reset = v
-	show_perks()
-
-
-func _do_reset() -> void:
-	Meta.reset_perks()
-	confirm_reset = false
-	show_perks()
 
 
 func _perk_node(id: String) -> void:
@@ -2594,6 +2685,10 @@ func _confetti_burst(combo_name: String) -> void:
 
 
 func _confetti(banner_text: String, banner_color: Color) -> void:
+	# Uit te zetten via Instellingen — één centrale plek, dus zowel de
+	# combo-uitbarsting als de tekening-confetti volgen die knop.
+	if not bool(Meta.setting("confetti")):
+		return
 	var vp := get_viewport_rect().size
 	var center := vp / 2.0
 
@@ -2641,7 +2736,9 @@ func _confetti(banner_text: String, banner_color: Color) -> void:
 func _small_negative_puff(text: String) -> void:
 	# Klein negatief feedbackje (bijv. bij een afwijzing): een rood tekstje dat
 	# kort opkomt, iets omhoog zakt en wegvaagt. Bewust bescheiden — geen
-	# schermvullende teleurstelling.
+	# schermvullende teleurstelling. Volgt dezelfde instelling als de confetti.
+	if not bool(Meta.setting("confetti")):
+		return
 	var vp := get_viewport_rect().size
 	var l := Label.new()
 	l.text = text

@@ -297,6 +297,26 @@ Logische volgorde, oplopend in werk:
 
 De enige vraag die deze MVP moet beantwoorden: **wil je na een game-over meteen opnieuw beginnen?** Zo nee, eerst events en balans verbeteren; geen enkel meta-systeem repareert een saaie kernloop.
 
+### 4.5 Instellingen (⚙)
+
+Bereikbaar via het startscherm (`show_settings()` in `main.gd`). Alle instellingen leven in `Meta.state.settings` (dus in `meta.json`, runs-overstijgend) met defaults in `Meta.SETTING_DEFAULTS`; lezen via `Meta.setting(key)`, wisselen via `Meta.toggle_setting(key)`. Bewust géén nep-schakelaars: elke toggle grijpt echt ergens in — de enige uitzondering is de taalkeuze, die als placeholder in de UI staat gemarkeerd.
+
+| Instelling | Key | Wat het doet |
+|---|---|---|
+| Taal | `lang` | **Placeholder** — alleen Nederlands werkt; de Engelse knop staat uitgeschakeld. |
+| Confetti & animaties | `confetti` | Gate in `_confetti()` én `_small_negative_puff()`, dus zowel de combo-uitbarsting en tekening-confetti als het rode puffje bij een afwijzing. |
+| Kantoor-achtergrond | `office_bg` | Gate in `_update_office_background()`: uit = effen donkere achtergrond i.p.v. beeld/sfeerkleur per niveau (rustiger te lezen). Wordt direct toegepast door `_bg_level` te invalideren. |
+| Spelerkaart onderaan | `player_panel` | Gate in `_show_player_info()`: uit = het onderste paneel blijft verborgen, wat ~156px schermruimte teruggeeft bij events/minigames. |
+
+Daarnaast staan hier de **destructieve acties**, allemaal met tweestaps-bevestiging via één `settings_confirm`-string (i.p.v. een aparte bool per actie):
+
+- **Reset perkboom** — `Meta.reset_perks()`, volledige puntenrefund. Verhuisd van het perkscherm hierheen; dat scherm is al lang en dit is geen aankoop-actie.
+- **Reset Erfenis-perks** — `Meta.reset_legacy_perks()`, volledige sterrenrefund. Idem verhuisd.
+- **Verwijder huidige run** — `Game.delete_save()`; legacy points en perks blijven staan.
+- **Alles wissen** — `Meta.wipe_everything()` + `Game.delete_save()`. Wist punten, perks, Erfenis-perks, sterren, ∞-upgrade, carrièrestats, Hall of Fame én de niveau-6-ontgrendeling. **Instellingen blijven expres staan** — die zijn geen progressie, en het is irritant als je taal-/animatiekeuzes verdwijnen omdat je opnieuw wilt beginnen.
+
+**Prestige** is bewust NIET verhuisd: dat is een progressie-keuze (boom opofferen voor een ster), geen instelling, en hoort dus op het perkscherm.
+
 ---
 
 ## 5. Exporteren naar Android (kort)

@@ -302,6 +302,39 @@ func load_meta() -> void:
 		state.hall_of_fame = []
 	if not state.has("has_won_ever"):
 		state.has_won_ever = false
+	if not state.has("settings"):
+		state.settings = {}
+	for k in SETTING_DEFAULTS:
+		if not state.settings.has(k):
+			state.settings[k] = SETTING_DEFAULTS[k]
+
+
+# ---- Instellingen (persistent in meta.json, dus runs-overstijgend) ----
+# Alleen instellingen die ECHT iets doen; `lang` is de enige placeholder en
+# staat in de UI ook als zodanig gemarkeerd.
+const SETTING_DEFAULTS := {
+	"lang": "nl",            # placeholder: alleen NL werkt nu
+	"confetti": true,        # confetti/puff-feedback bij tekenen, combo's, afwijzing
+	"office_bg": true,       # achtergrondbeeld/sfeerkleur per kantoorniveau
+	"player_panel": true,    # permanent spelerinfo-paneel onderaan bij events
+}
+
+
+func setting(key: String) -> Variant:
+	return state.get("settings", {}).get(key, SETTING_DEFAULTS.get(key))
+
+
+func set_setting(key: String, value) -> void:
+	if not state.has("settings"):
+		state.settings = {}
+	state.settings[key] = value
+	save_meta()
+
+
+func toggle_setting(key: String) -> bool:
+	var now := not bool(setting(key))
+	set_setting(key, now)
+	return now
 
 
 # UI-hulpvar: hoeveel van de laatst toegekende punten kampioensbonus was
@@ -560,6 +593,34 @@ func buy_inf() -> bool:
 func dev_wipe_points() -> void:
 	# Developer-only: wist alleen het puntensaldo (niet de gekochte perks).
 	state.legacy_points = 0
+	save_meta()
+
+
+func wipe_everything() -> void:
+	# Volledige meta-reset: punten, perks, Erfenis-perks, Prestige-sterren,
+	# ∞-upgrade, carrièrestats, Hall of Fame en de niveau-6-ontgrendeling.
+	# Instellingen blijven WEL staan — die zijn geen progressie, en het is
+	# irritant als je taal/animatiekeuzes verdwijnen omdat je opnieuw begint.
+	var keep: Dictionary = state.get("settings", {}).duplicate(true)
+	state = {
+		"legacy_points": 0,
+		"runs_completed": 0,
+		"best_fees": 0,
+		"best_season": 0,
+		"total_career_fees": 0,
+		"perks": {},
+		"prestige_stars": 0,
+		"legacy_perks": {},
+		"hall_of_fame": [],
+		"has_won_ever": false,
+		"inf_level": 0,
+		"pending_boost": false,
+		"settings": keep,
+	}
+	for id in PERKS:
+		state.perks[id] = 0
+	for id in LEGACY_PERKS:
+		state.legacy_perks[id] = false
 	save_meta()
 
 
