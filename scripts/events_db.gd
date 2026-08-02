@@ -80,8 +80,8 @@ static func get_events() -> Array:
 			"text": "Een oud-scout tipt je over een jeugdtoernooi vol onontdekt talent. Toegang tot de VIP-tribune kost wat.",
 			"options": [
 				{"label": "Erheen", "req_money": 3000,
-					"effects": {"money": -3000, "scout_points": 2},
-					"txt": "Je notitieboekje staat vol. Extra scoutingpunten volgend seizoen... nee, nu meteen."},
+					"effects": {"money": -3000, "scout_points_permanent": 1},
+					"txt": "Je notitieboekje staat vol, en de oud-scout houdt je voortaan op de hoogte: elk seizoen een scoutpunt extra."},
 				{"label": "Overslaan", "effects": {},
 					"txt": "Je blijft thuis. Talent genoeg, tijd te weinig."},
 			],
