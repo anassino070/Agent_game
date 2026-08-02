@@ -1634,6 +1634,20 @@ const EFFECT_GOOD_HIGH := {
 
 const EMPHASIS_MIN_RATIO := 2.0   # pas 4 tekens als de waarde ÉCHT ≥2× de kleinste is
 
+# Absolute drempel voor GELD (seizoen-1-bedrag, schaalt mee met de economie).
+# De gewone emphasis-regel is puur RELATIEF binnen één event, en dat viel bij de
+# corruptie-events verkeerd uit: bij "De weldoener" (€20.000 smeergeld) heeft de
+# nette optie helemaal geen geldeffect, dus was er niets om mee te vergelijken en
+# bleef het bij "++geld" — terwijl €20.000 objectief een smak geld is. Boven deze
+# drempel krijgt een bedrag dus altijd de zware markering, ongeacht de rest van
+# het event. Werkt op de absolute waarde, dus een fikse STRAF krijgt net zo goed
+# "----geld".
+const EMPHASIS_BIG_MONEY := 10000
+
+
+func _big_money_threshold() -> int:
+	return int(round(float(EMPHASIS_BIG_MONEY) * Game.event_money_scale()))
+
 
 func _emphasis_symbol(key: String, emphasize: Dictionary, v: int) -> String:
 	var sym := "+" if v > 0 else "-"
@@ -1747,6 +1761,12 @@ func _emphasis_for(effects: Dictionary, max_abs: Dictionary, distinct_counts: Di
 		if not effects.has(key) or int(effects[key]) == 0:
 			continue
 		var av := absi(int(effects[key]))
+		# Absolute uitzondering voor geld: een écht groot bedrag verdient de
+		# zware markering ook als er binnen dit event niets is om het mee te
+		# vergelijken (zie EMPHASIS_BIG_MONEY).
+		if key == "money" and av >= _big_money_threshold():
+			em[key] = true
+			continue
 		var seen: Dictionary = distinct_counts.get(key, {})
 		if av != int(max_abs.get(key, 0)) or seen.size() <= 1:
 			continue
