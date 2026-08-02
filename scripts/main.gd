@@ -70,6 +70,16 @@ var confirm_prestige := false      # tweestaps-bevestiging voor prestigen (perkb
 var player_info_panel: PanelContainer
 var player_info_holder: VBoxContainer
 
+# Het infopaneel ZWEEFT onderaan over de content heen (het hangt aan de root,
+# niet in de scroll-layout). Zonder compensatie verdwijnt de onderste knop van
+# een lang event dus achter dat paneel. `root_margin` krijgt daarom een grotere
+# ondermarge zolang het paneel zichtbaar is, zodat de scrollbare content boven
+# het paneel eindigt i.p.v. eronder door te lopen.
+var root_margin: MarginContainer
+const MARGIN_BOTTOM_BASE := 28
+# Paneel loopt van 156px tot 12px boven de onderkant; +8 lucht ertussen.
+const MARGIN_BOTTOM_WITH_PANEL := 164
+
 # Vaste (niet-scrollende) balk vlak boven de scrollende content: toont de
 # beurten/pogingen/scoutpunten-blokjes zodat ze altijd zichtbaar blijven,
 # ook als je in een lange log naar beneden scrollt.
@@ -137,13 +147,14 @@ func _ready() -> void:
 	office_scrim.color = Color(0.0, 0.0, 0.0, 0.45)
 	add_child(office_scrim)
 
-	var margin := MarginContainer.new()
-	margin.set_anchors_preset(Control.PRESET_FULL_RECT)
-	margin.add_theme_constant_override("margin_left", 28)
-	margin.add_theme_constant_override("margin_right", 28)
-	margin.add_theme_constant_override("margin_top", 28)
-	margin.add_theme_constant_override("margin_bottom", 28)
-	add_child(margin)
+	root_margin = MarginContainer.new()
+	root_margin.set_anchors_preset(Control.PRESET_FULL_RECT)
+	root_margin.add_theme_constant_override("margin_left", 28)
+	root_margin.add_theme_constant_override("margin_right", 28)
+	root_margin.add_theme_constant_override("margin_top", 28)
+	root_margin.add_theme_constant_override("margin_bottom", MARGIN_BOTTOM_BASE)
+	add_child(root_margin)
+	var margin := root_margin
 
 	var vbox := VBoxContainer.new()
 	vbox.add_theme_constant_override("separation", 16)
@@ -319,14 +330,25 @@ func _player_tooltip(pid: String) -> String:
 # Vult het permanente infopaneel onderaan met de kerngegevens van pid, of
 # verbergt het als er geen (bekende) speler relevant is. Dit is de
 # betrouwbare vervanging voor hover (die niet overal werkt, bijv. op touch).
+func _reserve_panel_space(reserve: bool) -> void:
+	# Houdt de onderkant van de scrollbare content vrij van het zwevende
+	# infopaneel, zodat de laatste knop van een event nooit onbereikbaar is.
+	if root_margin == null:
+		return
+	root_margin.add_theme_constant_override("margin_bottom",
+		MARGIN_BOTTOM_WITH_PANEL if reserve else MARGIN_BOTTOM_BASE)
+
+
 func _show_player_info(pid: String) -> void:
 	if player_info_panel == null:
 		return
 	# Uit te zetten via Instellingen: scheelt schermruimte bij events/minigames.
 	if pid == "" or not Game.state.players.has(pid) or not bool(Meta.setting("player_panel")):
 		player_info_panel.visible = false
+		_reserve_panel_space(false)
 		return
 	player_info_panel.visible = true
+	_reserve_panel_space(true)
 	if player_info_holder == null:
 		return
 	# Kaart opnieuw opbouwen. remove_child vóór queue_free(): queue_free is
