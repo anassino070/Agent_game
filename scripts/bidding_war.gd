@@ -1,41 +1,96 @@
 # bidding_war.gd — minigame "Biedingsoorlog" (event: overboden).
-# Drie clubs denken dat er een concurrerend bod ligt op je cliënt. Echte
-# tactiek zit 'm in drie dingen:
-# 1. Clubambitie is zichtbaar en bepaalt hun gedrag — ambitieuze clubs zijn
-#    happiger (grotere sprongen bij een geslaagde bluf) maar ook
-#    prikkelbaarder (stappen sneller uit bij een mislukte bluf/druk).
-# 2. Bluffen tegen dezelfde club raakt "verbrand": elke herhaling verlaagt
-#    de slagingskans van die specifieke bluf — wissel dus van doelwit.
-# 3. "Vergelijken" is niet gratis: de koploper kan zich ondermijnd voelen
-#    (annoyed) en wordt daardoor prikkelbaarder bij een latere druk-actie.
+# HERONTWORPEN: twee assen i.p.v. clubs porren tot er één toehapt.
+#
+# Elke club biedt een PRIJS (waar jouw fee uit komt) én VOORWAARDEN (waar het
+# vertrouwen van je cliënt uit komt: speeltijd, afkoopsom, imagerechten). Die
+# twee staan op gespannen voet: duw je bij een club de prijs op, dan snoeit ze
+# in de voorwaarden — en omgekeerd. De kernvraag is dus niet "welke knop werkt"
+# maar: HOEVEEL VAN HET GELUK VAN JE CLIËNT VERKOOP JE VOOR JE EIGEN MARGE?
+#
+# Waarom deze vorm: de oude versie legde alles open (biedingen, ambitie) en had
+# maar één leerbare regel (bluf niet twee keer dezelfde club), waardoor de
+# optimale lijn vastlag en het knopjes drukken werd. Erger: vertrouwen speelde
+# géén enkele rol, terwijl dat overal elders in het spel de motor is. Nu hangt
+# de minigame aan de kernspanning van het spel (fee vs. vertrouwen, met de
+# vertrekkans als staart).
+#
+# Clubs verschillen in PROFIEL, wat bepaalt hoe duur een duw is:
+# - "rijk"        : diepe zakken, maar hij wordt er een nummer
+# - "ambitieus"   : basisplek en een project, minder geld
+# - "gebalanceerd": middenweg, nergens uitschieter
 class_name BiddingWar
 extends RefCounted
 
+const ROUNDS := 5
+
+# Per profiel: startprijs (× marktwaarde), startvoorwaarden (0-100), en hoe hard
+# prijs en voorwaarden tegen elkaar inruilen. `price_give` = hoeveel prijs je
+# wint per duw (× marktwaarde), `terms_cost` = wat dat aan voorwaarden kost;
+# `terms_give`/`price_cost` is dezelfde ruil de andere kant op.
+const PROFILES := {
+	"rijk": {
+		"label": "Diepe zakken, weinig geduld — hij wordt hier een nummer.",
+		"price_mult": 0.85, "terms": 30,
+		"price_give": 0.14, "terms_cost": 14,
+		"terms_give": 10, "price_cost": 0.08,
+	},
+	"ambitieus": {
+		"label": "Sportief project met een basisplek, maar de kas is beperkt.",
+		"price_mult": 0.60, "terms": 70,
+		"price_give": 0.09, "terms_cost": 8,
+		"terms_give": 14, "price_cost": 0.05,
+	},
+	"gebalanceerd": {
+		"label": "Nette club, nergens uitschieter — in geld noch in beloftes.",
+		"price_mult": 0.72, "terms": 50,
+		"price_give": 0.11, "terms_cost": 11,
+		"terms_give": 12, "price_cost": 0.06,
+	},
+}
+
 var client_id := ""
-var clubs: Array = []      # [{id, name, ambition, bid, budget, active, bluffed, annoyed}]
-var rounds_left := 4
+var base_value := 0
+var clubs: Array = []      # [{id, name, profile, price, terms, patience, active}]
+var rounds_left := ROUNDS
 var finished := false
 var deal := false
 var winner_id := ""
-var final_bid := 0
+var final_price := 0
+var final_terms := 0
 var log: Array = []
 
 
-func setup(client_id_: String, candidate_ids: Array, base_value: int, all_clubs: Dictionary, rng: RandomNumberGenerator) -> void:
+func setup(client_id_: String, candidate_ids: Array, base_value_: int, all_clubs: Dictionary, rng: RandomNumberGenerator) -> void:
 	client_id = client_id_
+	base_value = base_value_
+	# Elk profiel maximaal één keer, zodat de drie clubs echt van elkaar
+	# verschillen — met twee identieke "rijke" clubs is de keuze tussen hen leeg.
+	var profiles: Array = PROFILES.keys()
+	for i in range(profiles.size() - 1, 0, -1):
+		var j := rng.randi_range(0, i)
+		var tmp = profiles[i]
+		profiles[i] = profiles[j]
+		profiles[j] = tmp
+	var idx := 0
 	for cid in candidate_ids:
 		var c: Dictionary = all_clubs[cid]
+		var prof: String = str(profiles[idx % profiles.size()])
+		var p: Dictionary = PROFILES[prof]
 		clubs.append({
-			"id": cid, "name": str(c.name), "ambition": int(c.ambition),
-			"bid": int(float(base_value) * rng.randf_range(0.55, 0.75)),
-			"budget": int(c.budget),
-			"active": true, "bluffed": 0, "annoyed": false,
+			"id": cid, "name": str(c.name), "profile": prof,
+			"price": int(float(base_value) * float(p.price_mult) * rng.randf_range(0.92, 1.08)),
+			"terms": clampi(int(p.terms) + rng.randi_range(-6, 6), 5, 95),
+			# Geduld: hoe vaak je bij deze club kunt duwen voor ze afhaakt.
+			# Bewust ZICHTBAAR: de spanning moet in de afweging zitten, niet in
+			# giswerk over wanneer iemand knapt.
+			"patience": rng.randi_range(2, 3),
+			"active": true,
 		})
+		idx += 1
 	if clubs.is_empty():
-		# Geen enkele club had het budget om mee te doen — loos alarm.
 		finished = true
 		deal = false
-		log.append("Geen van de clubs heeft er geld voor. Loos alarm.")
+		log.append("Geen enkele club meldt zich. Loos alarm.")
 
 
 func active_clubs() -> Array:
@@ -46,14 +101,6 @@ func active_clubs() -> Array:
 	return out
 
 
-func top_club() -> Dictionary:
-	var best: Dictionary = {}
-	for c in active_clubs():
-		if best.is_empty() or int(c.bid) > int(best.bid):
-			best = c
-	return best
-
-
 func find_club(cid: String) -> Dictionary:
 	for c in clubs:
 		if str(c.id) == cid:
@@ -61,110 +108,112 @@ func find_club(cid: String) -> Dictionary:
 	return {}
 
 
-func ambition_label(c: Dictionary) -> String:
-	var a := int(c.ambition)
-	if a >= 5:
-		return "torenhoge ambitie — happig, maar ook prikkelbaar"
-	if a >= 4:
-		return "hoge ambitie — wil graag winnen"
-	if a >= 2:
-		return "gematigde ambitie"
-	return "lage ambitie — kalm, moeilijk op te jagen"
+func profile_label(c: Dictionary) -> String:
+	return str(PROFILES[str(c.profile)].label)
 
 
-func play_bluf(target_id: String, rng: RandomNumberGenerator) -> void:
+func terms_label(t: int) -> String:
+	if t >= 80:
+		return "uitstekend (basisplek, vrije afkoop)"
+	if t >= 60:
+		return "goed (serieuze rol)"
+	if t >= 40:
+		return "redelijk"
+	if t >= 20:
+		return "mager (bankzitter, strakke clausules)"
+	return "slecht (hij wordt geparkeerd)"
+
+
+func top_by_price() -> Dictionary:
+	var best: Dictionary = {}
+	for c in active_clubs():
+		if best.is_empty() or int(c.price) > int(best.price):
+			best = c
+	return best
+
+
+# --- De twee duwrichtingen --------------------------------------------------
+
+func push_price(cid: String) -> void:
+	# Prijs omhoog ten koste van de voorwaarden. Kost een ronde én geduld: een
+	# club laat zich niet eindeloos uitknijpen.
+	var c := find_club(cid)
+	if c.is_empty() or not c.active or finished:
+		return
+	var p: Dictionary = PROFILES[str(c.profile)]
 	rounds_left -= 1
-	var c := find_club(target_id)
-	var bluffed := int(c.bluffed)
-	var ambition_bonus := (float(c.ambition) - 3.0) * 0.03
-	var fatigue := float(bluffed) * 0.12
-	var chance := clampf(0.6 + ambition_bonus - fatigue, 0.1, 0.85)
-	c["bluffed"] = bluffed + 1
-	if rng.randf() < chance:
-		var raise_pct := rng.randf_range(0.12, 0.22) + float(c.ambition) * 0.015
-		var raise := int(float(c.bid) * raise_pct)
-		c["bid"] = mini(int(c.bid) + raise, int(c.budget))
-		log.append("%s slikt het: bod stijgt naar %s." % [str(c.name), _eur(int(c.bid))])
-	else:
-		var walk_base := 0.3 + (float(c.ambition) - 3.0) * 0.05
-		if bluffed > 0:
-			walk_base += 0.15   # al eerder geblufd — hij is nu op zijn hoede
-		if rng.randf() < walk_base:
-			c["active"] = false
-			log.append("%s ruikt onraad en trekt zich volledig terug." % str(c.name))
-		elif bluffed > 0:
-			log.append("%s heeft dit smoesje al eerder gehoord en trapt er niet meer in." % str(c.name))
-		else:
-			log.append("%s trapt er niet in, maar blijft in de race." % str(c.name))
+	var gain := int(float(base_value) * float(p.price_give))
+	c["price"] = int(c.price) + gain
+	c["terms"] = clampi(int(c.terms) - int(p.terms_cost), 0, 100)
+	c["patience"] = int(c.patience) - 1
+	log.append("%s legt %s bij — maar snoeit in de voorwaarden (nu: %s)." % [
+		str(c.name), _eur(gain), terms_label(int(c.terms))])
+	_check_patience(c)
 	_check_end()
 
 
-func play_pressure(rng: RandomNumberGenerator) -> void:
-	rounds_left -= 1
-	var top := top_club()
-	if top.is_empty():
-		_check_end()
+func push_terms(cid: String) -> void:
+	# Voorwaarden omhoog ten koste van de prijs — dus ten koste van JOUW fee.
+	var c := find_club(cid)
+	if c.is_empty() or not c.active or finished:
 		return
-	var annoyed_penalty := 0.15 if bool(top.annoyed) else 0.0
-	var raise_chance := clampf(0.5 - annoyed_penalty, 0.1, 0.9)
-	if rng.randf() < raise_chance:
-		var raise := int(float(top.bid) * rng.randf_range(0.08, 0.14))
-		top["bid"] = mini(int(top.bid) + raise, int(top.budget))
-		log.append("%s voelt de klok tikken en verhoogt naar %s." % [str(top.name), _eur(int(top.bid))])
-	else:
-		# Mislukt: hij tekent NU (mooi) of stapt uit (pijnlijk) — een
-		# ambitieuze club is ongeduldiger en stapt sneller uit dan een kalme.
-		var walk_chance := clampf(0.5 + (float(top.ambition) - 3.0) * 0.06 + annoyed_penalty, 0.15, 0.85)
-		if rng.randf() < walk_chance:
-			top["active"] = false
-			var reason := " — hij was toch al geïrriteerd" if annoyed_penalty > 0 else ""
-			log.append("%s voelt zich gehaast%s en stapt uit de onderhandeling." % [str(top.name), reason])
-		else:
-			finished = true
-			deal = true
-			winner_id = str(top.id)
-			final_bid = int(top.bid)
-			log.append("%s heeft er genoeg van en tekent NU voor %s." % [str(top.name), _eur(final_bid)])
+	var p: Dictionary = PROFILES[str(c.profile)]
+	rounds_left -= 1
+	var drop := int(float(base_value) * float(p.price_cost))
+	c["terms"] = clampi(int(c.terms) + int(p.terms_give), 0, 100)
+	c["price"] = maxi(int(c.price) - drop, 0)
+	c["patience"] = int(c.patience) - 1
+	log.append("%s verbetert de voorwaarden (nu: %s) — en haalt %s van de prijs af." % [
+		str(c.name), terms_label(int(c.terms)), _eur(drop)])
+	_check_patience(c)
 	_check_end()
 
 
-func play_compare(rng: RandomNumberGenerator) -> void:
+func play_off(rng: RandomNumberGenerator) -> void:
+	# Clubs tegen elkaar uitspelen: de achterblijvers trekken bij naar de
+	# koploper. Raakt het geduld van de koploper NIET (je onderhandelt niet mét
+	# hem), maar de anderen voelen zich opgejaagd en verliezen wel geduld.
+	if finished:
+		return
 	rounds_left -= 1
-	var top := top_club()
+	var top := top_by_price()
 	if top.is_empty():
 		_check_end()
 		return
-	var any := false
+	var moved := false
 	for c in active_clubs():
 		if str(c.id) == str(top.id):
 			continue
-		if rng.randf() < 0.4:
-			var new_bid := int(float(top.bid) * rng.randf_range(1.02, 1.12))
-			if new_bid <= int(c.budget):
-				c["bid"] = new_bid
-				any = true
-				log.append("%s overtreft het bod: %s." % [str(c.name), _eur(new_bid)])
-	# Risico: de koploper voelt zich soms ondermijnd doordat zijn bod
-	# rondgaat — dat maakt hem prikkelbaarder bij een latere druk-actie.
-	if rng.randf() < 0.3 and not bool(top.annoyed):
-		top["annoyed"] = true
-		log.append("%s is not amused dat zijn bod ineens bij iedereen bekend is." % str(top.name))
-	if not any:
-		log.append("Niemand hapt — de clubs kennen elkaars grens.")
+		if int(c.price) < int(top.price):
+			var step := int(float(int(top.price) - int(c.price)) * rng.randf_range(0.35, 0.6))
+			if step > 0:
+				c["price"] = int(c.price) + step
+				moved = true
+				log.append("%s trekt bij tot %s." % [str(c.name), _eur(int(c.price))])
+		c["patience"] = int(c.patience) - 1
+		_check_patience(c)
+	if not moved:
+		log.append("Niemand beweegt — ze kennen elkaars grenzen.")
 	_check_end()
 
 
-func accept_now() -> void:
-	var top := top_club()
+func accept(cid: String) -> void:
+	var c := find_club(cid)
+	if c.is_empty() or not c.active or finished:
+		return
 	finished = true
-	if top.is_empty():
-		deal = false
-	else:
-		deal = true
-		winner_id = str(top.id)
-		final_bid = int(top.bid)
-		log.append("Je kapt het gesprek af en incasseert het bod van %s." % str(top.name))
-	_check_end()
+	deal = true
+	winner_id = str(c.id)
+	final_price = int(c.price)
+	final_terms = int(c.terms)
+	log.append("Je tekent bij %s: %s, voorwaarden %s." % [
+		str(c.name), _eur(final_price), terms_label(final_terms)])
+
+
+func _check_patience(c: Dictionary) -> void:
+	if int(c.patience) <= 0 and c.active:
+		c["active"] = false
+		log.append("%s is het zat en trekt zich terug." % str(c.name))
 
 
 func _check_end() -> void:
@@ -173,18 +222,48 @@ func _check_end() -> void:
 	if active_clubs().is_empty():
 		finished = true
 		deal = false
-		log.append("Alle clubs trekken zich terug. Het bod verdampt in de chaos.")
+		log.append("Alle clubs zijn afgehaakt. Geen deal.")
 		return
 	if rounds_left <= 0:
-		finished = true
-		var top := top_club()
+		# Tijd om: je moet het hoogste bod nemen dat er nog ligt.
+		var top := top_by_price()
 		if top.is_empty():
+			finished = true
 			deal = false
-		else:
-			deal = true
-			winner_id = str(top.id)
-			final_bid = int(top.bid)
-			log.append("De tijd is om. %s wint de strijd met %s." % [str(top.name), _eur(final_bid)])
+			return
+		finished = true
+		deal = true
+		winner_id = str(top.id)
+		final_price = int(top.price)
+		final_terms = int(top.terms)
+		log.append("De deadline verstrijkt; %s heeft het hoogste bod." % str(top.name))
+
+
+# --- Uitkomst ---------------------------------------------------------------
+
+func trust_delta() -> int:
+	# De voorwaarden bepalen wat je cliënt ervan vindt. 50 is neutraal: daarboven
+	# voelt hij zich gesteund, daaronder verkocht. Dit is de hele clou van de
+	# minigame — je fee maximaliseren kost je hier zichtbaar vertrouwen, en
+	# vertrouwen drijft elders de vertrekkans (zie Game.leave_chance()).
+	if not deal:
+		return 0
+	return int(round(float(final_terms - 50) / 5.0))
+
+
+func outcome_text() -> String:
+	if not deal:
+		return "Geen deal. De bui trekt over zonder handtekening."
+	var t := trust_delta()
+	if t >= 6:
+		return "Getekend — en hij weet dat je voor hém hebt onderhandeld, niet voor je fee."
+	if t >= 1:
+		return "Getekend. Nette voorwaarden, nette fee."
+	if t == 0:
+		return "Getekend. Zakelijk, zonder warmte."
+	if t >= -5:
+		return "Getekend, maar hij leest de kleine lettertjes en vraagt zich af voor wie je werkte."
+	return "Getekend. Jij bent binnen; hij is verkocht, en dat weet hij."
 
 
 func _eur(n: int) -> String:

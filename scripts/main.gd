@@ -1870,50 +1870,78 @@ func show_bidding() -> void:
 	_dev_test_banner()
 	lbl("BIEDINGSOORLOG", 32)
 	_name_row("Cliënt: ", bidding.client_id, "", 24)
-	_set_turn_bar("Rondes:", bidding.rounds_left, 4)
+	_set_turn_bar("Rondes:", bidding.rounds_left, BiddingWar.ROUNDS)
+	lbl("Prijs bepaalt JOUW fee, voorwaarden bepalen zijn vertrouwen. Duw je de een op, dan zakt de ander.", 19)
 	sep()
 	for c in bidding.clubs:
-		var status := "actief" if c.active else "afgehaakt"
-		var annoyed_txt := "  ⚠ geïrriteerd" if bool(c.get("annoyed", false)) else ""
-		lbl("%s — bod %s (%s)%s" % [str(c.name), eur(int(c.bid)), status, annoyed_txt], 24)
-		lbl("   %s" % bidding.ambition_label(c), 19)
+		if not c.active:
+			var dead := lbl("%s — afgehaakt" % str(c.name), 22)
+			dead.add_theme_color_override("font_color", Color(0.55, 0.55, 0.58))
+			continue
+		lbl("%s" % str(c.name), 24)
+		var money_lbl := lbl("   Prijs: %s   (jouw fee ~%s)" % [
+			eur(int(c.price)), eur(int(float(int(c.price)) * Game.fee_cut())),
+		], 20)
+		money_lbl.add_theme_color_override("font_color", Color(0.45, 0.9, 0.5))
+		var terms_lbl := lbl("   Voorwaarden: %d/100 — %s" % [int(c.terms), bidding.terms_label(int(c.terms))], 20)
+		terms_lbl.add_theme_color_override("font_color", _terms_color(int(c.terms)))
+		lbl("   Geduld: %s" % ("●".repeat(int(c.patience)) + "○".repeat(maxi(3 - int(c.patience), 0))), 19)
+		lbl("   %s" % bidding.profile_label(c), 18)
 	if not bidding.log.is_empty():
 		sep()
 		for line in bidding.log:
 			lbl("· " + str(line), 20)
 	sep()
 	if bidding.finished:
+		lbl(bidding.outcome_text(), 26)
 		if bidding.deal:
-			lbl("Winnaar: %s met %s." % [str(bidding.find_club(bidding.winner_id).name), eur(bidding.final_bid)], 26)
-			var income := int(float(bidding.final_bid) * Game.fee_cut())
+			lbl("%s — %s, voorwaarden %s." % [
+				str(bidding.find_club(bidding.winner_id).name), eur(bidding.final_price),
+				bidding.terms_label(bidding.final_terms),
+			], 22)
+			var income := int(float(bidding.final_price) * Game.fee_cut())
 			if Meta.perk_level("superprovisie") > 0:
 				income *= 2
-			_show_effect_lines({"money": income})
+			# Beide assen als effectregels, zodat de ruil die je net maakte
+			# zwart-op-wit staat: fee uit de prijs, vertrouwen uit de voorwaarden.
+			var eff := {"money": income}
+			var td := bidding.trust_delta()
+			if td != 0:
+				eff["trust"] = td
+			_show_effect_lines(eff, str(Game.state.players[str(bidding.client_id)].name))
 		else:
-			lbl("Geen deal. De bui trekt over zonder handtekening.", 26)
 			_show_effect_lines({"rep": BIDDING_FAIL_REP})
 		btn("Verder →", _finish_bidding)
 	else:
 		for c in bidding.active_clubs():
 			var target_id := str(c.id)
-			var club_name := str(c.name)
-			var bluffed := int(c.get("bluffed", 0))
-			var fatigue_txt := "  (al %d× geprobeerd — trapt er minder snel meer in)" % bluffed if bluffed > 0 else ""
-			btn("Bluffen richting %s%s" % [club_name, fatigue_txt], func(): _play_bidding("bluf", target_id))
-		if not bidding.top_club().is_empty():
-			btn("Deadline-druk op de leider (%s)" % str(bidding.top_club().name), func(): _play_bidding("druk", ""))
+			var prof: Dictionary = BiddingWar.PROFILES[str(c.profile)]
+			btn("%s: prijs omhoog  (+%s, voorwaarden -%d)" % [
+				str(c.name), eur(int(float(bidding.base_value) * float(prof.price_give))), int(prof.terms_cost),
+			], func(): _play_bidding("prijs", target_id))
+			btn("%s: voorwaarden omhoog  (+%d, prijs -%s)" % [
+				str(c.name), int(prof.terms_give), eur(int(float(bidding.base_value) * float(prof.price_cost))),
+			], func(): _play_bidding("voorwaarden", target_id))
+			btn("%s: hier tekenen" % str(c.name), func(): _play_bidding("tekenen", target_id))
+			sep()
 		if bidding.active_clubs().size() >= 2:
-			btn("Vergelijken (alle clubs) — risico: koploper kan geïrriteerd raken", func(): _play_bidding("vergelijk", ""))
-		if not bidding.top_club().is_empty():
-			btn("Bod aannemen nu", func(): _play_bidding("aannemen", ""))
+			btn("Clubs tegen elkaar uitspelen — de achterblijvers trekken bij (kost hen geduld)", func(): _play_bidding("uitspelen", ""))
+
+
+func _terms_color(t: int) -> Color:
+	if t >= 60:
+		return Color(0.4, 0.9, 0.5)
+	if t >= 40:
+		return Color(0.9, 0.85, 0.45)
+	return Color(1.0, 0.5, 0.4)
 
 
 func _play_bidding(action: String, target_id: String) -> void:
 	match action:
-		"bluf": bidding.play_bluf(target_id, Game.rng)
-		"druk": bidding.play_pressure(Game.rng)
-		"vergelijk": bidding.play_compare(Game.rng)
-		"aannemen": bidding.accept_now()
+		"prijs": bidding.push_price(target_id)
+		"voorwaarden": bidding.push_terms(target_id)
+		"uitspelen": bidding.play_off(Game.rng)
+		"tekenen": bidding.accept(target_id)
 	show_bidding()
 
 
@@ -1921,7 +1949,12 @@ const BIDDING_FAIL_REP := -3
 
 func _finish_bidding() -> void:
 	if bidding.deal:
-		var income := Game.complete_transfer(bidding.client_id, bidding.winner_id, bidding.final_bid, Game.fee_cut())
+		var income := Game.complete_transfer(bidding.client_id, bidding.winner_id, bidding.final_price, Game.fee_cut())
+		# Voorwaarden -> vertrouwen: apart toepassen, want complete_transfer()
+		# kent alleen de prijs. Dit is de helft van de ruil die de speler maakte.
+		var td := bidding.trust_delta()
+		if td != 0:
+			Game.apply_effects({"trust": td}, str(bidding.client_id))
 		flash = "Transfer uit de biedingsoorlog! Jij incasseert %s." % eur(income)
 	else:
 		Game.apply_effects({"rep": BIDDING_FAIL_REP}, "")
