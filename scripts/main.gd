@@ -491,7 +491,7 @@ func show_start() -> void:
 	], 21)
 	btn(T("Perkboom (%s legacy points te besteden) →") % _pts(Meta.state.legacy_points), show_perks)
 	if Meta.has_pending_boost():
-		var boost_lbl := lbl(T("🚀 MEGA-BOOST KLAAR: je volgende nieuwe run start met dubbel startkapitaal, +25 reputatie, +1 gunst en +2 scoutpunten."), 21)
+		var boost_lbl := lbl(T("🚀 MEGA-BOOST KLAAR: je volgende nieuwe run start met dubbel startkapitaal, +25 reputatie, +1 gunst en +2 scoutpunten per seizoen."), 21)
 		boost_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 	sep()
 	btn(T("NIEUWE RUN"), _on_new_run)

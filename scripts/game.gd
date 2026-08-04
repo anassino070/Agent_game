@@ -131,7 +131,8 @@ func fmt_thousands(n) -> String:
 # Mega-boost (eenmalig verbruikt): een gewonnen run zet Meta's pending_boost-
 # vlag, die precies deze ene keer een klapper geeft aan de allereerstvolgende
 # nieuwe run — dubbel startkapitaal, flink meer startreputatie, een extra
-# gunst en twee extra scoutpunten. Geen permanente perk: puur momentum.
+# gunst en twee extra scoutpunten PER SEIZOEN. Geen permanente perk over runs
+# heen: het geldt alleen die ene run, maar dan wel de hele run.
 const BOOST_MONEY_MULT := 2.0
 const BOOST_REP_BONUS := 25
 const BOOST_FAVORS_BONUS := 1
@@ -151,7 +152,9 @@ func new_run() -> void:
 		"rep": maxi(50 + (BOOST_REP_BONUS if boost else 0) + Meta.perk_bonus("netwerk") + Meta.perk_bonus("iconenstatus"), 0),
 		"scandal": 0,
 		"favors": 1 + (BOOST_FAVORS_BONUS if boost else 0) + (2 if Meta.has_legacy_perk("eeuwige_gunst") else 0) + Meta.perk_bonus("gunsten"),
-		"scout_points": scout_points_per_season() + (BOOST_SCOUT_POINTS_BONUS if boost else 0),
+		# Wordt direct na deze dict gezet: scout_points_per_season() leest state,
+		# en die verwijst hier nog naar de VORIGE run.
+		"scout_points": 0,
 		"players": world.players,
 		"clubs": world.clubs,
 		"clients": [],
@@ -167,8 +170,13 @@ func new_run() -> void:
 		"office_level": 2 if Meta.has_legacy_perk("kantoorvoorsprong") else 1,
 		"candidate_ids": [],   # pids van de verse scoutingkandidaten dit seizoen
 		"candidate_counter": 0, # oplopende teller voor unieke kandidaat-pids
-		"bonus_scout_points": 0, # permanente scoutpunten-bonus uit events (scout_points_permanent)
+		# Scoutpunten-bonus die voor de hele run geldt: uit events
+		# (scout_points_permanent) en, bij een gewonnen vorige run, de mega-boost.
+		"bonus_scout_points": BOOST_SCOUT_POINTS_BONUS if boost else 0,
 	}
+	# Nu state de NIEUWE run is, kan scout_points_per_season() correct rekenen:
+	# hij leest bonus_scout_points hierboven en shop_owned (nu leeg).
+	state.scout_points = scout_points_per_season()
 	# Geen startcliënt meer: je begint met een lege stal, en moet in de eerste
 	# scoutingronde zelf je eerste cliënt werven — een bewust moeilijker begin
 	# (met 0 of 1 cliënten slaat het verplichte-ontslag-scherm gewoon over,

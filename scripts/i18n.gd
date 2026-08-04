@@ -112,7 +112,7 @@ func _table_en() -> Dictionary:
 	d["Overleef %d seizoenen. Ga niet failliet, houd je schandaalmeter onder de 100 en zorg dat je cliënten je niet verlaten."] = "Survive %d seasons. Don't go bankrupt, keep your scandal meter under 100, and make sure your clients don't walk out on you."
 	d["LEGACY — %d runs gespeeld  |  beste run: %s (seizoen %d)  |  totale carrièrefees: %s"] = "LEGACY — %d runs played  |  best run: %s (season %d)  |  total career fees: %s"
 	d["Perkboom (%s legacy points te besteden) →"] = "Perk tree (%s legacy points to spend) →"
-	d["🚀 MEGA-BOOST KLAAR: je volgende nieuwe run start met dubbel startkapitaal, +25 reputatie, +1 gunst en +2 scoutpunten."] = "🚀 MEGA BOOST READY: your next new run starts with double starting capital, +25 reputation, +1 favour and +2 scout points."
+	d["🚀 MEGA-BOOST KLAAR: je volgende nieuwe run start met dubbel startkapitaal, +25 reputatie, +1 gunst en +2 scoutpunten per seizoen."] = "🚀 MEGA BOOST READY: your next new run starts with double starting capital, +25 reputation, +1 favour and +2 scout points per season."
 	d["NIEUWE RUN"] = "NEW RUN"
 	d["Doorgaan met vorige run"] = "Continue previous run"
 	d["🏆 HALL OF FAME"] = "🏆 HALL OF FAME"
