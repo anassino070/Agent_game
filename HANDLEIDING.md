@@ -349,7 +349,22 @@ Dit is de belangrijkste valkuil: de tweede vorm crasht niet, hij blijft gewoon s
 
 **Regel 2: pluraliseer met HELE woorden, niet met een achtervoegsel.** `"%d ster%s"` met `"" if n == 1 else "ren"` werkt alleen in het Nederlands — in het Engels wordt dat `"starren"`. Gebruik daarom `_stars_word(n)` / `_rounds_word(n)`, die `T("ster")` of `T("sterren")` teruggeven. Dit patroon zat op drie plekken en is nu overal weg; als je een nieuwe teller toevoegt, doe het meteen goed.
 
-**Regel 3: data-dicts lokaliseren op de LEESSITE, niet in de dict.** `SHOP_UPGRADES`, `PERKS`, `OFFICE_LEVELS` en `LEGACY_PERKS` zijn `const` — die kunnen op parse-time geen `T()` aanroepen. Daarom zijn er accessors: `Game.shop_name()/shop_desc()`, `Game.office_name()`, `Meta.perk_name()/perk_desc()/legacy_perk_name()/legacy_perk_desc()`. De UI leest hierlangs. Dat is ook waarom ~150 strings maar 9 code-edits kostten.
+**Regel 3: data-dicts lokaliseren op de LEESSITE, niet in de dict.** `SHOP_UPGRADES`, `PERKS`, `OFFICE_LEVELS` en `LEGACY_PERKS` zijn `const` — die kunnen op parse-time geen `T()` aanroepen. Daarom zijn er accessors: `Game.shop_name()/shop_desc()`, `Game.office_name()`, `Meta.perk_name()/perk_desc()/legacy_perk_name()/legacy_perk_desc()`. De UI leest hierlangs. Dat is ook waarom ~150 strings maar 9 code-edits kostten. Let op: `office_name()` dekt alleen het HUIDIGE niveau — leest je ergens `OFFICE_LEVELS[i].name` rechtstreeks (zoals de upgrade-preview doet), dan moet die leessite zelf gewrapt worden.
+
+**Regel 4: één `T()` per regel is niet genoeg.** De grote omzetting is met een regex gedaan die per regel het EERSTE string-literaal wrapt. Drie soorten regels ontsnappen daaraan, en dat waren precies de plekken waar later nog Nederlands opdook:
+
+* **ternaries** — `btn(T("Naar scouting →") if x else "Naar stalbeheer →")`: alleen de eerste tak was gewrapt;
+* **opgebouwde strings** — `var sub := "%s, %d jr" % [...]` gevolgd door `sub += " · waarde %s" % ...`: dat zijn geen `lbl()`/`btn()`-aanroepen, dus de regex zag ze niet;
+* **strings uit een ander bestand** — de nieuwsregels komen uit `game.gd`'s `_gen_news()`.
+
+Zoek ze met:
+
+```bash
+grep -n 'T("[^"]*") if .* else "' scripts/main.gd     # halve ternary
+grep -n 'var sub := "\|sub += "' scripts/main.gd      # opgebouwde string
+```
+
+**Noot over het nieuws.** `_gen_news()` interpoleert de clubnaam en bewaart het resultaat in `state.news` (dus in de save). Vertalen gebeurt daarom bij GENERATIE, niet bij weergave. Gevolg: schakel je midden in een run van taal, dan blijft die ene nieuwsregel in de oude taal staan tot het volgende seizoen. Bewust geaccepteerd — het alternatief is een sleutel + argumenten in de save opslaan, wat het saveformaat verandert voor één regel tekst.
 
 **`events_db.gd` blijft volledig onaangeroerd.** `get_events()` is een `static func`, en autoload-toegang vanuit een static context is in GDScript riskant. In plaats daarvan vertaalt `main.gd` op de **zes weergavesites**: `ev.title`, `ev.text`, `opt.label` en de drie uitkomst-fallbacks (`txt` / `success_txt` / `fail_txt`). Zes edits dekken zo alle 424 event-strings. Let op dat `{client}` en `{amount}` in elke vertaling bewaard blijven — die worden ná het vertalen vervangen.
 

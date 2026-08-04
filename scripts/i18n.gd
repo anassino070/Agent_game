@@ -1165,4 +1165,18 @@ func _table_en() -> Dictionary:
 	d["\"Wat heeft hij te zeggen tegen de fans die vanavond boe riepen?\""] = "\"What does he have to say to the fans who booed tonight?\""
 	d["\"Wat zou hij nu tegen zichzelf zeggen, denkt u?\""] = "\"What would he say to himself right now, do you think?\""
 	d["\"Gonst het nu al in de kleedkamer over zijn toekomst?\""] = "\"Is the dressing room already buzzing about his future?\""
+	# ---- spelerkaart-subregels (opgebouwde strings, geen lbl-literal) ----
+	d["%s, %d jr"] = "%s, %d yrs"
+	d[" · vertrouwen %d"] = " · trust %d"
+	d[" · waarde %s"] = " · value %s"
+	d["%s, %d jr · vert. %d"] = "%s, %d yrs · trust %d"
+	d[" · %d jr contract"] = " · %d yrs contract"
+	d["%s, %d jr · vert. %d\n%s"] = "%s, %d yrs · trust %d\n%s"
+	# ---- nieuws (in state.news opgeslagen; zie de noot in 4.7) ----
+	d["Je opent je kantoor met een enorme boost in de rug — je vorige triomf gonst nog na."] = "You open your office with huge momentum behind you — your last triumph is still echoing."
+	d["Je opent je kantoor boven een snackbar. Nog niemand gelooft in je — dat bewijs je zelf, deze eerste scoutingronde."] = "You open your office above a chip shop. Nobody believes in you yet — you'll prove that yourself, this first scouting round."
+	d["%s krijgt een rijke investeerder: het transferbudget gaat flink omhoog."] = "%s lands a wealthy investor: the transfer budget goes up sharply."
+	d["%s zit financieel krap en moet verkopen."] = "%s is financially stretched and has to sell."
+	d["Rustige zomer op de transfermarkt. Iedereen wacht op de eerste dominosteen."] = "A quiet summer on the transfer market. Everyone is waiting for the first domino."
+	d["Een groot eindtoernooi komt eraan; spelers willen zich in de kijker spelen."] = "A major tournament is coming up; players want to put themselves in the shop window."
 	return d

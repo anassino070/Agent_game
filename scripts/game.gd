@@ -155,7 +155,7 @@ func new_run() -> void:
 		"players": world.players,
 		"clubs": world.clubs,
 		"clients": [],
-		"news": "Je opent je kantoor met een enorme boost in de rug — je vorige triomf gonst nog na." if boost else "Je opent je kantoor boven een snackbar. Nog niemand gelooft in je — dat bewijs je zelf, deze eerste scoutingronde.",
+		"news": I18n.T("Je opent je kantoor met een enorme boost in de rug — je vorige triomf gonst nog na.") if boost else I18n.T("Je opent je kantoor boven een snackbar. Nog niemand gelooft in je — dat bewijs je zelf, deze eerste scoutingronde."),
 		"used_events": [],
 		"total_fees": 0,
 		"game_over": "",
@@ -1339,15 +1339,15 @@ func _gen_news() -> String:
 		0:
 			var c: Dictionary = state.clubs[keys[rng.randi_range(0, keys.size() - 1)]]
 			c["budget"] = int(float(c.budget) * 1.5)
-			return "%s krijgt een rijke investeerder: het transferbudget gaat flink omhoog." % c.name
+			return I18n.T("%s krijgt een rijke investeerder: het transferbudget gaat flink omhoog.") % c.name
 		1:
 			var c2: Dictionary = state.clubs[keys[rng.randi_range(0, keys.size() - 1)]]
 			c2["budget"] = int(float(c2.budget) * 0.7)
-			return "%s zit financieel krap en moet verkopen." % c2.name
+			return I18n.T("%s zit financieel krap en moet verkopen.") % c2.name
 		2:
-			return "Rustige zomer op de transfermarkt. Iedereen wacht op de eerste dominosteen."
+			return I18n.T("Rustige zomer op de transfermarkt. Iedereen wacht op de eerste dominosteen.")
 		_:
-			return "Een groot eindtoernooi komt eraan; spelers willen zich in de kijker spelen."
+			return I18n.T("Een groot eindtoernooi komt eraan; spelers willen zich in de kijker spelen.")
 
 
 # ---------------------------------------------------------------- save/load

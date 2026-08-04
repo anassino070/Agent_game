@@ -365,10 +365,10 @@ func _show_player_info(pid: String) -> void:
 		player_info_holder.remove_child(c)
 		c.queue_free()
 	var p: Dictionary = Game.state.players[pid]
-	var sub := "%s, %d jr" % [str(p.pos), int(p.age)]
+	var sub := T("%s, %d jr") % [str(p.pos), int(p.age)]
 	if pid in Game.state.clients:
-		sub += " · vertrouwen %d" % int(p.trust)
-	sub += " · waarde %s" % eur(Game.value(p))
+		sub += T(" · vertrouwen %d") % int(p.trust)
+	sub += T(" · waarde %s") % eur(Game.value(p))
 	player_info_holder.add_child(_player_card(pid, sub))
 
 
@@ -702,7 +702,7 @@ func show_dev_panel() -> void:
 	sep()
 	var won_ever := bool(Meta.state.get("has_won_ever", false))
 	lbl(T("Geheim kantoorniveau 6 (De Kampioenssuite): %s") % ("ontgrendeld" if won_ever else "nog vergrendeld"), 20)
-	btn(T("Zet uit (test)") if won_ever else "Forceer ontgrendeld (test)", func(): Meta.dev_toggle_won_ever(); show_dev_panel())
+	btn(T("Zet uit (test)") if won_ever else T("Forceer ontgrendeld (test)"), func(): Meta.dev_toggle_won_ever(); show_dev_panel())
 	sep()
 	btn(T("← Terug naar start"), func(): dev_unlocked = false; dev_confirm = false; show_start())
 
@@ -992,9 +992,9 @@ func show_prep() -> void:
 		# blijft wel zichtbaar (relevant voor tekengeld-timing), los van de
 		# clubnaam zelf. Compacte subregel: in een halve kolom is er geen ruimte
 		# voor een lange opsomming.
-		var sub := "%s, %d jr · vert. %d" % [str(p.pos), int(p.age), int(p.trust)]
+		var sub := T("%s, %d jr · vert. %d") % [str(p.pos), int(p.age), int(p.trust)]
 		if str(p.club) != "":
-			sub += " · %d jr contract" % int(p.contract)
+			sub += T(" · %d jr contract") % int(p.contract)
 		sub += "\n%s" % eur(Game.value(p))
 		_stat_card(cid, sub, false, stal_grid)
 	sep()
@@ -1008,10 +1008,10 @@ func show_prep() -> void:
 		var next_band: Dictionary = Game.OFFICE_LEVELS[Game.office_level()]
 		var cost := Game.office_upgrade_cost()
 		var l := lbl(T("Upgraden tilt je naar niveau %d: %s (spelers tot ~%d).") % [
-			Game.office_level() + 1, str(next_band.name), int(next_band.ceiling),
+			Game.office_level() + 1, T(str(next_band.name)), int(next_band.ceiling),
 		], 19)
 		l.add_theme_color_override("font_color", Color(0.8, 0.8, 0.85))
-		btn(T("Kantoor upgraden — %s (%s)") % [str(next_band.name), eur(cost)], _upgrade_office, Game.can_upgrade_office())
+		btn(T("Kantoor upgraden — %s (%s)") % [T(str(next_band.name)), eur(cost)], _upgrade_office, Game.can_upgrade_office())
 	else:
 		lbl(T("Hoogste niveau bereikt. Je onderhandelt tussen de miljardairs."), 20)
 	sep()
@@ -1042,7 +1042,7 @@ func show_prep() -> void:
 	content.add_child(deposit_btn)
 	sep()
 	var skip_release := Meta.perk_level("vaste_kern") > 0 or int(Game.state.season) == 1
-	btn(T("Naar scouting →") if skip_release else "Naar stalbeheer →", _goto_release)
+	btn(T("Naar scouting →") if skip_release else T("Naar stalbeheer →"), _goto_release)
 
 
 func _upgrade_office() -> void:
@@ -1104,7 +1104,7 @@ func show_release() -> void:
 	for cid in Game.state.clients:
 		var p: Dictionary = Game.state.players[cid]
 		var selected: bool = cid in release_selection
-		var sub := "%s, %d jr · vert. %d\n%s" % [
+		var sub := T("%s, %d jr · vert. %d\n%s") % [
 			str(p.pos), int(p.age), int(p.trust), eur(Game.value(p)),
 		]
 		var info := _stat_card(cid, sub, selected, rel_grid)
@@ -2167,7 +2167,7 @@ func show_poker() -> void:
 			_show_player_info(Game.last_new_client_id)
 		btn(T("Verder →"), _finish_poker)
 	else:
-		btn(T("Meegaan") if poker.to_call > 0 else "Checken", func(): _play_poker("meegaan"))
+		btn(T("Meegaan") if poker.to_call > 0 else T("Checken"), func(): _play_poker("meegaan"))
 		# Na een re-raise van de tegenstander mag je alleen nog meegaan of
 		# passen — geen re-re-raise, om het simpel en overzichtelijk te houden.
 		if not poker.awaiting_my_response:
@@ -2525,7 +2525,7 @@ func show_window() -> void:
 	for cid in Game.state.clients:
 		sep()
 		var p: Dictionary = Game.state.players[cid]
-		var contract_txt := "contract loopt af" if int(p.contract) <= 1 else "contract nog %d jaar" % int(p.contract)
+		var contract_txt := T("contract loopt af") if int(p.contract) <= 1 else T("contract nog %d jaar") % int(p.contract)
 		lbl(T("%s — rating %d, %s, waarde %s, %s") % [
 			p.name, int(p.rating), Game.club_name(str(p.club)), eur(Game.value(p)), contract_txt,
 		], 26)
