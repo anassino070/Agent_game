@@ -2053,7 +2053,7 @@ func show_press() -> void:
 		if press.has_momentum():
 			var mom_lbl := lbl(T("MOMENTUM: je volgende succesvolle antwoord telt +50%% zwaarder!"), 19)
 			mom_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
-		var q := lbl(press.current_question(), 26)
+		var q := lbl(T(press.current_question()), 26)
 		q.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
 		sep()
 		btn(T("Ontwijken — 'Daar ga ik nu niet op in.'"), func(): _play_press("ontwijken"))
@@ -2476,7 +2476,7 @@ func show_simon() -> void:
 		for i in range(simon.moves.size()):
 			var mv := i
 			var b := Button.new()
-			b.text = str(simon.moves[i])
+			b.text = T(str(simon.moves[i]))
 			b.add_theme_font_size_override("font_size", 24)
 			b.custom_minimum_size = Vector2(0, 68)
 			b.size_flags_horizontal = Control.SIZE_EXPAND_FILL

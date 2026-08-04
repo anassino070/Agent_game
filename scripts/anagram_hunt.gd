@@ -25,7 +25,7 @@ var log: Array = []
 
 
 func setup(rng: RandomNumberGenerator) -> void:
-	var pool: Array = WORD_BANK.duplicate()
+	var pool: Array = I18n.word_bank(WORD_BANK).duplicate()
 	for i in range(pool.size() - 1, 0, -1):
 		var j := rng.randi_range(0, i)
 		var tmp = pool[i]

@@ -72,7 +72,7 @@ func input_move(move_idx: int, rng: RandomNumberGenerator) -> bool:
 func sequence_text() -> String:
 	var parts: Array = []
 	for m in sequence:
-		parts.append(str(moves[int(m)]))
+		parts.append(I18n.T(str(moves[int(m)])))
 	return " → ".join(parts)
 
 
