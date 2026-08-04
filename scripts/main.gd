@@ -1512,7 +1512,7 @@ func _try_sign(pid: String) -> void:
 	# Feedback ná het herbouwen van het scherm (confetti/puff hangen aan de
 	# root, niet aan `content`, dus ze overleven de clear() in show_scouting()).
 	if signed:
-		_confetti("✔ %s tekent!" % p.name, Color(0.35, 0.9, 0.4))
+		_confetti(T("✔ %s tekent!") % p.name, Color(0.35, 0.9, 0.4))
 	else:
 		_small_negative_puff("✗ afgewezen")
 
@@ -2792,7 +2792,7 @@ func _play_favor_halve() -> void:
 const CONFETTI_EMOJI := ["🎉", "✨", "🎊", "⭐", "💰"]
 
 func _confetti_burst(combo_name: String) -> void:
-	_confetti("★ COMBO — %s! ★" % combo_name, Color(1.0, 0.85, 0.2))
+	_confetti(T("★ COMBO — %s! ★") % T(combo_name), Color(1.0, 0.85, 0.2))
 
 
 func _confetti(banner_text: String, banner_color: Color) -> void:

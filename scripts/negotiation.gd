@@ -276,7 +276,7 @@ func _check_combos() -> void:
 			resistance -= float(combo.bonus)
 			last_combo = str(combo.name)
 			var bonus_txt := str(int(combo.bonus)) if was_known else "?"
-			log.append(I18n.T("COMBO — %s! Extra weerstand -%s.") % [str(combo.name), bonus_txt])
+			log.append(I18n.T("COMBO — %s! Extra weerstand -%s.") % [I18n.T(str(combo.name)), bonus_txt])
 			if combo.has("req_pers") and not pers_known:
 				pers_known = true
 				log.append(I18n.T("…en nu weet je het zeker: %s") % I18n.T(str(PERS_INFO[pers])))

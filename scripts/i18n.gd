@@ -1231,4 +1231,5 @@ func _table_en() -> Dictionary:
 	d["%s wordt weggekaapt door %s. 'Zij beloven me meer.'"] = "%s is being poached by %s. 'They promise me more.'"
 	d["een rivaal"] = "a rival"
 	d["★ Kans op een NIEUWE CLIËNT"] = "★ Chance of a NEW CLIENT"
+	d["★ COMBO — %s! ★"] = "★ COMBO — %s! ★"
 	return d
