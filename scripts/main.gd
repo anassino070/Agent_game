@@ -247,6 +247,13 @@ func _go_home() -> void:
 
 # ---------------------------------------------------------------- helpers
 
+# Korte alias voor de vertaallaag. Vertaal ALTIJD vóór het interpoleren:
+#   goed:  lbl(T("Seizoen %d/%d") % [a, b])
+#   fout:  lbl(T("Seizoen %d/%d" % [a, b]))   <- zoekt een ingevulde string op
+func T(nl: String) -> String:
+	return I18n.T(nl)
+
+
 func clear() -> void:
 	for c in content.get_children():
 		c.queue_free()
@@ -469,32 +476,32 @@ func _discard_flash() -> void:
 func show_start() -> void:
 	clear()
 	home_btn.visible = false
-	header.text = "VOETBALMAKELAAR"
-	lbl("Van kelderkantoor naar superagent.", 34)
-	lbl("Overleef %d seizoenen. Ga niet failliet, houd je schandaalmeter onder de 100 en zorg dat je cliënten je niet verlaten." % Game.MAX_SEASONS, 26)
+	header.text = T("VOETBALMAKELAAR")
+	lbl(T("Van kelderkantoor naar superagent."), 34)
+	lbl(T("Overleef %d seizoenen. Ga niet failliet, houd je schandaalmeter onder de 100 en zorg dat je cliënten je niet verlaten.") % Game.MAX_SEASONS, 26)
 	sep()
-	lbl("LEGACY — %d runs gespeeld  |  beste run: %s (seizoen %d)  |  totale carrièrefees: %s" % [
+	lbl(T("LEGACY — %d runs gespeeld  |  beste run: %s (seizoen %d)  |  totale carrièrefees: %s") % [
 		int(Meta.state.runs_completed), eur(Meta.state.best_fees), int(Meta.state.best_season),
 		eur(Meta.state.total_career_fees),
 	], 21)
-	btn("Perkboom (%s legacy points te besteden) →" % _pts(Meta.state.legacy_points), show_perks)
+	btn(T("Perkboom (%s legacy points te besteden) →") % _pts(Meta.state.legacy_points), show_perks)
 	if Meta.has_pending_boost():
-		var boost_lbl := lbl("🚀 MEGA-BOOST KLAAR: je volgende nieuwe run start met dubbel startkapitaal, +25 reputatie, +1 gunst en +2 scoutpunten.", 21)
+		var boost_lbl := lbl(T("🚀 MEGA-BOOST KLAAR: je volgende nieuwe run start met dubbel startkapitaal, +25 reputatie, +1 gunst en +2 scoutpunten."), 21)
 		boost_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 	sep()
-	btn("NIEUWE RUN", _on_new_run)
+	btn(T("NIEUWE RUN"), _on_new_run)
 	if Game.has_save():
-		btn("Doorgaan met vorige run", _on_continue)
+		btn(T("Doorgaan met vorige run"), _on_continue)
 	if not Meta.state.hall_of_fame.is_empty():
 		sep()
-		lbl("🏆 HALL OF FAME", 26)
+		lbl(T("🏆 HALL OF FAME"), 26)
 		for entry in Meta.state.hall_of_fame:
 			var cname: String = str(entry.client_name)
-			lbl("  %s — %s (seizoen %d)" % [
-				cname if cname != "" else "Naamloze topper", eur(int(entry.total_fees)), int(entry.seasons),
+			lbl(T("  %s — %s (seizoen %d)") % [
+				cname if cname != "" else T("Naamloze topper"), eur(int(entry.total_fees)), int(entry.seasons),
 			], 20)
 	sep()
-	btn("⚙ Instellingen →", show_settings)
+	btn(T("⚙ Instellingen →"), show_settings)
 	var dev_tap := btn("v1.0", _on_dev_tap)
 	dev_tap.add_theme_font_size_override("font_size", 14)
 	dev_tap.modulate = Color(1, 1, 1, 0.25)
@@ -508,10 +515,10 @@ var settings_confirm := ""   # welke gevaarlijke actie op bevestiging wacht ("" 
 
 func _setting_toggle_btn(key: String, label: String, hint := "") -> void:
 	var on := bool(Meta.setting(key))
-	var b := btn("%s  —  %s" % [label, "AAN" if on else "UIT"], func(): _toggle_setting(key))
+	var b := btn(T("%s  —  %s") % [T(label), T("AAN") if on else T("UIT")], func(): _toggle_setting(key))
 	b.add_theme_color_override("font_color", Color(0.85, 0.95, 0.85) if on else Color(0.7, 0.7, 0.72))
 	if hint != "":
-		lbl("    " + hint, 18)
+		lbl("    " + T(hint), 18)
 
 
 func _toggle_setting(key: String) -> void:
@@ -526,17 +533,22 @@ func _toggle_setting(key: String) -> void:
 func show_settings() -> void:
 	clear()
 	home_btn.visible = false
-	header.text = "⚙ INSTELLINGEN"
-	lbl("Instellingen gelden voor alle runs en worden bewaard in je meta-save.", 20)
+	header.text = T("⚙ INSTELLINGEN")
+	lbl(T("Instellingen gelden voor alle runs en worden bewaard in je meta-save."), 20)
 	sep()
 
-	lbl("TAAL", 26)
-	lbl("Nederlands  (Engels volgt — nog niet beschikbaar)", 20)
-	var lang_btn := btn("English (nog niet beschikbaar)", func(): pass, false)
-	lang_btn.modulate = Color(1, 1, 1, 0.5)
+	lbl(T("TAAL"), 26)
+	lbl(T("Kies je taal. Ontbrekende vertalingen vallen terug op het Nederlands."), 20)
+	for code in I18n.LANGS:
+		var lc := str(code)
+		var active := I18n.lang() == lc
+		var lb := btn("%s%s" % [I18n.lang_name(lc), "  ✔" if active else ""],
+			func(): _set_lang(lc), not active)
+		if active:
+			lb.add_theme_color_override("font_disabled_color", Color(0.85, 0.95, 0.85))
 	sep()
 
-	lbl("WEERGAVE", 26)
+	lbl(T("WEERGAVE"), 26)
 	_setting_toggle_btn("confetti", "Confetti & animaties",
 		"Confetti bij een combo of geslaagde tekening, en het rode puffje bij een afwijzing.")
 	_setting_toggle_btn("office_bg", "Kantoor-achtergrond",
@@ -545,47 +557,59 @@ func show_settings() -> void:
 		"Het paneel met de spelerkaart bij events en minigames. Uit = meer schermruimte.")
 	sep()
 
-	lbl("PROGRESSIE", 26)
+	lbl(T("PROGRESSIE"), 26)
 	var spent := Meta.spent_points()
 	if spent > 0:
 		if settings_confirm == "perks":
-			lbl("Weet je het zeker? Alle perks (ook de ★-extra's) gaan naar 0; je krijgt %s punten terug." % _pts(spent), 21)
-			btn("JA — reset perkboom", _do_settings_reset_perks)
-			btn("Annuleer", func(): _set_settings_confirm(""))
+			lbl(T("Weet je het zeker? Alle perks (ook de ★-extra's) gaan naar 0; je krijgt %s punten terug.") % _pts(spent), 21)
+			btn(T("JA — reset perkboom"), _do_settings_reset_perks)
+			btn(T("Annuleer"), func(): _set_settings_confirm(""))
 		else:
-			btn("Reset perkboom (geeft %s punten terug)" % _pts(spent), func(): _set_settings_confirm("perks"))
+			btn(T("Reset perkboom (geeft %s punten terug)") % _pts(spent), func(): _set_settings_confirm("perks"))
 	else:
-		lbl("Perkboom: nog niets gekocht om te resetten.", 20)
+		lbl(T("Perkboom: nog niets gekocht om te resetten."), 20)
 	var stars := Meta.spent_stars()
 	if stars > 0:
 		if settings_confirm == "legacy":
-			lbl("Weet je het zeker? Al je Erfenis-perks gaan naar 0; je krijgt %d ster%s terug." % [stars, "" if stars == 1 else "ren"], 21)
-			btn("JA — reset Erfenis-perks", _do_settings_reset_legacy)
-			btn("Annuleer", func(): _set_settings_confirm(""))
+			lbl(T("Weet je het zeker? Al je Erfenis-perks gaan naar 0; je krijgt %d %s terug.") % [stars, _stars_word(stars)], 21)
+			btn(T("JA — reset Erfenis-perks"), _do_settings_reset_legacy)
+			btn(T("Annuleer"), func(): _set_settings_confirm(""))
 		else:
-			btn("Reset Erfenis-perks (geeft %d ster%s terug)" % [stars, "" if stars == 1 else "ren"], func(): _set_settings_confirm("legacy"))
+			btn(T("Reset Erfenis-perks (geeft %d %s terug)") % [stars, _stars_word(stars)], func(): _set_settings_confirm("legacy"))
 	sep()
 
-	lbl("OPSLAG", 26)
+	lbl(T("OPSLAG"), 26)
 	if Game.has_save():
 		if settings_confirm == "run":
-			lbl("Je huidige run wordt definitief verwijderd. Je legacy points en perks blijven staan.", 21)
-			btn("JA — verwijder huidige run", _do_settings_delete_run)
-			btn("Annuleer", func(): _set_settings_confirm(""))
+			lbl(T("Je huidige run wordt definitief verwijderd. Je legacy points en perks blijven staan."), 21)
+			btn(T("JA — verwijder huidige run"), _do_settings_delete_run)
+			btn(T("Annuleer"), func(): _set_settings_confirm(""))
 		else:
-			btn("Verwijder huidige run", func(): _set_settings_confirm("run"))
+			btn(T("Verwijder huidige run"), func(): _set_settings_confirm("run"))
 	else:
-		lbl("Geen lopende run opgeslagen.", 20)
+		lbl(T("Geen lopende run opgeslagen."), 20)
 	if settings_confirm == "all":
-		var warn := lbl("ALLES WISSEN: punten, perks, Erfenis-perks, sterren, ∞-upgrade, carrièrestats, Hall of Fame én de niveau-6-ontgrendeling. Dit kan NIET ongedaan worden gemaakt. Je instellingen blijven staan.", 21)
+		var warn := lbl(T("ALLES WISSEN: punten, perks, Erfenis-perks, sterren, ∞-upgrade, carrièrestats, Hall of Fame én de niveau-6-ontgrendeling. Dit kan NIET ongedaan worden gemaakt. Je instellingen blijven staan."), 21)
 		warn.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
-		btn("JA, WIS ALLES", _do_settings_wipe_all)
-		btn("Annuleer", func(): _set_settings_confirm(""))
+		btn(T("JA, WIS ALLES"), _do_settings_wipe_all)
+		btn(T("Annuleer"), func(): _set_settings_confirm(""))
 	else:
-		var wipe := btn("Alles wissen (volledige reset)", func(): _set_settings_confirm("all"))
+		var wipe := btn(T("Alles wissen (volledige reset)"), func(): _set_settings_confirm("all"))
 		wipe.add_theme_color_override("font_color", Color(1.0, 0.55, 0.5))
 	sep()
-	btn("← Terug", func(): _set_settings_confirm_and_go(""))
+	btn(T("← Terug"), func(): _set_settings_confirm_and_go(""))
+
+
+func _stars_word(n: int) -> String:
+	# Pluralisering met HELE woorden i.p.v. een aangeplakt achtervoegsel:
+	# "ster"/"ster+ren" werkt niet in andere talen ("star"+"ren" = "starren").
+	return T("ster") if n == 1 else T("sterren")
+
+
+func _set_lang(code: String) -> void:
+	Meta.set_setting("lang", code)
+	I18n.set_lang(code)
+	show_settings()
 
 
 func _set_settings_confirm(v: String) -> void:

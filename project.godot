@@ -22,6 +22,7 @@ config/features=PackedStringArray("4.7")
 
 Game="*res://scripts/game.gd"
 Meta="*res://scripts/meta.gd"
+I18n="*res://scripts/i18n.gd"
 
 [display]
 
