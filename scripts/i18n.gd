@@ -1225,4 +1225,10 @@ func _table_en() -> Dictionary:
 	d["   [CLIËNT]"] = "   [CLIENT]"
 	d["Ga naar event"] = "Go to event"
 	d["∞ ×%s\n+1%%\nkoop: %d pt"] = "∞ ×%s\n+1%%\nbuy: %d pt"
+	# ---- vertrek-nieuwsscherm ----
+	d["EEN CLIËNT"] = "A CLIENT"
+	d["%d CLIËNTEN"] = "%d CLIENTS"
+	d["%s wordt weggekaapt door %s. 'Zij beloven me meer.'"] = "%s is being poached by %s. 'They promise me more.'"
+	d["een rivaal"] = "a rival"
+	d["★ Kans op een NIEUWE CLIËNT"] = "★ Chance of a NEW CLIENT"
 	return d

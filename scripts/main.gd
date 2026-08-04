@@ -1585,7 +1585,7 @@ func show_event(ev: Dictionary) -> void:
 			suffix = "  (te weinig geld)"
 		if opt.has("req_favors") and int(Game.state.favors) < int(opt.req_favors):
 			enabled = false
-			suffix = "  (geen gunst beschikbaar)"
+			suffix = T("  (geen gunst beschikbaar)")
 		# Generieke vangnet bovenop req_money: nooit een optie kunnen kiezen die
 		# je gegarandeerd onder €0 zet (zie _option_certain_bankrupt()).
 		if enabled and _option_certain_bankrupt(opt):
@@ -1750,7 +1750,7 @@ func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: b
 	# uitkomst van een optie — anders lees je alleen "Reputatie -5" en mis
 	# je dat je hier een HELE NIEUWE CLIËNT kunt winnen.
 	if bool(effects.get("new_client", false)):
-		rows.append({"text": "★ Kans op een NIEUWE CLIËNT", "good": true})
+		rows.append({"text": T("★ Kans op een NIEUWE CLIËNT"), "good": true})
 	if bool(effects.get("new_top_client", false)):
 		rows.append({"text": T("★ Kans op een NIEUWE TOPSPELER als cliënt"), "good": true})
 	return rows
@@ -2094,7 +2094,7 @@ func show_tax() -> void:
 			var labels := ["Open aangeven", "Deels verhullen", "Volledig verhullen"]
 			var scaled_amount := int(round(float(post.amount) * Game.event_money_scale()))
 			lbl(T("%s (%s)  —  %s") % [str(post.name), eur(scaled_amount),
-				labels[chosen] if chosen >= 0 else "nog niet gekozen"], 24)
+				labels[chosen] if chosen >= 0 else T("nog niet gekozen")], 24)
 			for opt_i in range(3):
 				if opt_i != chosen:
 					var post_idx := i
@@ -2641,7 +2641,7 @@ func show_nego() -> void:
 			lbl(T("DEAL! Jouw fee: %s") % eur(int(nego.deal_value * nego.cut)), 30)
 			btn(T("Incasseren →"), func(): _close_nego(true))
 		else:
-			lbl(T("Geen deal.") + ("  De relatie heeft een deuk." if nego.walked else ""), 28)
+			lbl(T("Geen deal.") + (T("  De relatie heeft een deuk.") if nego.walked else ""), 28)
 			btn(T("Terug naar het window →"), func(): _close_nego(false))
 	else:
 		# Tactieken links, combo's rechts — twee kolommen naast elkaar. De
@@ -2999,7 +2999,7 @@ func show_departures_news(departures: Array, report: Array) -> void:
 	refresh_header()
 	clear()
 	var n := departures.size()
-	var title := lbl(T("💥 JE RAAKT %s KWIJT") % ("EEN CLIËNT" if n == 1 else "%d CLIËNTEN" % n), 38)
+	var title := lbl(T("💥 JE RAAKT %s KWIJT") % (T("EEN CLIËNT") if n == 1 else T("%d CLIËNTEN") % n), 38)
 	title.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
 	for entry in departures:
 		sep()
@@ -3008,7 +3008,7 @@ func show_departures_news(departures: Array, report: Array) -> void:
 		var trust := int(entry.get("trust", 0))
 		var line := ""
 		if reason == "poached":
-			line = "%s wordt weggekaapt door %s. 'Zij beloven me meer.'" % [nm, str(entry.get("rival", "een rivaal"))]
+			line = T("%s wordt weggekaapt door %s. 'Zij beloven me meer.'") % [nm, str(entry.get("rival", T("een rivaal")))]
 		else:
 			line = T("%s stapt zelf op. Het vertrouwen was op (%d).") % [nm, trust]
 		var l := lbl(line, 26)
