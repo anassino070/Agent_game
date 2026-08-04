@@ -72,16 +72,16 @@ func submit() -> void:
 
 
 func timeout() -> void:
-	log.append("Tijd is om! Het was %s." % str(current().answer))
+	log.append(I18n.T("Tijd is om! Het was %s.") % str(current().answer))
 	_advance(false, true)
 
 
 func _advance(correct: bool, was_timeout: bool) -> void:
 	if correct:
 		correct_count += 1
-		log.append("Juist! Het was %s." % str(current().answer))
+		log.append(I18n.T("Juist! Het was %s.") % str(current().answer))
 	elif not was_timeout:
-		log.append("Fout — het was %s." % str(current().answer))
+		log.append(I18n.T("Fout — het was %s.") % str(current().answer))
 	round_idx += 1
 	typed = ""
 	if round_idx >= rounds.size():

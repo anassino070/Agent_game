@@ -56,14 +56,14 @@ func input_move(move_idx: int, rng: RandomNumberGenerator) -> bool:
 	if int(sequence[player_progress]) != move_idx:
 		finished = true
 		failed = true
-		log.append("Fout bij stap %d. De reeks breekt af." % (player_progress + 1))
+		log.append(I18n.T("Fout bij stap %d. De reeks breekt af.") % (player_progress + 1))
 		return false
 	player_progress += 1
 	if player_progress >= sequence.size():
 		if round_num >= TARGET_ROUNDS:
 			finished = true
 			failed = false
-			log.append("Perfecte reeks van %d! Hij kent zijn praatjes nu uit zijn hoofd." % TARGET_ROUNDS)
+			log.append(I18n.T("Perfecte reeks van %d! Hij kent zijn praatjes nu uit zijn hoofd.") % TARGET_ROUNDS)
 		else:
 			_extend(rng)
 	return true

@@ -1633,7 +1633,7 @@ func _resolve(ev: Dictionary, opt: Dictionary) -> void:
 		else:
 			used = Game.scale_money_effects(opt.get("fail", {}))
 			notes = Game.apply_effects(used, str(ev.client_id))
-			txt = str(opt.get("fail_txt", "Het mislukt."))
+			txt = str(opt.get("fail_txt", I18n.T("Het mislukt.")))
 	else:
 		used = Game.scale_money_effects(opt.get("effects", {}))
 		notes = Game.apply_effects(used, str(ev.client_id))
@@ -2038,7 +2038,7 @@ func show_press() -> void:
 	sep()
 	if press.finished:
 		var o := press.outcome()
-		lbl(str(o.txt), 26)
+		lbl(T(str(o.txt)), 26)
 		_show_effect_lines(o.effects, str(Game.state.players[cid].name))
 		btn(T("Verder →"), func(): _finish_press(o))
 	else:
@@ -2047,9 +2047,9 @@ func show_press() -> void:
 		if press.is_final_question():
 			var final_lbl := lbl(T("⚡ SLOTVRAAG — dubbele inzet"), 22)
 			final_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
-		var j_lbl := lbl(T("%s %s") % [str(j.icon), str(j.name)], 24)
+		var j_lbl := lbl(T("%s %s") % [str(j.icon), I18n.T(str(j.name))], 24)
 		j_lbl.add_theme_color_override("font_color", Color(0.75, 0.82, 0.95))
-		lbl(str(j.hint), 19)
+		lbl(T(str(j.hint)), 19)
 		if press.has_momentum():
 			var mom_lbl := lbl(T("MOMENTUM: je volgende succesvolle antwoord telt +50%% zwaarder!"), 19)
 			mom_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
@@ -2159,7 +2159,7 @@ func show_poker() -> void:
 	if poker.finished:
 		lbl(T("Tegenstander had: %s") % poker.cards_text(poker.opp_hole), 22)
 		var o := poker.outcome()
-		lbl(str(o.txt), 26)
+		lbl(T(str(o.txt)), 26)
 		_show_effect_lines(o.effects)
 		for n in poker_notes:
 			lbl(T(">> ") + str(n), 24)
@@ -2222,7 +2222,7 @@ func show_dice() -> void:
 	sep()
 	if dice.finished:
 		var o := dice.outcome()
-		lbl(str(o.txt), 26)
+		lbl(T(str(o.txt)), 26)
 		_show_effect_lines(o.effects)
 		btn(T("Verder →"), func(): _finish_dice(o))
 	else:
@@ -2287,7 +2287,7 @@ func show_accounting() -> void:
 	sep()
 	if accounting.finished:
 		var o := accounting.outcome(Game.event_money_scale())
-		lbl(str(o.txt), 26)
+		lbl(T(str(o.txt)), 26)
 		_show_effect_lines(o.effects)
 		btn(T("Verder →"), func(): _finish_accounting(o))
 	else:
@@ -2356,7 +2356,7 @@ func show_anagram() -> void:
 		anagram_active = false
 		sep()
 		var o := anagram.outcome(Game.event_money_scale())
-		lbl(str(o.txt), 26)
+		lbl(T(str(o.txt)), 26)
 		_show_effect_lines(o.effects)
 		btn(T("Verder →"), func(): _finish_anagram(o))
 
@@ -2407,7 +2407,7 @@ func show_scoutdate() -> void:
 	sep()
 	if scoutdate.finished:
 		var o := scoutdate.outcome()
-		lbl(str(o.txt), 26)
+		lbl(T(str(o.txt)), 26)
 		_show_effect_lines(o.effects)
 		btn(T("Verder →"), func(): _finish_scoutdate(o))
 	else:
@@ -2455,7 +2455,7 @@ func show_simon() -> void:
 	sep()
 	if simon.finished:
 		var o := simon.outcome()
-		lbl(str(o.txt), 26)
+		lbl(T(str(o.txt)), 26)
 		_show_effect_lines(o.effects, str(Game.state.players[cid].name))
 		btn(T("Verder →"), func(): _finish_simon(o))
 	elif simon.phase == "show":
@@ -2558,7 +2558,7 @@ func show_window() -> void:
 				var c: Dictionary = Game.state.clubs[club_id]
 				var td_txt := str(c.td)
 				if Game.td_known(club_id):
-					td_txt += " — " + str(Negotiation.PERS_INFO[Game.td_personality(club_id)]).split(" — ")[0]
+					td_txt += " — " + I18n.T(str(Negotiation.PERS_INFO[Game.td_personality(club_id)])).split(" — ")[0]
 				btn(T("Onderhandel met %s (TD: %s)") % [c.name, td_txt], func(): _start_nego(cid, club_id))
 			if can_extend:
 				if high and not ints.is_empty():
@@ -2616,7 +2616,7 @@ func show_nego() -> void:
 	_set_turn_bar("Rondes:", nego.rounds_left, 5 + Meta.perk_level("reserves"))
 	lbl(T("Stemming: %s") % nego.mood_name(), 24)
 	if nego.pers_known:
-		lbl(T("Type: %s") % str(Negotiation.PERS_INFO[nego.pers]), 22)
+		lbl(T("Type: %s") % I18n.T(str(Negotiation.PERS_INFO[nego.pers])), 22)
 	else:
 		lbl(T("Type: onbekend — 'Aftasten' onthult het (blijft deze run bekend)."), 20)
 	if nego.has_flow():
@@ -2746,7 +2746,7 @@ func _show_combo_pattern_row(pattern: Array, reached: int) -> void:
 	content.add_child(row)
 	for i in range(pattern.size()):
 		var step_lbl := Label.new()
-		step_lbl.text = str(Negotiation.MOVE_LABELS.get(pattern[i], pattern[i]))
+		step_lbl.text = T(str(Negotiation.MOVE_LABELS.get(pattern[i], pattern[i])))
 		step_lbl.add_theme_font_size_override("font_size", 18)
 		var col := _combo_step_color(i, pattern.size()) if i < reached else COMBO_STEP_UNREACHED
 		step_lbl.add_theme_color_override("font_color", col)

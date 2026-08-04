@@ -65,22 +65,22 @@ func _score() -> void:
 			pair_count += 1
 	if max_count >= 5:
 		payout_mult = 10.0
-		log.append("VIJF GELIJKE OGEN! De bookmaker verbleekt.")
+		log.append(I18n.T("VIJF GELIJKE OGEN! De bookmaker verbleekt."))
 	elif max_count == 4:
 		payout_mult = 4.0
-		log.append("Vier gelijke ogen. Mooie klapper.")
+		log.append(I18n.T("Vier gelijke ogen. Mooie klapper."))
 	elif max_count == 3 and pair_count >= 2:
 		payout_mult = 3.0
-		log.append("Full house!")
+		log.append(I18n.T("Full house!"))
 	elif max_count == 3:
 		payout_mult = 1.5
-		log.append("Drie gelijke ogen.")
+		log.append(I18n.T("Drie gelijke ogen."))
 	elif pair_count >= 2:
 		payout_mult = 0.5
-		log.append("Twee paar — een schamele troostprijs.")
+		log.append(I18n.T("Twee paar — een schamele troostprijs."))
 	else:
 		payout_mult = -1.0
-		log.append("Niets. De bookmaker glimlacht breed.")
+		log.append(I18n.T("Niets. De bookmaker glimlacht breed."))
 
 
 func outcome() -> Dictionary:

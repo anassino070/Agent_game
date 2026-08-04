@@ -84,7 +84,7 @@ func setup(value: int, start_resistance: float, personality: String, known: bool
 
 
 func mood_name() -> String:
-	return MOODS[mood]
+	return I18n.T(MOODS[mood])
 
 
 func has_flow() -> bool:
@@ -204,8 +204,11 @@ func play(t: Dictionary, rng: RandomNumberGenerator) -> void:
 		last_failed_id = ""
 		rounds_left -= aftast_cost
 		pers_known = true
-		log.append("Je tast af (%d ronde%s). Deze TD is %s." % [
-			aftast_cost, "" if aftast_cost == 1 else "s", str(PERS_INFO[pers])])
+		# Pluralisering met hele woorden (zie i18n.gd): een achtervoegsel
+		# aanplakken werkt niet buiten het Nederlands.
+		var rw := I18n.T("ronde") if aftast_cost == 1 else I18n.T("rondes")
+		log.append(I18n.T("Je tast af (%d %s). Deze TD is %s.") % [
+			aftast_cost, rw, I18n.T(str(PERS_INFO[pers]))])
 		_check_end()
 		return
 
@@ -229,11 +232,11 @@ func play(t: Dictionary, rng: RandomNumberGenerator) -> void:
 		var drop_txt := str(int(drop)) if pers_known else "?"
 		if t.has("cut_cost"):
 			cut = maxf(cut - float(t.cut_cost), 0.04)
-			log.append("%s Weerstand -%s; jouw fee zakt naar %d%%." % [
-				str(t.get("ok_txt", "")), drop_txt, int(round(cut * 100))])
+			log.append(I18n.T("%s Weerstand -%s; jouw fee zakt naar %d%%.") % [
+				I18n.T(str(t.get("ok_txt", ""))), drop_txt, int(round(cut * 100))])
 		else:
-			log.append("%s Weerstand -%s.%s" % [
-				str(t.get("ok_txt", "Het werkt.")), drop_txt,
+			log.append(I18n.T("%s Weerstand -%s.%s") % [
+				I18n.T(str(t.get("ok_txt", "Het werkt."))), drop_txt,
 				("  (FLOW +%d%%)" % int(round((flow_mult - 1.0) * 100))) if flow else ""])
 		if counts_for_combo:
 			_check_combos()
@@ -245,11 +248,11 @@ func play(t: Dictionary, rng: RandomNumberGenerator) -> void:
 		success_run.clear()
 		resistance += float(t.get("fail_res", 0))
 		_shift_mood(int(t.get("mood_fail", 0)))
-		log.append(str(t.get("fail_txt", "Mislukt.")))
+		log.append(I18n.T(str(t.get("fail_txt", "Mislukt."))))
 		if float(t.get("walk_risk", 0.0)) > 0.0 and rng.randf() < float(t.walk_risk):
 			finished = true
 			walked = true
-			log.append("De TD is het zat en breekt het gesprek af.")
+			log.append(I18n.T("De TD is het zat en breekt het gesprek af."))
 			return
 	_check_end()
 
@@ -273,10 +276,10 @@ func _check_combos() -> void:
 			resistance -= float(combo.bonus)
 			last_combo = str(combo.name)
 			var bonus_txt := str(int(combo.bonus)) if was_known else "?"
-			log.append("COMBO — %s! Extra weerstand -%s." % [str(combo.name), bonus_txt])
+			log.append(I18n.T("COMBO — %s! Extra weerstand -%s.") % [str(combo.name), bonus_txt])
 			if combo.has("req_pers") and not pers_known:
 				pers_known = true
-				log.append("…en nu weet je het zeker: %s" % str(PERS_INFO[pers]))
+				log.append(I18n.T("…en nu weet je het zeker: %s") % I18n.T(str(PERS_INFO[pers])))
 
 
 # Hoeveel stappen van dit patroon je al hebt gezet, met de LOPENDE reeks als
@@ -299,7 +302,7 @@ func combo_progress(combo: Dictionary) -> int:
 func combo_pattern_text(combo: Dictionary) -> String:
 	var labels: Array = []
 	for id in combo.pattern:
-		labels.append(str(MOVE_LABELS.get(id, id)))
+		labels.append(I18n.T(str(MOVE_LABELS.get(id, id))))
 	return " → ".join(labels)
 
 
@@ -313,7 +316,7 @@ func use_favor_deal() -> void:
 	rounds_left -= 1
 	resistance = 0.0
 	streak += 1
-	log.append("Je zet een gunst in: een contact belt de TD persoonlijk. Hij zwicht op de plek.")
+	log.append(I18n.T("Je zet een gunst in: een contact belt de TD persoonlijk. Hij zwicht op de plek."))
 	_check_end()
 
 
@@ -322,7 +325,7 @@ func use_favor_deal() -> void:
 func raise_fee() -> void:
 	rounds_left -= 1
 	cut = minf(cut + RAISE_FEE_STEP, MAX_CUT)
-	log.append("Je onderhandelt een hoger percentage: jouw fee stijgt naar %d%%." % int(round(cut * 100)))
+	log.append(I18n.T("Je onderhandelt een hoger percentage: jouw fee stijgt naar %d%%.") % int(round(cut * 100)))
 	_check_end()
 
 
@@ -330,7 +333,7 @@ func _check_end() -> void:
 	if resistance <= 0.0:
 		finished = true
 		success = true
-		log.append("De TD steekt zijn hand uit. DEAL.")
+		log.append(I18n.T("De TD steekt zijn hand uit. DEAL."))
 	elif rounds_left <= 0:
 		finished = true
-		log.append("De tijd is om; de deal ketst af.")
+		log.append(I18n.T("De tijd is om; de deal ketst af."))

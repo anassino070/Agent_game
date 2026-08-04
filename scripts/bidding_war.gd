@@ -90,7 +90,7 @@ func setup(client_id_: String, candidate_ids: Array, base_value_: int, all_clubs
 	if clubs.is_empty():
 		finished = true
 		deal = false
-		log.append("Geen enkele club meldt zich. Loos alarm.")
+		log.append(I18n.T("Geen enkele club meldt zich. Loos alarm."))
 
 
 func active_clubs() -> Array:
@@ -146,7 +146,7 @@ func push_price(cid: String) -> void:
 	c["price"] = int(c.price) + gain
 	c["terms"] = clampi(int(c.terms) - int(p.terms_cost), 0, 100)
 	c["patience"] = int(c.patience) - 1
-	log.append("%s legt %s bij — maar snoeit in de voorwaarden (nu: %s)." % [
+	log.append(I18n.T("%s legt %s bij — maar snoeit in de voorwaarden (nu: %s).") % [
 		str(c.name), _eur(gain), terms_label(int(c.terms))])
 	_check_patience(c)
 	_check_end()
@@ -163,7 +163,7 @@ func push_terms(cid: String) -> void:
 	c["terms"] = clampi(int(c.terms) + int(p.terms_give), 0, 100)
 	c["price"] = maxi(int(c.price) - drop, 0)
 	c["patience"] = int(c.patience) - 1
-	log.append("%s verbetert de voorwaarden (nu: %s) — en haalt %s van de prijs af." % [
+	log.append(I18n.T("%s verbetert de voorwaarden (nu: %s) — en haalt %s van de prijs af.") % [
 		str(c.name), terms_label(int(c.terms)), _eur(drop)])
 	_check_patience(c)
 	_check_end()
@@ -189,11 +189,11 @@ func play_off(rng: RandomNumberGenerator) -> void:
 			if step > 0:
 				c["price"] = int(c.price) + step
 				moved = true
-				log.append("%s trekt bij tot %s." % [str(c.name), _eur(int(c.price))])
+				log.append(I18n.T("%s trekt bij tot %s.") % [str(c.name), _eur(int(c.price))])
 		c["patience"] = int(c.patience) - 1
 		_check_patience(c)
 	if not moved:
-		log.append("Niemand beweegt — ze kennen elkaars grenzen.")
+		log.append(I18n.T("Niemand beweegt — ze kennen elkaars grenzen."))
 	_check_end()
 
 
@@ -206,14 +206,14 @@ func accept(cid: String) -> void:
 	winner_id = str(c.id)
 	final_price = int(c.price)
 	final_terms = int(c.terms)
-	log.append("Je tekent bij %s: %s, voorwaarden %s." % [
+	log.append(I18n.T("Je tekent bij %s: %s, voorwaarden %s.") % [
 		str(c.name), _eur(final_price), terms_label(final_terms)])
 
 
 func _check_patience(c: Dictionary) -> void:
 	if int(c.patience) <= 0 and c.active:
 		c["active"] = false
-		log.append("%s is het zat en trekt zich terug." % str(c.name))
+		log.append(I18n.T("%s is het zat en trekt zich terug.") % str(c.name))
 
 
 func _check_end() -> void:
@@ -222,7 +222,7 @@ func _check_end() -> void:
 	if active_clubs().is_empty():
 		finished = true
 		deal = false
-		log.append("Alle clubs zijn afgehaakt. Geen deal.")
+		log.append(I18n.T("Alle clubs zijn afgehaakt. Geen deal."))
 		return
 	if rounds_left <= 0:
 		# Tijd om: je moet het hoogste bod nemen dat er nog ligt.
@@ -236,7 +236,7 @@ func _check_end() -> void:
 		winner_id = str(top.id)
 		final_price = int(top.price)
 		final_terms = int(top.terms)
-		log.append("De deadline verstrijkt; %s heeft het hoogste bod." % str(top.name))
+		log.append(I18n.T("De deadline verstrijkt; %s heeft het hoogste bod.") % str(top.name))
 
 
 # --- Uitkomst ---------------------------------------------------------------

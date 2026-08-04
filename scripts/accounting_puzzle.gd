@@ -97,13 +97,13 @@ func check() -> bool:
 	if ok:
 		finished = true
 		success = true
-		log.append("Perfect. Elke rij en kolom klopt.")
+		log.append(I18n.T("Perfect. Elke rij en kolom klopt."))
 	elif attempts_left <= 0:
 		finished = true
 		success = false
-		log.append("Het rooster klopt nog steeds niet — geen pogingen meer.")
+		log.append(I18n.T("Het rooster klopt nog steeds niet — geen pogingen meer."))
 	else:
-		log.append("Nog niet helemaal goed. Nog %d poging(en)." % attempts_left)
+		log.append(I18n.T("Nog niet helemaal goed. Nog %d poging(en).") % attempts_left)
 	return ok
 
 

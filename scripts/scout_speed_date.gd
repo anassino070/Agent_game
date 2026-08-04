@@ -43,10 +43,10 @@ func guess(scout_idx: int, talent_idx: int) -> bool:
 	var correct: bool = accepted[scout_idx].has(talent_idx)
 	if correct:
 		locked[scout_idx] = true
-		log.append("%s past bij %s! Vastgezet." % [SCOUTS[scout_idx], TALENTS[talent_idx]])
+		log.append(I18n.T("%s past bij %s! Vastgezet.") % [SCOUTS[scout_idx], TALENTS[talent_idx]])
 	else:
 		burned[scout_idx] = true
-		log.append("%s voelt zich verkeerd ingeschat en haakt af — niet meer beschikbaar." % SCOUTS[scout_idx])
+		log.append(I18n.T("%s voelt zich verkeerd ingeschat en haakt af — niet meer beschikbaar.") % SCOUTS[scout_idx])
 	_check_end()
 	return correct
 

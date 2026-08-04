@@ -43,7 +43,7 @@ func setup(rng: RandomNumberGenerator, money_scale: float = 1.0) -> void:
 	opp_stack -= ante
 	pot = ante * 2
 	to_call = 0
-	log.append("Inleg betaald door beide spelers. Pot: %s." % _eur(pot))
+	log.append(I18n.T("Inleg betaald door beide spelers. Pot: %s.") % _eur(pot))
 
 
 func _build_deck(rng: RandomNumberGenerator) -> void:
@@ -65,14 +65,14 @@ func play(action: String, rng: RandomNumberGenerator) -> void:
 		"passen":
 			folded_by_me = true
 			finished = true
-			log.append("Je legt je kaarten neer bij de %s." % street)
+			log.append(I18n.T("Je legt je kaarten neer bij de %s.") % street)
 			return
 		"meegaan":
 			var cost := mini(to_call, my_stack)
 			my_stack -= cost
 			pot += cost
 			to_call = 0
-			log.append("Je gaat mee. Pot: %s." % _eur(pot))
+			log.append(I18n.T("Je gaat mee. Pot: %s.") % _eur(pot))
 			if awaiting_my_response:
 				# Je hebt de re-raise van de tegenstander betaald — nu pas
 				# gaat de hand verder naar de volgende straat.
@@ -88,7 +88,7 @@ func play(action: String, rng: RandomNumberGenerator) -> void:
 			var cost := to_call + raise_amt
 			my_stack -= cost
 			pot += cost
-			log.append("Je verhoogt met %s." % _eur(raise_amt))
+			log.append(I18n.T("Je verhoogt met %s.") % _eur(raise_amt))
 			_opp_respond_to_raise(rng, raise_amt)
 			if finished or awaiting_my_response:
 				return
@@ -100,7 +100,7 @@ func _opp_respond_to_raise(rng: RandomNumberGenerator, raise_amt: int) -> void:
 	if strength < 0.3 and rng.randf() < 0.55:
 		folded_by_opp = true
 		finished = true
-		log.append("De tegenstander legt zich neer voor jouw verhoging!")
+		log.append(I18n.T("De tegenstander legt zich neer voor jouw verhoging!"))
 		return
 	# Bij een sterke hand vecht hij soms terug met een RE-RAISE i.p.v. gewoon
 	# mee te gaan — zo is verhogen geen gratis winst: een sterke tegenstander
@@ -112,13 +112,13 @@ func _opp_respond_to_raise(rng: RandomNumberGenerator, raise_amt: int) -> void:
 		pot += re_raise
 		to_call = re_raise
 		awaiting_my_response = true
-		log.append("De tegenstander re-raist met %s! Wat doe jij?" % _eur(re_raise))
+		log.append(I18n.T("De tegenstander re-raist met %s! Wat doe jij?") % _eur(re_raise))
 		return
 	var cost := mini(raise_amt, opp_stack)
 	opp_stack -= cost
 	pot += cost
 	to_call = 0
-	log.append("De tegenstander betaalt mee.")
+	log.append(I18n.T("De tegenstander betaalt mee."))
 
 
 func _advance_street(rng: RandomNumberGenerator) -> void:
@@ -130,15 +130,15 @@ func _advance_street(rng: RandomNumberGenerator) -> void:
 			community.append(deck.pop_back())
 			community.append(deck.pop_back())
 			street = "flop"
-			log.append("FLOP: %s" % cards_text(community))
+			log.append(I18n.T("FLOP: %s") % cards_text(community))
 		"flop":
 			community.append(deck.pop_back())
 			street = "turn"
-			log.append("TURN: %s" % cards_text(community))
+			log.append(I18n.T("TURN: %s") % cards_text(community))
 		"turn":
 			community.append(deck.pop_back())
 			street = "river"
-			log.append("RIVER: %s" % cards_text(community))
+			log.append(I18n.T("RIVER: %s") % cards_text(community))
 		"river":
 			finished = true
 			street = "showdown"
@@ -149,7 +149,7 @@ func _advance_street(rng: RandomNumberGenerator) -> void:
 		opp_stack -= bet
 		pot += bet
 		to_call = bet
-		log.append("De tegenstander opent met een inzet van %s." % _eur(bet))
+		log.append(I18n.T("De tegenstander opent met een inzet van %s.") % _eur(bet))
 	else:
 		to_call = 0
 
@@ -189,15 +189,15 @@ func outcome() -> Dictionary:
 	if cmp > 0:
 		var net := (my_stack + pot) - starting_stack
 		return {"effects": {"money": net, "new_client": true},
-			"txt": "Showdown! Jij wint met %s tegen %s — de pot (%s) én het talent zijn voor jou." % [HAND_NAMES[my_best[0]], HAND_NAMES[opp_best[0]], _eur(pot)]}
+			"txt": "Showdown! Jij wint met %s tegen %s — de pot (%s) én het talent zijn voor jou." % [I18n.T(HAND_NAMES[my_best[0]]), I18n.T(HAND_NAMES[opp_best[0]]), _eur(pot)]}
 	elif cmp < 0:
 		var net := my_stack - starting_stack
 		return {"effects": {"money": net},
-			"txt": "Showdown! De tegenstander wint met %s tegen jouw %s. Verlies: %s." % [HAND_NAMES[opp_best[0]], HAND_NAMES[my_best[0]], _eur(-net)]}
+			"txt": "Showdown! De tegenstander wint met %s tegen jouw %s. Verlies: %s." % [I18n.T(HAND_NAMES[opp_best[0]]), I18n.T(HAND_NAMES[my_best[0]]), _eur(-net)]}
 	else:
 		var net := (my_stack + int(pot / 2)) - starting_stack
 		return {"effects": {"money": net},
-			"txt": "Showdown! Gelijkspel (beiden %s). De pot wordt gedeeld." % HAND_NAMES[my_best[0]]}
+			"txt": "Showdown! Gelijkspel (beiden %s). De pot wordt gedeeld." % I18n.T(HAND_NAMES[my_best[0]])}
 
 
 # ---------------------------------------------------------------- weergave

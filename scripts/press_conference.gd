@@ -139,8 +139,8 @@ func has_momentum() -> bool:
 func play(action: String, rng: RandomNumberGenerator) -> void:
 	var jid := current_journalist()
 	var j: Dictionary = JOURNALISTS[jid]
-	log.append("%s vraagt: %s" % [str(j.icon), current_question()])
-	log.append("Jouw antwoord: %s" % str(RESPONSES.get(action, "...")))
+	log.append(I18n.T("%s vraagt: %s") % [str(j.icon), current_question()])
+	log.append(I18n.T("Jouw antwoord: %s") % I18n.T(str(RESPONSES.get(action, "..."))))
 	var payoff: Dictionary = PAYOFFS[jid][action]
 	# De Slotvraag (laatste ronde) heeft dubbele inzet — een climax i.p.v.
 	# gewoon nog een ronde.
@@ -150,18 +150,18 @@ func play(action: String, rng: RandomNumberGenerator) -> void:
 		var delta := float(payoff.ok) * stakes * (1.5 if momentum else 1.0)
 		sympathy = clampf(sympathy + delta, 0.0, 100.0)
 		streak += 1
-		log.append("%s%s" % [str(payoff.ok_txt), "  (MOMENTUM +50%%)" if momentum else ""])
+		log.append(I18n.T("%s%s") % [I18n.T(str(payoff.ok_txt)), I18n.T("  (MOMENTUM +50%%)") if momentum else ""])
 	else:
 		var delta := float(payoff.fail) * stakes
 		sympathy = clampf(sympathy + delta, 0.0, 100.0)
 		streak = 0
-		log.append(str(payoff.fail_txt))
+		log.append(I18n.T(str(payoff.fail_txt)))
 	questions_left -= 1
 	question_idx += 1
 	if sympathy <= 0.0:
 		finished = true
 		blew_up = true
-		log.append("De zaal ontploft. Dit wordt het nieuws van morgen.")
+		log.append(I18n.T("De zaal ontploft. Dit wordt het nieuws van morgen."))
 	elif questions_left <= 0:
 		finished = true
 
