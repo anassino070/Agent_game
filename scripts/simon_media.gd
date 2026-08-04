@@ -79,6 +79,6 @@ func sequence_text() -> String:
 func outcome() -> Dictionary:
 	if failed:
 		return {"effects": {},
-			"txt": "Bij reeks %d ging het mis. Nog niet klaar voor prime time — maar geen schade." % round_num}
+			"txt": I18n.T("Bij reeks %d ging het mis. Nog niet klaar voor prime time — maar geen schade.") % round_num}
 	return {"effects": {"trust": 10, "scandal": -8},
 		"txt": "Vlekkeloos! Hij is voortaan een stuk persvaardiger — de schandaalmeter zakt meteen wat."}

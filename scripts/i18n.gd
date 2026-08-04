@@ -1232,4 +1232,8 @@ func _table_en() -> Dictionary:
 	d["een rivaal"] = "a rival"
 	d["★ Kans op een NIEUWE CLIËNT"] = "★ Chance of a NEW CLIENT"
 	d["★ COMBO — %s! ★"] = "★ COMBO — %s! ★"
+	d["Buitenlandse rekening"] = "Foreign account"
+	d["Contante betalingen"] = "Cash payments"
+	d["Overige aftrekposten"] = "Other deductions"
+	d["   |   Reeks %d/%d"] = "   |   Sequence %d/%d"
 	return d

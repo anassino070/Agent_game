@@ -133,7 +133,7 @@ func outcome(money_scale: float = 1.0) -> Dictionary:
 		# maar 3 controles).
 		var savings := int(round(15000.0 * money_scale))
 		return {"effects": {"money": savings},
-			"txt": "Het rooster klopt helemaal. Legale besparing: %s." % _eur(savings)}
+			"txt": I18n.T("Het rooster klopt helemaal. Legale besparing: %s.") % _eur(savings)}
 	return {"effects": {},
 		"txt": "Geen besparing dit keer — maar ook geen enkel risico gelopen."}
 

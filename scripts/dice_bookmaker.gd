@@ -91,9 +91,9 @@ func outcome() -> Dictionary:
 	if payout_mult > 0.0:
 		var bonus_txt := ("  (+%d%% bonus voor vroeg stoppen)" % int(round((stop_bonus - 1.0) * 100))) if stop_bonus > 1.0 else ""
 		return {"effects": {"money": delta},
-			"txt": "Uitbetaling op je inzet van %s: %s.%s" % [_eur(stake), _eur(delta), bonus_txt]}
+			"txt": I18n.T("Uitbetaling op je inzet van %s: %s.%s") % [_eur(stake), _eur(delta), bonus_txt]}
 	return {"effects": {"money": -stake},
-		"txt": "Verloren: %s." % _eur(-stake)}
+		"txt": I18n.T("Verloren: %s.") % _eur(-stake)}
 
 
 func _eur(n: int) -> String:

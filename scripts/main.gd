@@ -2093,7 +2093,7 @@ func show_tax() -> void:
 			var chosen := int(tax.choices[i])
 			var labels := ["Open aangeven", "Deels verhullen", "Volledig verhullen"]
 			var scaled_amount := int(round(float(post.amount) * Game.event_money_scale()))
-			lbl(T("%s (%s)  —  %s") % [str(post.name), eur(scaled_amount),
+			lbl(T("%s (%s)  —  %s") % [T(str(post.name)), eur(scaled_amount),
 				labels[chosen] if chosen >= 0 else T("nog niet gekozen")], 24)
 			for opt_i in range(3):
 				if opt_i != chosen:
@@ -2457,7 +2457,7 @@ func show_simon() -> void:
 	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
 	lbl(T("MEDIATRAINING: SIMON SAYS"), 32)
-	_name_row("", cid, "   |   Reeks %d/%d" % [simon.round_num, SimonMedia.TARGET_ROUNDS], 24)
+	_name_row("", cid, T("   |   Reeks %d/%d") % [simon.round_num, SimonMedia.TARGET_ROUNDS], 24)
 	sep()
 	if simon.finished:
 		var o := simon.outcome()

@@ -178,11 +178,11 @@ func outcome() -> Dictionary:
 	if folded_by_me:
 		var net := my_stack - starting_stack
 		return {"effects": {"money": net},
-			"txt": "Je legt je kaarten neer bij de %s. Verlies: %s." % [street, _eur(-net)]}
+			"txt": I18n.T("Je legt je kaarten neer bij de %s. Verlies: %s.") % [street, _eur(-net)]}
 	if folded_by_opp:
 		var net := (my_stack + pot) - starting_stack
 		return {"effects": {"money": net, "new_client": true},
-			"txt": "De tegenstander legt zich neer! Jij incasseert de pot (%s) én wint de rechten op het talent." % _eur(pot)}
+			"txt": I18n.T("De tegenstander legt zich neer! Jij incasseert de pot (%s) én wint de rechten op het talent.") % _eur(pot)}
 	var my_best: Array = best_hand(my_hole + community)
 	var opp_best: Array = best_hand(opp_hole + community)
 	var cmp := compare_scores(my_best, opp_best)
