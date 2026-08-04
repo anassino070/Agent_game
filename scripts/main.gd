@@ -1553,12 +1553,12 @@ func show_event(ev: Dictionary) -> void:
 	var cname := ""
 	if str(ev.client_id) != "":
 		cname = str(Game.state.players[ev.client_id].name)
-	lbl(T("EVENT: %s") % str(ev.title), 32)
+	lbl(T("EVENT: %s") % T(str(ev.title)), 32)
 	# Events met een concreet geldbedrag in hun flavor-tekst gebruiken een
 	# "amount"-key (ongeschaalde basiswaarde) i.p.v. het bedrag hard te coderen
 	# — anders klopt de tekst na seizoen 1 niet meer met het WERKELIJK
 	# geschaalde effect (Game.event_money_scale()).
-	var text := str(ev.text)
+	var text := T(str(ev.text))
 	if ev.has("amount"):
 		text = text.replace("{amount}", eur(int(round(float(ev.amount) * Game.event_money_scale()))))
 	if str(ev.client_id) != "":
@@ -1588,7 +1588,7 @@ func show_event(ev: Dictionary) -> void:
 			suffix = "  (te weinig geld)"
 		if enabled:
 			any_enabled = true
-		var label := str(opt.label)
+		var label := T(str(opt.label))
 		if opt.has("chance"):
 			# Geluksvogel-perk telt mee in de getoonde én de echte kans.
 			var shown := clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98)
@@ -1629,15 +1629,15 @@ func _resolve(ev: Dictionary, opt: Dictionary) -> void:
 		if Game.rng.randf() < clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98):
 			used = Game.scale_money_effects(opt.get("success", {}))
 			notes = Game.apply_effects(used, str(ev.client_id))
-			txt = str(opt.get("success_txt", "Het pakt goed uit."))
+			txt = T(str(opt.get("success_txt", "Het pakt goed uit.")))
 		else:
 			used = Game.scale_money_effects(opt.get("fail", {}))
 			notes = Game.apply_effects(used, str(ev.client_id))
-			txt = str(opt.get("fail_txt", I18n.T("Het mislukt.")))
+			txt = T(str(opt.get("fail_txt", "Het mislukt.")))
 	else:
 		used = Game.scale_money_effects(opt.get("effects", {}))
 		notes = Game.apply_effects(used, str(ev.client_id))
-		txt = str(opt.get("txt", "Gedaan."))
+		txt = T(str(opt.get("txt", "Gedaan.")))
 	refresh_header()
 	clear()
 	lbl(T("UITKOMST"), 32)
