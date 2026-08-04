@@ -412,7 +412,7 @@ func _name_row(before: String, pid: String, after: String, size := 24) -> void:
 
 func refresh_header() -> void:
 	var s: Dictionary = Game.state
-	header.text = "Seizoen %d/%d  |  %s  |  Rep %d  |  Schandaal %d  |  [color=#ffd633]Gunsten %d[/color]  |  Stal %d/%d  |  🏢 Nv.%d %s" % [
+	header.text = T("Seizoen %d/%d  |  %s  |  Rep %d  |  Schandaal %d  |  [color=#ffd633]Gunsten %d[/color]  |  Stal %d/%d  |  🏢 Nv.%d %s") % [
 		int(s.season), Game.MAX_SEASONS, eur(s.money),
 		int(s.rep), int(s.scandal), int(s.favors),
 		s.clients.size(), Game.client_cap(),
@@ -455,10 +455,10 @@ func _update_office_background() -> void:
 
 func show_flash() -> void:
 	if flash != "":
-		var l := lbl(">> " + flash, 24)
+		var l := lbl(T(">> ") + flash, 24)
 		if flash_color != null:
 			l.add_theme_color_override("font_color", flash_color as Color)
-		flash = ""
+		flash = T("")
 		flash_color = null
 
 
@@ -467,7 +467,7 @@ func _discard_flash() -> void:
 	# is al zichtbaar via de bijgewerkte staat zelf): leegt flash zonder 'm te
 	# tonen, zodat een oude melding niet alsnog opduikt zodra je naar een
 	# scherm gaat dat wél show_flash() aanroept.
-	flash = ""
+	flash = T("")
 	flash_color = null
 
 
@@ -502,7 +502,7 @@ func show_start() -> void:
 			], 20)
 	sep()
 	btn(T("⚙ Instellingen →"), show_settings)
-	var dev_tap := btn("v1.0", _on_dev_tap)
+	var dev_tap := btn(T("v1.0"), _on_dev_tap)
 	dev_tap.add_theme_font_size_override("font_size", 14)
 	dev_tap.modulate = Color(1, 1, 1, 0.25)
 	dev_tap.custom_minimum_size = Vector2(0, 36)
@@ -518,7 +518,7 @@ func _setting_toggle_btn(key: String, label: String, hint := "") -> void:
 	var b := btn(T("%s  —  %s") % [T(label), T("AAN") if on else T("UIT")], func(): _toggle_setting(key))
 	b.add_theme_color_override("font_color", Color(0.85, 0.95, 0.85) if on else Color(0.7, 0.7, 0.72))
 	if hint != "":
-		lbl("    " + T(hint), 18)
+		lbl(T("    ") + T(hint), 18)
 
 
 func _toggle_setting(key: String) -> void:
@@ -542,7 +542,7 @@ func show_settings() -> void:
 	for code in I18n.LANGS:
 		var lc := str(code)
 		var active := I18n.lang() == lc
-		var lb := btn("%s%s" % [I18n.lang_name(lc), "  ✔" if active else ""],
+		var lb := btn(T("%s%s") % [I18n.lang_name(lc), "  ✔" if active else ""],
 			func(): _set_lang(lc), not active)
 		if active:
 			lb.add_theme_color_override("font_disabled_color", Color(0.85, 0.95, 0.85))
@@ -606,6 +606,10 @@ func _stars_word(n: int) -> String:
 	return T("ster") if n == 1 else T("sterren")
 
 
+func _rounds_word(n: int) -> String:
+	return T("ronde") if n == 1 else T("rondes")
+
+
 func _set_lang(code: String) -> void:
 	Meta.set_setting("lang", code)
 	I18n.set_lang(code)
@@ -654,18 +658,18 @@ func _on_dev_tap() -> void:
 
 func _show_dev_login(error := "") -> void:
 	clear()
-	header.text = "DEVELOPER"
+	header.text = T("DEVELOPER")
 	if error != "":
 		var e := lbl(error, 20)
 		e.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
-	lbl("Voer het developer-wachtwoord in.", 22)
+	lbl(T("Voer het developer-wachtwoord in."), 22)
 	var input := LineEdit.new()
 	input.placeholder_text = "wachtwoord"
 	input.secret = true
 	input.custom_minimum_size = Vector2(0, 56)
 	content.add_child(input)
-	btn("Bevestigen", func(): _check_dev_password(input.text))
-	btn("← Terug", show_start)
+	btn(T("Bevestigen"), func(): _check_dev_password(input.text))
+	btn(T("← Terug"), show_start)
 
 
 func _check_dev_password(pw: String) -> void:
@@ -682,25 +686,25 @@ func show_dev_panel() -> void:
 		show_start()
 		return
 	clear()
-	header.text = "DEVELOPER — puntenbeheer"
-	lbl("Huidig puntensaldo: %s legacy points." % _pts(Meta.state.legacy_points), 26)
-	lbl("Dit wist alleen het saldo, niet de gekochte perk-niveaus (gebruik daarvoor 'Reset perkboom' in ⚙ Instellingen).", 20)
+	header.text = T("DEVELOPER — puntenbeheer")
+	lbl(T("Huidig puntensaldo: %s legacy points.") % _pts(Meta.state.legacy_points), 26)
+	lbl(T("Dit wist alleen het saldo, niet de gekochte perk-niveaus (gebruik daarvoor 'Reset perkboom' in ⚙ Instellingen)."), 20)
 	sep()
 	if dev_confirm:
-		lbl("Weet je het zeker? Het puntensaldo gaat naar 0 en dit kan niet ongedaan worden.", 22)
-		btn("JA — wis puntensaldo", _do_dev_wipe)
-		btn("Annuleer", func(): dev_confirm = false; show_dev_panel())
+		lbl(T("Weet je het zeker? Het puntensaldo gaat naar 0 en dit kan niet ongedaan worden."), 22)
+		btn(T("JA — wis puntensaldo"), _do_dev_wipe)
+		btn(T("Annuleer"), func(): dev_confirm = false; show_dev_panel())
 	else:
-		btn("Wis alle punten (naar 0)", func(): dev_confirm = true; show_dev_panel())
+		btn(T("Wis alle punten (naar 0)"), func(): dev_confirm = true; show_dev_panel())
 	sep()
-	lbl("Testmodus: doorloopt ALLE %d events op volgorde, met onbeperkt geld en zonder fail-checks. Start een verse testrun in het geheugen — je opgeslagen run blijft veilig op schijf." % EventsDB.get_events().size(), 20)
-	btn("Test: doorloop alle events →", _start_event_test)
+	lbl(T("Testmodus: doorloopt ALLE %d events op volgorde, met onbeperkt geld en zonder fail-checks. Start een verse testrun in het geheugen — je opgeslagen run blijft veilig op schijf.") % EventsDB.get_events().size(), 20)
+	btn(T("Test: doorloop alle events →"), _start_event_test)
 	sep()
 	var won_ever := bool(Meta.state.get("has_won_ever", false))
-	lbl("Geheim kantoorniveau 6 (De Kampioenssuite): %s" % ("ontgrendeld" if won_ever else "nog vergrendeld"), 20)
-	btn("Zet uit (test)" if won_ever else "Forceer ontgrendeld (test)", func(): Meta.dev_toggle_won_ever(); show_dev_panel())
+	lbl(T("Geheim kantoorniveau 6 (De Kampioenssuite): %s") % ("ontgrendeld" if won_ever else "nog vergrendeld"), 20)
+	btn(T("Zet uit (test)") if won_ever else "Forceer ontgrendeld (test)", func(): Meta.dev_toggle_won_ever(); show_dev_panel())
 	sep()
-	btn("← Terug naar start", func(): dev_unlocked = false; dev_confirm = false; show_start())
+	btn(T("← Terug naar start"), func(): dev_unlocked = false; dev_confirm = false; show_start())
 
 
 func _do_dev_wipe() -> void:
@@ -714,7 +718,7 @@ func _do_dev_wipe() -> void:
 func _dev_test_banner() -> void:
 	if not dev_test_mode:
 		return
-	var l := lbl("[DEV TEST] Event %d/%d — id: %s" % [dev_test_index, dev_test_total, str(mg_ev.get("id", "?"))], 18)
+	var l := lbl(T("[DEV TEST] Event %d/%d — id: %s") % [dev_test_index, dev_test_total, str(mg_ev.get("id", "?"))], 18)
 	l.add_theme_color_override("font_color", Color(1.0, 0.6, 0.2))
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 8)
@@ -781,7 +785,7 @@ func _dev_cleanup_minigames() -> void:
 
 func _finish_event_test() -> void:
 	dev_test_mode = false
-	flash = "Testrun klaar: alle %d events doorlopen." % dev_test_total
+	flash = T("Testrun klaar: alle %d events doorlopen.") % dev_test_total
 	show_dev_panel()
 
 
@@ -791,19 +795,19 @@ func show_perks() -> void:
 	clear()
 	_refresh_inf_btn()
 	inf_btn.visible = true
-	header.text = "PERKBOOM — %s legacy points" % _pts(Meta.state.legacy_points)
-	lbl("Boom voltooid: %s%%  (%s van %s punten)" % [
+	header.text = T("PERKBOOM — %s legacy points") % _pts(Meta.state.legacy_points)
+	lbl(T("Boom voltooid: %s%%  (%s van %s punten)") % [
 		("%.1f" % (Meta.tree_progress() * 100.0)).replace(".", ","),
 		_pts(Meta.tree_spent()), _pts(Meta.tree_total_cost()),
 	], 26)
-	lbl("Permanente upgrades voor elke volgende run. Je verdient legacy points door te spelen — hoe verder je komt, hoe exponentieel meer (een gewonnen run = 1%% van de boom). Elke rij biedt 3 opties; koop %d niveaus in een rij om de rij eronder te ontgrendelen (of alles wat die rij te bieden heeft, als dat er minder zijn)." % Meta.TIER_REQ, 22)
+	lbl(T("Permanente upgrades voor elke volgende run. Je verdient legacy points door te spelen — hoe verder je komt, hoe exponentieel meer (een gewonnen run = 1%% van de boom). Elke rij biedt 3 opties; koop %d niveaus in een rij om de rij eronder te ontgrendelen (of alles wat die rij te bieden heeft, als dat er minder zijn).") % Meta.TIER_REQ, 22)
 	for branch in Meta.TREE:
 		sep()
-		lbl("◆ TAK: %s" % str(branch.name), 30)
+		lbl(T("◆ TAK: %s") % str(branch.name), 30)
 		for tier_idx in range(branch.tiers.size()):
 			var unlocked: bool = Meta.tier_unlocked(branch, tier_idx)
 			if unlocked:
-				lbl("— Rij %d —" % (tier_idx + 1), 22)
+				lbl(T("— Rij %d —") % (tier_idx + 1), 22)
 				for id in branch.tiers[tier_idx]:
 					_perk_node(str(id))
 			else:
@@ -813,37 +817,38 @@ func show_perks() -> void:
 				# De échte eis opvragen i.p.v. de kale TIER_REQ: in een rij met
 				# minder dan 5 koopbare niveaus is de eis lager (zie
 				# Meta.tier_req_for()), en dan moet de melding dat ook zeggen.
-				lbl("🔒 Rij %d (%s) — vereist %d niveaus in rij %d (nu %d)." % [
+				lbl(T("🔒 Rij %d (%s) — vereist %d niveaus in rij %d (nu %d).") % [
 					tier_idx + 1, ", ".join(names),
 					Meta.tier_req_for(branch, tier_idx - 1), tier_idx,
 					Meta.tier_levels(branch, tier_idx - 1),
 				], 20)
 	sep()
-	lbl("★ OVERPOWERED — extra's buiten de boom (tellen niet mee voor de 100%)", 26)
+	lbl(T("★ OVERPOWERED — extra's buiten de boom (tellen niet mee voor de 100%)"), 26)
 	for id in Meta.OP_PERKS:
 		_perk_node(str(id))
 	sep()
-	lbl("✦ ERFENIS-PERKS — %d Prestige-ster%s" % [int(Meta.state.prestige_stars), "" if int(Meta.state.prestige_stars) == 1 else "ren"], 26)
-	lbl("Bonussen die je NOOIT met gewone legacy points kunt kopen — alleen met Prestige-sterren. Die krijg je door te prestigen: je hele perkboom resetten NA een gewonnen run, zonder puntenrefund.", 20)
+	var pstars := int(Meta.state.prestige_stars)
+	lbl(T("✦ ERFENIS-PERKS — %d Prestige-%s") % [pstars, _stars_word(pstars)], 26)
+	lbl(T("Bonussen die je NOOIT met gewone legacy points kunt kopen — alleen met Prestige-sterren. Die krijg je door te prestigen: je hele perkboom resetten NA een gewonnen run, zonder puntenrefund."), 20)
 	for id in Meta.LEGACY_PERKS:
 		_legacy_perk_node(str(id))
 	if Meta.can_prestige():
 		if confirm_prestige:
-			lbl("Weet je het zeker? Je hele perkboom (%s punten aan niveaus) gaat naar 0 — GEEN refund — in ruil voor 1 Prestige-ster." % _pts(Meta.spent_points()), 22)
-			btn("JA — prestige nu", _do_prestige)
-			btn("Annuleer", func(): _set_confirm_prestige(false))
+			lbl(T("Weet je het zeker? Je hele perkboom (%s punten aan niveaus) gaat naar 0 — GEEN refund — in ruil voor 1 Prestige-ster.") % _pts(Meta.spent_points()), 22)
+			btn(T("JA — prestige nu"), _do_prestige)
+			btn(T("Annuleer"), func(): _set_confirm_prestige(false))
 		else:
-			btn("✦ Prestige (perkboom weg, +1 Prestige-ster)", func(): _set_confirm_prestige(true))
+			btn(T("✦ Prestige (perkboom weg, +1 Prestige-ster)"), func(): _set_confirm_prestige(true))
 	else:
-		lbl("Prestigen kan pas vanaf %s%% boomvoortgang (nu %s%%) — bij te weinig opgebouwd stelt de opoffering niets voor." % [
+		lbl(T("Prestigen kan pas vanaf %s%% boomvoortgang (nu %s%%) — bij te weinig opgebouwd stelt de opoffering niets voor.") % [
 			("%.0f" % (Meta.PRESTIGE_MIN_TREE_PROGRESS * 100.0)),
 			("%.1f" % (Meta.tree_progress() * 100.0)).replace(".", ","),
 		], 19)
 	sep()
 	# De reset-knoppen (perkboom én Erfenis-perks) staan in ⚙ Instellingen —
 	# dit scherm is al lang genoeg, en het zijn geen aankoop-acties.
-	lbl("Resetten kan via ⚙ Instellingen op het startscherm.", 19)
-	btn("← Terug", show_start)
+	lbl(T("Resetten kan via ⚙ Instellingen op het startscherm."), 19)
+	btn(T("← Terug"), show_start)
 
 
 func _legacy_perk_node(id: String) -> void:
@@ -854,7 +859,7 @@ func _legacy_perk_node(id: String) -> void:
 		Meta.legacy_perk_name(id), stars, _stars_word(stars),
 		T("  ✔ ACTIEF") if owned else "",
 	], 24)
-	lbl("       " + Meta.legacy_perk_desc(id), 20)
+	lbl(T("       ") + Meta.legacy_perk_desc(id), 20)
 	if not owned:
 		btn(T("Koop %s  (%d %s)") % [Meta.legacy_perk_name(id), stars, _stars_word(stars)],
 			func(): _buy_legacy_perk(id), Meta.can_buy_legacy_perk(id))
@@ -886,14 +891,14 @@ func _perk_node(id: String) -> void:
 	var lvl := Meta.perk_level(id)
 	var maxlvl := int(perk.max_level)
 	var bar := "●".repeat(lvl) + "○".repeat(maxlvl - lvl)
-	lbl("  %s  %s" % [Meta.perk_name(id), bar], 25)
+	lbl(T("  %s  %s") % [Meta.perk_name(id), bar], 25)
 	if lvl > 0:
-		lbl("       " + T("nu: ") + Meta.perk_desc(id, lvl), 21)
+		lbl(T("       ") + T("nu: ") + Meta.perk_desc(id, lvl), 21)
 	if lvl < maxlvl:
-		lbl("       " + T("volgend niveau: ") + Meta.perk_desc(id, 1), 21)
+		lbl(T("       ") + T("volgend niveau: ") + Meta.perk_desc(id, 1), 21)
 		btn(T("Koop %s niveau %d  (%s punten)") % [Meta.perk_name(id), lvl + 1, _pts(Meta.perk_cost(id))], func(): _buy_perk(id), Meta.can_buy(id))
 	else:
-		lbl("       " + T("MAX bereikt."), 20)
+		lbl(T("       ") + T("MAX bereikt."), 20)
 
 
 func _buy_perk(id: String) -> void:
@@ -911,7 +916,7 @@ func _refresh_inf_btn() -> void:
 func _buy_inf() -> void:
 	if Meta.buy_inf():
 		# Alleen de knop en de header verversen; de boom hoeft niet opnieuw.
-		header.text = "PERKBOOM — %s legacy points" % _pts(Meta.state.legacy_points)
+		header.text = T("PERKBOOM — %s legacy points") % _pts(Meta.state.legacy_points)
 	_refresh_inf_btn()
 
 
@@ -961,9 +966,9 @@ func _on_continue() -> void:
 func show_prep() -> void:
 	refresh_header()
 	clear()
-	lbl("VOORBEREIDING", 34)
+	lbl(T("VOORBEREIDING"), 34)
 	if str(Game.state.news) != "":
-		lbl("Nieuws: " + str(Game.state.news), 24)
+		lbl(T("Nieuws: ") + str(Game.state.news), 24)
 	# Geen show_flash() hier — de resultaten van acties op dit scherm (storten,
 	# upgraden) zijn al zichtbaar via de bijgewerkte staat zelf (lopende
 	# bankstortingen-lijst, kantoorniveau), een losse meldingsregel erbovenop
@@ -973,13 +978,13 @@ func show_prep() -> void:
 	# game.gd) — deze waarschuwing maakt dat zichtbaar, anders merk je alleen
 	# een lagere tekenkans/hogere kaapkans zonder te snappen waarom.
 	if int(Game.state.scandal) >= 70:
-		var l := lbl("⚠ Schandaal %d — je reputatie is in vrije val: rivalen kapen je cliënten makkelijker weg en clubs mijden je bij transfers." % int(Game.state.scandal), 20)
+		var l := lbl(T("⚠ Schandaal %d — je reputatie is in vrije val: rivalen kapen je cliënten makkelijker weg en clubs mijden je bij transfers.") % int(Game.state.scandal), 20)
 		l.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
 	elif int(Game.state.scandal) >= 40:
-		var l := lbl("⚠ Schandaal %d — je staat onder een vergrootglas: nieuwe cliënten tekenen minder makkelijk bij je." % int(Game.state.scandal), 20)
+		var l := lbl(T("⚠ Schandaal %d — je staat onder een vergrootglas: nieuwe cliënten tekenen minder makkelijk bij je.") % int(Game.state.scandal), 20)
 		l.add_theme_color_override("font_color", Color(1.0, 0.7, 0.3))
 	sep()
-	lbl("Jouw stal (%d/%d):" % [Game.state.clients.size(), Game.client_cap()], 28)
+	lbl(T("Jouw stal (%d/%d):") % [Game.state.clients.size(), Game.client_cap()], 28)
 	var stal_grid := _card_grid()
 	for cid in Game.state.clients:
 		var p: Dictionary = Game.state.players[cid]
@@ -995,31 +1000,31 @@ func show_prep() -> void:
 	sep()
 	# ---- Het kantoor: niveau, band en upgrade ----
 	var band: Dictionary = Game.office_band()
-	lbl("🏢 KANTOOR — niveau %d/%d: %s" % [Game.office_level(), Game.office_max_level(), Game.office_name()], 28)
-	lbl("Je ziet elk seizoen %d spelers, rating %d–%d (gemiddeld ~%d). Hoger niveau = betere spelers binnen bereik." % [
+	lbl(T("🏢 KANTOOR — niveau %d/%d: %s") % [Game.office_level(), Game.office_max_level(), Game.office_name()], 28)
+	lbl(T("Je ziet elk seizoen %d spelers, rating %d–%d (gemiddeld ~%d). Hoger niveau = betere spelers binnen bereik.") % [
 		Game.candidate_count(), Game.candidate_floor(), Game.candidate_ceiling(), int(band.avg),
 	], 20)
 	if Game.office_level() < Game.office_max_level():
 		var next_band: Dictionary = Game.OFFICE_LEVELS[Game.office_level()]
 		var cost := Game.office_upgrade_cost()
-		var l := lbl("Upgraden tilt je naar niveau %d: %s (spelers tot ~%d)." % [
+		var l := lbl(T("Upgraden tilt je naar niveau %d: %s (spelers tot ~%d).") % [
 			Game.office_level() + 1, str(next_band.name), int(next_band.ceiling),
 		], 19)
 		l.add_theme_color_override("font_color", Color(0.8, 0.8, 0.85))
-		btn("Kantoor upgraden — %s (%s)" % [str(next_band.name), eur(cost)], _upgrade_office, Game.can_upgrade_office())
+		btn(T("Kantoor upgraden — %s (%s)") % [str(next_band.name), eur(cost)], _upgrade_office, Game.can_upgrade_office())
 	else:
-		lbl("Hoogste niveau bereikt. Je onderhandelt tussen de miljardairs.", 20)
+		lbl(T("Hoogste niveau bereikt. Je onderhandelt tussen de miljardairs."), 20)
 	sep()
-	lbl("DE BANK — stort geld weg, krijg het na %d seizoenen verdubbeld terug." % Game.BANK_MATURITY_SEASONS, 20)
+	lbl(T("DE BANK — stort geld weg, krijg het na %d seizoenen verdubbeld terug.") % Game.BANK_MATURITY_SEASONS, 20)
 	if Game.bank_deposit_count() > 0:
 		# Elke storting loopt onafhankelijk af — dus ook los getoond, niet
 		# als één opgeteld bedrag met één gedeelde termijn.
 		for d in Game.bank_deposits_list():
-			lbl("• %s gestort — nog %d seizoen(en), dan %s terug." % [
+			lbl(T("• %s gestort — nog %d seizoen(en), dan %s terug.") % [
 				eur(int(d.amount)), int(d.seasons_left), eur(int(round(float(d.amount) * Game.BANK_MULTIPLIER))),
 			], 19)
 	var max_deposit := maxi(int(Game.state.money), 0)
-	bank_deposit_label = lbl("Storten: %s" % eur(0), 22)
+	bank_deposit_label = lbl(T("Storten: %s") % eur(0), 22)
 	bank_deposit_slider = HSlider.new()
 	bank_deposit_slider.min_value = 0
 	bank_deposit_slider.max_value = max_deposit
@@ -1037,15 +1042,15 @@ func show_prep() -> void:
 	content.add_child(deposit_btn)
 	sep()
 	var skip_release := Meta.perk_level("vaste_kern") > 0 or int(Game.state.season) == 1
-	btn("Naar scouting →" if skip_release else "Naar stalbeheer →", _goto_release)
+	btn(T("Naar scouting →") if skip_release else "Naar stalbeheer →", _goto_release)
 
 
 func _upgrade_office() -> void:
 	if Game.upgrade_office():
-		flash = "Kantoor geüpgraded naar %s! De hele tent verandert." % Game.office_name()
+		flash = T("Kantoor geüpgraded naar %s! De hele tent verandert.") % Game.office_name()
 		_update_office_background()
 	else:
-		flash = "Upgrade mislukt — niet genoeg geld."
+		flash = T("Upgrade mislukt — niet genoeg geld.")
 	show_prep()
 
 
@@ -1060,9 +1065,9 @@ func _do_bank_deposit() -> void:
 	var amount := int(bank_deposit_slider.value)
 	if Game.bank_deposit(amount):
 		var payout := int(round(float(amount) * (Game.BANK_MULTIPLIER + (0.3 if Game.has_shop("investeringsfonds") else 0.0))))
-		flash = "Gestort: %s. Komt over %d seizoenen terug als %s." % [eur(amount), Game.BANK_MATURITY_SEASONS, eur(payout)]
+		flash = T("Gestort: %s. Komt over %d seizoenen terug als %s.") % [eur(amount), Game.BANK_MATURITY_SEASONS, eur(payout)]
 	else:
-		flash = "Storting mislukt — vul een geldig bedrag in dat je ook echt hebt."
+		flash = T("Storting mislukt — vul een geldig bedrag in dat je ook echt hebt.")
 	show_prep()
 
 
@@ -1091,8 +1096,8 @@ func _goto_release() -> void:
 func show_release() -> void:
 	refresh_header()
 	clear()
-	lbl("STALBEHEER — VERPLICHT ONTSLAG", 34)
-	lbl("Selecteer wie je wegstuurt (je mag er zoveel kwijt als je wilt, zolang er minstens 1 overblijft — handig als je meteen plek wilt maken voor een kantoorupgrade) en bevestig onderaan. De rest van je stal verliest 2 vertrouwen per weggestuurde cliënt.", 22)
+	lbl(T("STALBEHEER — VERPLICHT ONTSLAG"), 34)
+	lbl(T("Selecteer wie je wegstuurt (je mag er zoveel kwijt als je wilt, zolang er minstens 1 overblijft — handig als je meteen plek wilt maken voor een kantoorupgrade) en bevestig onderaan. De rest van je stal verliest 2 vertrouwen per weggestuurde cliënt."), 22)
 	show_flash()
 	sep()
 	var rel_grid := _card_grid()
@@ -1103,7 +1108,7 @@ func show_release() -> void:
 			str(p.pos), int(p.age), int(p.trust), eur(Game.value(p)),
 		]
 		var info := _stat_card(cid, sub, selected, rel_grid)
-		info.add_child(_mini_btn("✗ Wegsturen" if not selected else "✔ Blijft toch", func(): _toggle_release(cid)))
+		info.add_child(_mini_btn(T("✗ Wegsturen") if not selected else T("✔ Blijft toch"), func(): _toggle_release(cid)))
 	sep()
 	var remaining: int = Game.state.clients.size() - release_selection.size()
 	var confirm_txt := ("Bevestig: stuur %d weg (%d blijft over)" % [release_selection.size(), remaining]) if not release_selection.is_empty() else "Niemand geselecteerd"
@@ -1118,7 +1123,7 @@ func _toggle_release(cid: String) -> void:
 		if Game.state.clients.size() - release_selection.size() > 1:
 			release_selection.append(cid)
 		else:
-			flash = "Je moet minstens 1 cliënt overhouden."
+			flash = T("Je moet minstens 1 cliënt overhouden.")
 	show_release()
 
 
@@ -1129,9 +1134,9 @@ func _confirm_release() -> void:
 		Game.release_client(cid)
 	release_selection = []
 	if names.size() == 1:
-		flash = "%s pakt zijn spullen. 'Ik dacht dat we een team waren.'" % str(names[0])
+		flash = T("%s pakt zijn spullen. 'Ik dacht dat we een team waren.'") % str(names[0])
 	else:
-		flash = "%d cliënten pakken hun spullen: %s." % [names.size(), ", ".join(names)]
+		flash = T("%d cliënten pakken hun spullen: %s.") % [names.size(), ", ".join(names)]
 	_goto_scouting()
 
 
@@ -1147,14 +1152,14 @@ func _goto_scouting() -> void:
 func show_scouting() -> void:
 	refresh_header()
 	clear()
-	lbl("SCOUTING", 34)
+	lbl(T("SCOUTING"), 34)
 	_set_turn_bar("Scoutpunten:", int(Game.state.scout_points), Game.scout_points_per_season())
 	# Geen show_flash() hier — scout-/benaderresultaten zijn al zichtbaar via
 	# de kaart zelf (confetti bij tekenen, rood puffje bij afwijzing, of de
 	# bijgewerkte tekenkans/onzekerheid). Wel legen, anders duikt hij later op.
 	_discard_flash()
-	lbl("De potentieel-band is een schátting — die kan er flink naast zitten. Scouten trekt haar naar de waarheid én maakt tekenen makkelijker (+5% per scout, max +10%).", 22)
-	lbl("Kantoor niveau %d (%s) brengt spelers tot rating ~%d binnen bereik. Je reputatie (%d) bepaalt of ze tekenen." % [
+	lbl(T("De potentieel-band is een schátting — die kan er flink naast zitten. Scouten trekt haar naar de waarheid én maakt tekenen makkelijker (+5% per scout, max +10%)."), 22)
+	lbl(T("Kantoor niveau %d (%s) brengt spelers tot rating ~%d binnen bereik. Je reputatie (%d) bepaalt of ze tekenen.") % [
 		Game.office_level(), Game.office_name(), Game.candidate_ceiling(), int(Game.state.rep),
 	], 20)
 	# Sorteerknoppen — tik nogmaals op dezelfde sleutel om de richting te draaien.
@@ -1171,7 +1176,7 @@ func show_scouting() -> void:
 	for pid in _sorted_candidates():
 		cand_grid.add_child(_candidate_card(pid))
 	sep()
-	btn("Naar events →", _goto_events)
+	btn(T("Naar events →"), _goto_events)
 
 
 func _candidate_card(pid: String) -> Control:
@@ -1203,9 +1208,9 @@ func _candidate_card(pid: String) -> Control:
 		btn_row.add_child(al)
 	elif not is_client:
 		if int(Game.state.scout_points) > 0 and int(p.unc) > 2:
-			btn_row.add_child(_mini_btn("Scout", func(): _scout(pid)))
+			btn_row.add_child(_mini_btn(T("Scout"), func(): _scout(pid)))
 		if Game.state.clients.size() < Game.client_cap():
-			btn_row.add_child(_mini_btn("Benader", func(): _try_sign(pid)))
+			btn_row.add_child(_mini_btn(T("Benader"), func(): _try_sign(pid)))
 
 	return card
 
@@ -1493,10 +1498,10 @@ func _try_sign(pid: String) -> void:
 	approached.append(pid)
 	var signed := Game.attempt_sign(pid)
 	if signed:
-		flash = "%s tekent bij jou!" % p.name
+		flash = T("%s tekent bij jou!") % p.name
 		flash_color = Color(0.35, 0.9, 0.4)
 	else:
-		flash = "%s wijst je af. 'Ik hoor goede verhalen over een ander kantoor.'" % p.name
+		flash = T("%s wijst je af. 'Ik hoor goede verhalen over een ander kantoor.'") % p.name
 		flash_color = Color(1.0, 0.5, 0.5)
 	show_scouting()
 	# Feedback ná het herbouwen van het scherm (confetti/puff hangen aan de
@@ -1548,7 +1553,7 @@ func show_event(ev: Dictionary) -> void:
 	var cname := ""
 	if str(ev.client_id) != "":
 		cname = str(Game.state.players[ev.client_id].name)
-	lbl("EVENT: %s" % str(ev.title), 32)
+	lbl(T("EVENT: %s") % str(ev.title), 32)
 	# Events met een concreet geldbedrag in hun flavor-tekst gebruiken een
 	# "amount"-key (ongeschaalde basiswaarde) i.p.v. het bedrag hard te coderen
 	# — anders klopt de tekst na seizoen 1 niet meer met het WERKELIJK
@@ -1563,7 +1568,7 @@ func show_event(ev: Dictionary) -> void:
 		lbl(text, 26)
 	sep()
 	if ev.has("minigame"):
-		btn("Beginnen →", func(): _start_minigame(ev))
+		btn(T("Beginnen →"), func(): _start_minigame(ev))
 		return
 	var em_ctx := _event_emphasis_context(ev)
 	var any_enabled := false
@@ -1594,12 +1599,12 @@ func show_event(ev: Dictionary) -> void:
 			var succ_rows := _effect_rows(succ_eff, "", false, _emphasis_for(succ_eff, em_ctx.max_abs, em_ctx.distinct_counts, em_ctx.min_abs))
 			var fail_rows := _effect_rows(fail_eff, "", false, _emphasis_for(fail_eff, em_ctx.max_abs, em_ctx.distinct_counts, em_ctx.min_abs))
 			if not succ_rows.is_empty():
-				lbl("Bij succes:", 18)
+				lbl(T("Bij succes:"), 18)
 				for row in succ_rows:
 					var l := lbl(str(row.text), 19)
 					l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35))
 			if not fail_rows.is_empty():
-				lbl("Bij mislukking:", 18)
+				lbl(T("Bij mislukking:"), 18)
 				for row in fail_rows:
 					var l := lbl(str(row.text), 19)
 					l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35))
@@ -1612,8 +1617,8 @@ func show_event(ev: Dictionary) -> void:
 	# geldkostende opties je bij een leeg saldo vastzetten op dit scherm.
 	if not any_enabled:
 		sep()
-		lbl("Je kunt geen van deze opties betalen. Er zit niets anders op dan het te laten lopen.", 20)
-		btn("Laten lopen →", _next_event)
+		lbl(T("Je kunt geen van deze opties betalen. Er zit niets anders op dan het te laten lopen."), 20)
+		btn(T("Laten lopen →"), _next_event)
 
 
 func _resolve(ev: Dictionary, opt: Dictionary) -> void:
@@ -1635,14 +1640,14 @@ func _resolve(ev: Dictionary, opt: Dictionary) -> void:
 		txt = str(opt.get("txt", "Gedaan."))
 	refresh_header()
 	clear()
-	lbl("UITKOMST", 32)
+	lbl(T("UITKOMST"), 32)
 	lbl(txt, 26)
 	var cname := ""
 	if str(ev.client_id) != "" and Game.state.players.has(ev.client_id):
 		cname = str(Game.state.players[ev.client_id].name)
 	_show_effect_lines(used, cname)
 	for n in notes:
-		lbl(">> " + str(n), 24)
+		lbl(T(">> ") + str(n), 24)
 	if Game.last_new_client_id != "":
 		# Een kaap-event leverde een nieuwe cliënt op — toon zijn/haar echte
 		# stats onderaan i.p.v. alleen de naam in de meldingsregel hierboven.
@@ -1650,7 +1655,7 @@ func _resolve(ev: Dictionary, opt: Dictionary) -> void:
 	elif str(ev.client_id) != "":
 		_show_player_info(str(ev.client_id))
 	sep()
-	btn("Verder →", _next_event)
+	btn(T("Verder →"), _next_event)
 
 
 # ---------------------------------------------------------------- effect-samenvatting
@@ -1915,34 +1920,34 @@ func show_bidding() -> void:
 	refresh_header()
 	clear()
 	_dev_test_banner()
-	lbl("BIEDINGSOORLOG", 32)
+	lbl(T("BIEDINGSOORLOG"), 32)
 	_name_row("Cliënt: ", bidding.client_id, "", 24)
 	_set_turn_bar("Rondes:", bidding.rounds_left, BiddingWar.ROUNDS)
-	lbl("Prijs bepaalt JOUW fee, voorwaarden bepalen zijn vertrouwen. Duw je de een op, dan zakt de ander.", 19)
+	lbl(T("Prijs bepaalt JOUW fee, voorwaarden bepalen zijn vertrouwen. Duw je de een op, dan zakt de ander."), 19)
 	sep()
 	for c in bidding.clubs:
 		if not c.active:
-			var dead := lbl("%s — afgehaakt" % str(c.name), 22)
+			var dead := lbl(T("%s — afgehaakt") % str(c.name), 22)
 			dead.add_theme_color_override("font_color", Color(0.55, 0.55, 0.58))
 			continue
-		lbl("%s" % str(c.name), 24)
-		var money_lbl := lbl("   Prijs: %s   (jouw fee ~%s)" % [
+		lbl(T("%s") % str(c.name), 24)
+		var money_lbl := lbl(T("   Prijs: %s   (jouw fee ~%s)") % [
 			eur(int(c.price)), eur(int(float(int(c.price)) * Game.fee_cut())),
 		], 20)
 		money_lbl.add_theme_color_override("font_color", Color(0.45, 0.9, 0.5))
-		var terms_lbl := lbl("   Voorwaarden: %d/100 — %s" % [int(c.terms), bidding.terms_label(int(c.terms))], 20)
+		var terms_lbl := lbl(T("   Voorwaarden: %d/100 — %s") % [int(c.terms), bidding.terms_label(int(c.terms))], 20)
 		terms_lbl.add_theme_color_override("font_color", _terms_color(int(c.terms)))
-		lbl("   Geduld: %s" % ("●".repeat(int(c.patience)) + "○".repeat(maxi(3 - int(c.patience), 0))), 19)
-		lbl("   %s" % bidding.profile_label(c), 18)
+		lbl(T("   Geduld: %s") % ("●".repeat(int(c.patience)) + "○".repeat(maxi(3 - int(c.patience), 0))), 19)
+		lbl(T("   %s") % bidding.profile_label(c), 18)
 	if not bidding.log.is_empty():
 		sep()
 		for line in bidding.log:
-			lbl("· " + str(line), 20)
+			lbl(T("· ") + str(line), 20)
 	sep()
 	if bidding.finished:
 		lbl(bidding.outcome_text(), 26)
 		if bidding.deal:
-			lbl("%s — %s, voorwaarden %s." % [
+			lbl(T("%s — %s, voorwaarden %s.") % [
 				str(bidding.find_club(bidding.winner_id).name), eur(bidding.final_price),
 				bidding.terms_label(bidding.final_terms),
 			], 22)
@@ -1958,21 +1963,21 @@ func show_bidding() -> void:
 			_show_effect_lines(eff, str(Game.state.players[str(bidding.client_id)].name))
 		else:
 			_show_effect_lines({"rep": BIDDING_FAIL_REP})
-		btn("Verder →", _finish_bidding)
+		btn(T("Verder →"), _finish_bidding)
 	else:
 		for c in bidding.active_clubs():
 			var target_id := str(c.id)
 			var prof: Dictionary = BiddingWar.PROFILES[str(c.profile)]
-			btn("%s: prijs omhoog  (+%s, voorwaarden -%d)" % [
+			btn(T("%s: prijs omhoog  (+%s, voorwaarden -%d)") % [
 				str(c.name), eur(int(float(bidding.base_value) * float(prof.price_give))), int(prof.terms_cost),
 			], func(): _play_bidding("prijs", target_id))
-			btn("%s: voorwaarden omhoog  (+%d, prijs -%s)" % [
+			btn(T("%s: voorwaarden omhoog  (+%d, prijs -%s)") % [
 				str(c.name), int(prof.terms_give), eur(int(float(bidding.base_value) * float(prof.price_cost))),
 			], func(): _play_bidding("voorwaarden", target_id))
-			btn("%s: hier tekenen" % str(c.name), func(): _play_bidding("tekenen", target_id))
+			btn(T("%s: hier tekenen") % str(c.name), func(): _play_bidding("tekenen", target_id))
 			sep()
 		if bidding.active_clubs().size() >= 2:
-			btn("Clubs tegen elkaar uitspelen — de achterblijvers trekken bij (kost hen geduld)", func(): _play_bidding("uitspelen", ""))
+			btn(T("Clubs tegen elkaar uitspelen — de achterblijvers trekken bij (kost hen geduld)"), func(): _play_bidding("uitspelen", ""))
 
 
 func _terms_color(t: int) -> Color:
@@ -2002,7 +2007,7 @@ func _finish_bidding() -> void:
 		var td := bidding.trust_delta()
 		if td != 0:
 			Game.apply_effects({"trust": td}, str(bidding.client_id))
-		flash = "Transfer uit de biedingsoorlog! Jij incasseert %s." % eur(income)
+		flash = T("Transfer uit de biedingsoorlog! Jij incasseert %s.") % eur(income)
 	else:
 		Game.apply_effects({"rep": BIDDING_FAIL_REP}, "")
 	bidding = null
@@ -2016,9 +2021,9 @@ func show_press() -> void:
 	clear()
 	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
-	lbl("PERSCONFERENTIE", 32)
+	lbl(T("PERSCONFERENTIE"), 32)
 	_name_row("", cid, "", 24)
-	var sym_lbl := lbl("Publiekssympathie: %d/100" % int(press.sympathy), 24)
+	var sym_lbl := lbl(T("Publiekssympathie: %d/100") % int(press.sympathy), 24)
 	sym_lbl.add_theme_color_override("font_color",
 		Color(0.35, 0.9, 0.4) if press.sympathy >= 50.0 else Color(1.0, 0.55, 0.3))
 	_set_turn_bar("Vragen:", press.questions_left, PressConference.TARGET_QUESTIONS)
@@ -2029,31 +2034,31 @@ func show_press() -> void:
 		# bij de onderhandeling.
 		var start := maxi(press.log.size() - 3, 0)
 		for i in range(start, press.log.size()):
-			lbl("· " + str(press.log[i]), 20)
+			lbl(T("· ") + str(press.log[i]), 20)
 	sep()
 	if press.finished:
 		var o := press.outcome()
 		lbl(str(o.txt), 26)
 		_show_effect_lines(o.effects, str(Game.state.players[cid].name))
-		btn("Verder →", func(): _finish_press(o))
+		btn(T("Verder →"), func(): _finish_press(o))
 	else:
 		var jid := press.current_journalist()
 		var j: Dictionary = PressConference.JOURNALISTS[jid]
 		if press.is_final_question():
-			var final_lbl := lbl("⚡ SLOTVRAAG — dubbele inzet", 22)
+			var final_lbl := lbl(T("⚡ SLOTVRAAG — dubbele inzet"), 22)
 			final_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
-		var j_lbl := lbl("%s %s" % [str(j.icon), str(j.name)], 24)
+		var j_lbl := lbl(T("%s %s") % [str(j.icon), str(j.name)], 24)
 		j_lbl.add_theme_color_override("font_color", Color(0.75, 0.82, 0.95))
 		lbl(str(j.hint), 19)
 		if press.has_momentum():
-			var mom_lbl := lbl("MOMENTUM: je volgende succesvolle antwoord telt +50%% zwaarder!", 19)
+			var mom_lbl := lbl(T("MOMENTUM: je volgende succesvolle antwoord telt +50%% zwaarder!"), 19)
 			mom_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 		var q := lbl(press.current_question(), 26)
 		q.add_theme_color_override("font_color", Color(1.0, 0.9, 0.6))
 		sep()
-		btn("Ontwijken — 'Daar ga ik nu niet op in.'", func(): _play_press("ontwijken"))
-		btn("Toegeven — vertel het eerlijke verhaal", func(): _play_press("toegeven"))
-		btn("Aanvallen — de vraag zelf onterecht noemen", func(): _play_press("aanvallen"))
+		btn(T("Ontwijken — 'Daar ga ik nu niet op in.'"), func(): _play_press("ontwijken"))
+		btn(T("Toegeven — vertel het eerlijke verhaal"), func(): _play_press("toegeven"))
+		btn(T("Aanvallen — de vraag zelf onterecht noemen"), func(): _play_press("aanvallen"))
 
 
 func _play_press(action: String) -> void:
@@ -2073,16 +2078,16 @@ func show_tax() -> void:
 	refresh_header()
 	clear()
 	_dev_test_banner()
-	lbl("FISCALE SCHIKKING", 32)
+	lbl(T("FISCALE SCHIKKING"), 32)
 	if not tax.resolved:
-		lbl("Kies per post hoe je ermee omgaat. Pas als alle drie gekozen zijn, kun je regelen.", 22)
+		lbl(T("Kies per post hoe je ermee omgaat. Pas als alle drie gekozen zijn, kun je regelen."), 22)
 		for i in range(TaxSettlement.POSTS.size()):
 			sep()
 			var post: Dictionary = TaxSettlement.POSTS[i]
 			var chosen := int(tax.choices[i])
 			var labels := ["Open aangeven", "Deels verhullen", "Volledig verhullen"]
 			var scaled_amount := int(round(float(post.amount) * Game.event_money_scale()))
-			lbl("%s (%s)  —  %s" % [str(post.name), eur(scaled_amount),
+			lbl(T("%s (%s)  —  %s") % [str(post.name), eur(scaled_amount),
 				labels[chosen] if chosen >= 0 else "nog niet gekozen"], 24)
 			for opt_i in range(3):
 				if opt_i != chosen:
@@ -2097,21 +2102,21 @@ func show_tax() -> void:
 					var bad := int(amounts[1])
 					if good == bad:
 						# Eén zekere uitkomst (open aangeven): geen succes/mislukking.
-						var lc := lbl("    %s" % eur(good), 19)
+						var lc := lbl(T("    %s") % eur(good), 19)
 						lc.add_theme_color_override("font_color", Color(1.0, 0.45, 0.35))
 					else:
-						var lg := lbl("    lukt: %s" % eur(good), 19)
+						var lg := lbl(T("    lukt: %s") % eur(good), 19)
 						lg.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4))
-						var lb := lbl("    mislukt: %s" % eur(bad), 19)
+						var lb := lbl(T("    mislukt: %s") % eur(bad), 19)
 						lb.add_theme_color_override("font_color", Color(1.0, 0.35, 0.35))
 		sep()
-		btn("Regelen →", _resolve_tax, tax.all_chosen())
+		btn(T("Regelen →"), _resolve_tax, tax.all_chosen())
 	else:
 		for r in tax.results:
-			lbl("· " + str(r.txt), 22)
+			lbl(T("· ") + str(r.txt), 22)
 		_show_effect_lines({"money": tax.total_money, "scandal": tax.total_scandal})
 		sep()
-		btn("Verder →", _finish_tax)
+		btn(T("Verder →"), _finish_tax)
 
 
 func _choose_tax(post_idx: int, option: int) -> void:
@@ -2136,38 +2141,38 @@ func show_poker() -> void:
 	refresh_header()
 	clear()
 	_dev_test_banner()
-	lbl("POKER OM EEN TALENT", 32)
-	lbl("Straat: %s   |   Pot: %s" % [str(poker.street).capitalize(), eur(poker.pot)], 26)
-	lbl("Jouw kaarten: %s   |   Bord: %s" % [
+	lbl(T("POKER OM EEN TALENT"), 32)
+	lbl(T("Straat: %s   |   Pot: %s") % [str(poker.street).capitalize(), eur(poker.pot)], 26)
+	lbl(T("Jouw kaarten: %s   |   Bord: %s") % [
 		poker.cards_text(poker.my_hole),
 		poker.cards_text(poker.community) if not poker.community.is_empty() else "—",
 	], 24)
-	lbl("Jouw stack: %s   |   Tegenstander: %s%s" % [
+	lbl(T("Jouw stack: %s   |   Tegenstander: %s%s") % [
 		eur(poker.my_stack), eur(poker.opp_stack),
 		"   |   Bij te leggen: %s" % eur(poker.to_call) if poker.to_call > 0 else "",
 	], 22)
 	if not poker.log.is_empty():
 		sep()
 		for line in poker.log:
-			lbl("· " + str(line), 20)
+			lbl(T("· ") + str(line), 20)
 	sep()
 	if poker.finished:
-		lbl("Tegenstander had: %s" % poker.cards_text(poker.opp_hole), 22)
+		lbl(T("Tegenstander had: %s") % poker.cards_text(poker.opp_hole), 22)
 		var o := poker.outcome()
 		lbl(str(o.txt), 26)
 		_show_effect_lines(o.effects)
 		for n in poker_notes:
-			lbl(">> " + str(n), 24)
+			lbl(T(">> ") + str(n), 24)
 		if Game.last_new_client_id != "":
 			_show_player_info(Game.last_new_client_id)
-		btn("Verder →", _finish_poker)
+		btn(T("Verder →"), _finish_poker)
 	else:
-		btn("Meegaan" if poker.to_call > 0 else "Checken", func(): _play_poker("meegaan"))
+		btn(T("Meegaan") if poker.to_call > 0 else "Checken", func(): _play_poker("meegaan"))
 		# Na een re-raise van de tegenstander mag je alleen nog meegaan of
 		# passen — geen re-re-raise, om het simpel en overzichtelijk te houden.
 		if not poker.awaiting_my_response:
-			btn("Verhogen", func(): _play_poker("verhogen"))
-		btn("Passen (veilig wegwezen)", func(): _play_poker("passen"))
+			btn(T("Verhogen"), func(): _play_poker("verhogen"))
+		btn(T("Passen (veilig wegwezen)"), func(): _play_poker("passen"))
 
 
 func _play_poker(action: String) -> void:
@@ -2194,10 +2199,10 @@ func show_dice() -> void:
 	refresh_header()
 	clear()
 	_dev_test_banner()
-	lbl("DOBBELEN BIJ DE BOOKMAKER", 32)
-	lbl("Inzet: %s" % eur(dice.stake), 24)
+	lbl(T("DOBBELEN BIJ DE BOOKMAKER"), 32)
+	lbl(T("Inzet: %s") % eur(dice.stake), 24)
 	_set_turn_bar("Herkansingen:", dice.rolls_left, 2)
-	lbl("Uitbetaling op je inzet: 5 gelijke ogen ×10, 4 gelijk ×4, full house ×3, 3 gelijk ×1,5, twee paar ×0,5. Niets van dit alles? Dan ben je je inzet kwijt.", 19)
+	lbl(T("Uitbetaling op je inzet: 5 gelijke ogen ×10, 4 gelijk ×4, full house ×3, 3 gelijk ×1,5, twee paar ×0,5. Niets van dit alles? Dan ben je je inzet kwijt."), 19)
 	sep()
 	var row := HBoxContainer.new()
 	row.add_theme_constant_override("separation", 12)
@@ -2213,16 +2218,16 @@ func show_dice() -> void:
 	if not dice.log.is_empty():
 		sep()
 		for line in dice.log:
-			lbl("· " + str(line), 20)
+			lbl(T("· ") + str(line), 20)
 	sep()
 	if dice.finished:
 		var o := dice.outcome()
 		lbl(str(o.txt), 26)
 		_show_effect_lines(o.effects)
-		btn("Verder →", func(): _finish_dice(o))
+		btn(T("Verder →"), func(): _finish_dice(o))
 	else:
-		lbl("Tik dobbelstenen aan om ze vast te houden, gooi dan de rest opnieuw.", 20)
-		btn("Opnieuw gooien (%d over)" % dice.rolls_left, _reroll_dice, dice.rolls_left > 0)
+		lbl(T("Tik dobbelstenen aan om ze vast te houden, gooi dan de rest opnieuw."), 20)
+		btn(T("Opnieuw gooien (%d over)") % dice.rolls_left, _reroll_dice, dice.rolls_left > 0)
 		var bonus_pct := int(round((dice.early_stop_bonus_for(dice.rolls_left) - 1.0) * 100))
 		var stop_label := ("Nu stoppen, uitbetalen  (+%d%% bonus)" % bonus_pct) if bonus_pct > 0 else "Nu stoppen, uitbetalen"
 		btn(stop_label, _stop_dice)
@@ -2255,8 +2260,8 @@ func show_accounting() -> void:
 	refresh_header()
 	clear()
 	_dev_test_banner()
-	lbl("DE BOEKHOUDPUZZEL", 32)
-	lbl("Vul elke rij en kolom met de cijfers 1-5, elk precies één keer.", 22)
+	lbl(T("DE BOEKHOUDPUZZEL"), 32)
+	lbl(T("Vul elke rij en kolom met de cijfers 1-5, elk precies één keer."), 22)
 	_set_turn_bar("Pogingen:", accounting.attempts_left, 3)
 	sep()
 	var grid := GridContainer.new()
@@ -2278,15 +2283,15 @@ func show_accounting() -> void:
 	if not accounting.log.is_empty():
 		sep()
 		for line in accounting.log:
-			lbl("· " + str(line), 20)
+			lbl(T("· ") + str(line), 20)
 	sep()
 	if accounting.finished:
 		var o := accounting.outcome(Game.event_money_scale())
 		lbl(str(o.txt), 26)
 		_show_effect_lines(o.effects)
-		btn("Verder →", func(): _finish_accounting(o))
+		btn(T("Verder →"), func(): _finish_accounting(o))
 	else:
-		btn("Controleren", _check_accounting)
+		btn(T("Controleren"), _check_accounting)
 
 
 func _cycle_accounting(i: int) -> void:
@@ -2311,16 +2316,16 @@ func show_anagram() -> void:
 	refresh_header()
 	clear()
 	_dev_test_banner()
-	lbl("HET GELEKTE DOCUMENT", 32)
+	lbl(T("HET GELEKTE DOCUMENT"), 32)
 	if not anagram.finished:
 		var r: Dictionary = anagram.current()
 		if anagram_round_started_idx != anagram.round_idx:
 			anagram_round_started_idx = anagram.round_idx
 			anagram_time_left = AnagramHunt.ROUND_SECONDS
 			anagram_active = true
-		lbl("Woord %d/3: %s" % [anagram.round_idx + 1, str(r.scrambled)], 28)
-		anagram_timer_label = lbl("Tijd: %ds" % int(ceil(anagram_time_left)), 22)
-		lbl("Getypt: %s" % (str(anagram.typed) if str(anagram.typed) != "" else "_"), 26)
+		lbl(T("Woord %d/3: %s") % [anagram.round_idx + 1, str(r.scrambled)], 28)
+		anagram_timer_label = lbl(T("Tijd: %ds") % int(ceil(anagram_time_left)), 22)
+		lbl(T("Getypt: %s") % (str(anagram.typed) if str(anagram.typed) != "" else "_"), 26)
 		sep()
 		# 5 kolommen → 6 rijen voor 26 letters (was 13 kolommen / 2 rijen met
 		# 40×40-toetsen). Veel grotere, beter aan te tikken toetsen die de volle
@@ -2341,19 +2346,19 @@ func show_anagram() -> void:
 			kbtn.pressed.connect(func(): _type_anagram_letter(ch))
 			kb.add_child(kbtn)
 		sep()
-		btn("⌫ Wis", _backspace_anagram)
-		btn("Indienen", _submit_anagram, anagram.can_submit())
+		btn(T("⌫ Wis"), _backspace_anagram)
+		btn(T("Indienen"), _submit_anagram, anagram.can_submit())
 	if not anagram.log.is_empty():
 		sep()
 		for line in anagram.log:
-			lbl("· " + str(line), 20)
+			lbl(T("· ") + str(line), 20)
 	if anagram.finished:
 		anagram_active = false
 		sep()
 		var o := anagram.outcome(Game.event_money_scale())
 		lbl(str(o.txt), 26)
 		_show_effect_lines(o.effects)
-		btn("Verder →", func(): _finish_anagram(o))
+		btn(T("Verder →"), func(): _finish_anagram(o))
 
 
 func _type_anagram_letter(ch: String) -> void:
@@ -2392,27 +2397,27 @@ func show_scoutdate() -> void:
 	refresh_header()
 	clear()
 	_dev_test_banner()
-	lbl("SPEED-DATEN OP DE SCOUTINGBEURS", 32)
-	lbl("Vastgezet: %d/4" % scoutdate.locked_count(), 24)
+	lbl(T("SPEED-DATEN OP DE SCOUTINGBEURS"), 32)
+	lbl(T("Vastgezet: %d/4") % scoutdate.locked_count(), 24)
 	_set_turn_bar("Pogingen:", scoutdate.attempts_left, 6)
 	if not scoutdate.log.is_empty():
 		sep()
 		for line in scoutdate.log:
-			lbl("· " + str(line), 20)
+			lbl(T("· ") + str(line), 20)
 	sep()
 	if scoutdate.finished:
 		var o := scoutdate.outcome()
 		lbl(str(o.txt), 26)
 		_show_effect_lines(o.effects)
-		btn("Verder →", func(): _finish_scoutdate(o))
+		btn(T("Verder →"), func(): _finish_scoutdate(o))
 	else:
-		lbl("Let op: een fout aanbod verbrandt de scout — hij is dan niet meer beschikbaar.", 19)
+		lbl(T("Let op: een fout aanbod verbrandt de scout — hij is dan niet meer beschikbaar."), 19)
 		for si in range(ScoutSpeedDate.SCOUTS.size()):
 			if bool(scoutdate.locked[si]):
-				lbl("✔ %s — vastgezet" % str(ScoutSpeedDate.SCOUTS[si]), 22)
+				lbl(T("✔ %s — vastgezet") % str(ScoutSpeedDate.SCOUTS[si]), 22)
 				continue
 			if bool(scoutdate.burned[si]):
-				lbl("✘ %s — afgehaakt" % str(ScoutSpeedDate.SCOUTS[si]), 22)
+				lbl(T("✘ %s — afgehaakt") % str(ScoutSpeedDate.SCOUTS[si]), 22)
 				continue
 			lbl(str(ScoutSpeedDate.SCOUTS[si]), 22)
 			var row := HBoxContainer.new()
@@ -2445,20 +2450,20 @@ func show_simon() -> void:
 	clear()
 	_dev_test_banner()
 	var cid := str(mg_ev.client_id)
-	lbl("MEDIATRAINING: SIMON SAYS", 32)
+	lbl(T("MEDIATRAINING: SIMON SAYS"), 32)
 	_name_row("", cid, "   |   Reeks %d/%d" % [simon.round_num, SimonMedia.TARGET_ROUNDS], 24)
 	sep()
 	if simon.finished:
 		var o := simon.outcome()
 		lbl(str(o.txt), 26)
 		_show_effect_lines(o.effects, str(Game.state.players[cid].name))
-		btn("Verder →", func(): _finish_simon(o))
+		btn(T("Verder →"), func(): _finish_simon(o))
 	elif simon.phase == "show":
-		lbl("Onthoud deze reeks:", 22)
+		lbl(T("Onthoud deze reeks:"), 22)
 		lbl(simon.sequence_text(), 28)
-		btn("Ik heb het onthouden →", _start_simon_input)
+		btn(T("Ik heb het onthouden →"), _start_simon_input)
 	else:
-		lbl("Herhaal de reeks (stap %d/%d):" % [simon.player_progress + 1, simon.sequence.size()], 22)
+		lbl(T("Herhaal de reeks (stap %d/%d):") % [simon.player_progress + 1, simon.sequence.size()], 22)
 		# Raster van 2 kolommen i.p.v. één lange lijst: bij 8-10 reacties scrol
 		# je anders door het halve scherm, en naast elkaar zijn ze veel sneller
 		# te scannen tijdens het herhalen van een reeks.
@@ -2511,17 +2516,17 @@ func show_window() -> void:
 	refresh_header()
 	clear()
 	var deadline_day: bool = int(Game.state.season) % 5 == 0
-	lbl("TRANSFERWINDOW" + ("  — DEADLINE DAY!" if deadline_day else ""), 34)
+	lbl(T("TRANSFERWINDOW") + ("  — DEADLINE DAY!" if deadline_day else ""), 34)
 	if deadline_day:
-		lbl("TD's zijn nerveus vandaag: onderhandelen is makkelijker.", 22)
+		lbl(T("TD's zijn nerveus vandaag: onderhandelen is makkelijker."), 22)
 	show_flash()
 	if Game.state.clients.is_empty():
-		lbl("Je hebt geen cliënten om deals voor te sluiten...", 26)
+		lbl(T("Je hebt geen cliënten om deals voor te sluiten..."), 26)
 	for cid in Game.state.clients:
 		sep()
 		var p: Dictionary = Game.state.players[cid]
 		var contract_txt := "contract loopt af" if int(p.contract) <= 1 else "contract nog %d jaar" % int(p.contract)
-		lbl("%s — rating %d, %s, waarde %s, %s" % [
+		lbl(T("%s — rating %d, %s, waarde %s, %s") % [
 			p.name, int(p.rating), Game.club_name(str(p.club)), eur(Game.value(p)), contract_txt,
 		], 26)
 		var ints: Array = interest.get(cid, [])
@@ -2530,7 +2535,7 @@ func show_window() -> void:
 			# 1 of 2 interesses (Game.gen_interest()) — leeg hier betekent dus
 			# dat je die al hebt afgehandeld (onderhandeld/afgewezen), niet
 			# dat er nooit interesse was.
-			lbl("Alle interesse voor %s is dit venster al afgehandeld." % p.name, 22)
+			lbl(T("Alle interesse voor %s is dit venster al afgehandeld.") % p.name, 22)
 
 		# Drie mogelijke opties per cliënt: onderhandelen met elke
 		# geïnteresseerde club plus contract verlengen. Normaal mag je er
@@ -2543,33 +2548,33 @@ func show_window() -> void:
 		var can_extend := str(p.club) != "" and int(p.contract) <= 1 and not extended.has(cid)
 
 		if budget <= 0:
-			lbl("Geen acties meer over voor %s dit transferwindow." % p.name, 20)
+			lbl(T("Geen acties meer over voor %s dit transferwindow.") % p.name, 20)
 		elif extended.has(cid):
 			# Verlengen sluit clubonderhandelingen voor dit window uit — hij
 			# heeft net getekend, dus een nieuwe club is niet meer aan de orde.
-			lbl("Contract dit window al verlengd. Geen nieuwe clubonderhandeling meer mogelijk.", 20)
+			lbl(T("Contract dit window al verlengd. Geen nieuwe clubonderhandeling meer mogelijk."), 20)
 		else:
 			for club_id in ints:
 				var c: Dictionary = Game.state.clubs[club_id]
 				var td_txt := str(c.td)
 				if Game.td_known(club_id):
 					td_txt += " — " + str(Negotiation.PERS_INFO[Game.td_personality(club_id)]).split(" — ")[0]
-				btn("Onderhandel met %s (TD: %s)" % [c.name, td_txt], func(): _start_nego(cid, club_id))
+				btn(T("Onderhandel met %s (TD: %s)") % [c.name, td_txt], func(): _start_nego(cid, club_id))
 			if can_extend:
 				if high and not ints.is_empty():
-					lbl("Hoge rating: verlengen blijft een optie náást beide clubgesprekken, maar het tekengeld is lager — met clubs in de rij bindt hij zich niet goedkoop.", 19)
+					lbl(T("Hoge rating: verlengen blijft een optie náást beide clubgesprekken, maar het tekengeld is lager — met clubs in de rij bindt hij zich niet goedkoop."), 19)
 				var tg_preview := int(Game.value(p) * Game.EXTEND_FEE_PCT * Game.tekengeld_mult() * Game.extend_mult(p))
-				btn("Contract verlengen (tekengeld ~%s)" % eur(tg_preview), func(): _extend(cid))
+				btn(T("Contract verlengen (tekengeld ~%s)") % eur(tg_preview), func(): _extend(cid))
 			elif str(p.club) != "":
-				lbl("Verlengen kan pas in het laatste contractjaar.", 19)
+				lbl(T("Verlengen kan pas in het laatste contractjaar."), 19)
 	sep()
-	btn("Seizoen afronden →", _goto_wrapup)
+	btn(T("Seizoen afronden →"), _goto_wrapup)
 
 
 func _extend(cid: String) -> void:
 	var tg := Game.extend_contract(cid)
 	extended.append(cid)
-	flash = "Contract verlengd. Tekengeld: %s." % eur(tg)
+	flash = T("Contract verlengd. Tekengeld: %s.") % eur(tg)
 	show_window()
 
 
@@ -2599,39 +2604,39 @@ func show_nego() -> void:
 	clear()
 	var p: Dictionary = Game.state.players[nego_client]
 	var c: Dictionary = Game.state.clubs[nego_club]
-	lbl("ONDERHANDELING", 32)
-	lbl("%s → %s" % [p.name, c.name], 26)
-	lbl("Transfersom: %s   |   Jouw fee: %d%%" % [eur(nego.deal_value), int(round(nego.cut * 100))], 24)
+	lbl(T("ONDERHANDELING"), 32)
+	lbl(T("%s → %s") % [p.name, c.name], 26)
+	lbl(T("Transfersom: %s   |   Jouw fee: %d%%") % [eur(nego.deal_value), int(round(nego.cut * 100))], 24)
 	# Zodra er een actie is gespeeld (log niet meer leeg) blijft de weerstand
 	# zelf ook verborgen tot je de TD kent — anders zou je uit het verschil
 	# vóór/na alsnog kunnen afleiden wat een actie deed (en dus welk type hij
 	# is), ook al staat er geen expliciet effect meer bij de knoppen.
 	var res_txt := "?" if (not nego.pers_known and not nego.log.is_empty()) else str(int(maxf(nego.resistance, 0)))
-	lbl("Weerstand van TD %s: %s" % [c.td, res_txt], 26)
+	lbl(T("Weerstand van TD %s: %s") % [c.td, res_txt], 26)
 	_set_turn_bar("Rondes:", nego.rounds_left, 5 + Meta.perk_level("reserves"))
-	lbl("Stemming: %s" % nego.mood_name(), 24)
+	lbl(T("Stemming: %s") % nego.mood_name(), 24)
 	if nego.pers_known:
-		lbl("Type: %s" % str(Negotiation.PERS_INFO[nego.pers]), 22)
+		lbl(T("Type: %s") % str(Negotiation.PERS_INFO[nego.pers]), 22)
 	else:
-		lbl("Type: onbekend — 'Aftasten' onthult het (blijft deze run bekend).", 20)
+		lbl(T("Type: onbekend — 'Aftasten' onthult het (blijft deze run bekend)."), 20)
 	if nego.has_flow():
-		lbl("FLOW (%d op rij): je volgende zet krijgt +50%% effect!" % nego.streak, 23)
+		lbl(T("FLOW (%d op rij): je volgende zet krijgt +50%% effect!") % nego.streak, 23)
 	elif nego.streak == 1:
-		lbl("Reeks: 1 succes — nog één voor flow.", 20)
+		lbl(T("Reeks: 1 succes — nog één voor flow."), 20)
 	if not nego.log.is_empty():
 		sep()
 		# Alleen de meest recente regel — bij een combo kan één zet meerdere
 		# regels toevoegen (het effect + "COMBO — ..." + evt. een onthulling),
 		# maar we tonen bewust alleen de laatste, geen volledige geschiedenis.
-		lbl("· " + str(nego.log[nego.log.size() - 1]), 22)
+		lbl(T("· ") + str(nego.log[nego.log.size() - 1]), 22)
 	sep()
 	if nego.finished:
 		if nego.success:
-			lbl("DEAL! Jouw fee: %s" % eur(int(nego.deal_value * nego.cut)), 30)
-			btn("Incasseren →", func(): _close_nego(true))
+			lbl(T("DEAL! Jouw fee: %s") % eur(int(nego.deal_value * nego.cut)), 30)
+			btn(T("Incasseren →"), func(): _close_nego(true))
 		else:
-			lbl("Geen deal." + ("  De relatie heeft een deuk." if nego.walked else ""), 28)
-			btn("Terug naar het window →", func(): _close_nego(false))
+			lbl(T("Geen deal.") + ("  De relatie heeft een deuk." if nego.walked else ""), 28)
+			btn(T("Terug naar het window →"), func(): _close_nego(false))
 	else:
 		# Tactieken links, combo's rechts — twee kolommen naast elkaar. De
 		# btn()/lbl()-helpers schrijven altijd naar `content`, dus we wisselen
@@ -2655,7 +2660,7 @@ func show_nego() -> void:
 		var coach_bonus := 15 if Game.has_shop("onderhandelcoach") else 0
 		for t in nego.tactics(int(Game.state.rep) + Meta.perk_bonus("onderhandelen") * 5 + coach_bonus):
 			if str(t.id) == "aftasten":
-				btn("%s  [kost %d ronde%s]" % [str(t.label), nego.aftast_cost, "" if nego.aftast_cost == 1 else "s"], func(): _play_tactic(t))
+				btn(T("%s  [kost %d %s]") % [T(str(t.label)), nego.aftast_cost, _rounds_word(nego.aftast_cost)], func(): _play_tactic(t))
 			else:
 				# Zowel de slagingskans als het weerstandseffect blijven verborgen
 				# tot je de TD kent (aftasten of een type-combo) — anders zou je
@@ -2664,8 +2669,8 @@ func show_nego() -> void:
 				var drop_txt := ("weerstand -%d" % int(t.drop)) if nego.pers_known else "weerstand ?"
 				var blocked := nego.is_blocked(str(t.id))
 				var suffix := "  (net mislukt — probeer iets anders)" if blocked else ""
-				btn("%s  [%s, %s]%s" % [str(t.label), chance_txt, drop_txt, suffix], func(): _play_tactic(t), not blocked)
-		btn("Percentage verhogen (+%d%%, raakt weerstand/flow niet)" % int(round(Negotiation.RAISE_FEE_STEP * 100)), _raise_fee, nego.cut < Negotiation.MAX_CUT)
+				btn(T("%s  [%s, %s]%s") % [T(str(t.label)), chance_txt, drop_txt, suffix], func(): _play_tactic(t), not blocked)
+		btn(T("Percentage verhogen (+%d%%, raakt weerstand/flow niet)") % int(round(Negotiation.RAISE_FEE_STEP * 100)), _raise_fee, nego.cut < Negotiation.MAX_CUT)
 
 		var favor_btn := Button.new()
 		favor_btn.text = "🪙 Gunst inzetten: deal direct rond"
@@ -2686,7 +2691,7 @@ func show_nego() -> void:
 		left_col.add_child(favor_btn)
 
 		content = right_col
-		lbl("COMBO'S (opeenvolgende successen; ×1 per gesprek):", 20)
+		lbl(T("COMBO'S (opeenvolgende successen; ×1 per gesprek):"), 20)
 		# Combo's waar je verder in zit (meer stappen op koers, of al
 		# voltooid) staan bovenaan — hoe hoger je zit, hoe relevanter nu.
 		var combo_list: Array = Negotiation.COMBOS.duplicate()
@@ -2700,7 +2705,7 @@ func show_nego() -> void:
 				req = "  [alleen tegen een %s TD]" % str(combo.req_pers)
 			var mark := "✔" if done else ("▸" if progress > 0 else "·")
 			var header_color := Color(0.35, 0.9, 0.4) if done else (Color(1.0, 0.78, 0.15) if progress > 0 else Color(0.75, 0.75, 0.75))
-			var header := lbl("%s %s (+%d)%s" % [mark, str(combo.name), int(combo.bonus), req], 19)
+			var header := lbl(T("%s %s (+%d)%s") % [mark, str(combo.name), int(combo.bonus), req], 19)
 			header.add_theme_color_override("font_color", header_color)
 			_show_combo_pattern_row(combo.pattern, reached)
 
@@ -2862,7 +2867,7 @@ func _close_nego(deal: bool) -> void:
 	if deal and nego != null:
 		var income := Game.complete_transfer(nego_client, nego_club, nego.deal_value, nego.cut)
 		interest[nego_client] = []
-		flash = "Transfer rond! Jij incasseert %s." % eur(income)
+		flash = T("Transfer rond! Jij incasseert %s.") % eur(income)
 	else:
 		# Eén kans per club per window: afketsen of weglopen verbruikt
 		# de interesse, anders kun je eindeloos opnieuw onderhandelen.
@@ -2913,28 +2918,28 @@ func _after_departures_news(report: Array) -> void:
 func show_prepared_transfer_result(results: Array, report: Array) -> void:
 	refresh_header()
 	clear()
-	lbl("VOORBEREIDE TRANSFER", 34)
-	lbl("Dit is het gevolg van de medische info die je eerder off-the-record kreeg en waarop je een transfer voorbereidde.", 22)
+	lbl(T("VOORBEREIDE TRANSFER"), 34)
+	lbl(T("Dit is het gevolg van de medische info die je eerder off-the-record kreeg en waarop je een transfer voorbereidde."), 22)
 	for r in results:
 		sep()
 		if bool(r.success):
-			lbl("%s is verkocht aan een mysterieuze buitenlandse club." % str(r.name), 26)
-			lbl("Transfersom: %s" % eur(int(r.transfer_sum)), 24)
-			var l := lbl("Jouw fee: %s" % eur(int(r.income)), 26)
+			lbl(T("%s is verkocht aan een mysterieuze buitenlandse club.") % str(r.name), 26)
+			lbl(T("Transfersom: %s") % eur(int(r.transfer_sum)), 24)
+			var l := lbl(T("Jouw fee: %s") % eur(int(r.income)), 26)
 			l.add_theme_color_override("font_color", Color(0.4, 0.9, 0.45))
 		else:
-			var l := lbl("De transfer van %s ging niet door — de prognose bleek onjuist." % str(r.name), 24)
+			var l := lbl(T("De transfer van %s ging niet door — de prognose bleek onjuist.") % str(r.name), 24)
 			l.add_theme_color_override("font_color", Color(1.0, 0.4, 0.4))
 	sep()
-	btn("Verder →", func(): _show_wrapup_report(report))
+	btn(T("Verder →"), func(): _show_wrapup_report(report))
 
 
 func _show_wrapup_report(report: Array) -> void:
 	refresh_header()
 	clear()
-	lbl("SEIZOENSAFSLUITING", 34)
+	lbl(T("SEIZOENSAFSLUITING"), 34)
 	for line in report:
-		var l := lbl("· " + str(line), 23)
+		var l := lbl(T("· ") + str(line), 23)
 		var c: Variant = _wrapup_color(str(line))
 		if c != null:
 			l.add_theme_color_override("font_color", c as Color)
@@ -2944,7 +2949,7 @@ func _show_wrapup_report(report: Array) -> void:
 	var developed: Array = Game.state.get("last_developed", [])
 	if not developed.is_empty():
 		sep()
-		lbl("📈 ONTWIKKELING", 28)
+		lbl(T("📈 ONTWIKKELING"), 28)
 		# Volle breedte (géén 2-kolomsraster zoals stal/scouting): deze kaart
 		# heeft een derde badge, en in een halve kolom blijft er dan te weinig
 		# breedte over voor naam en subregel.
@@ -2970,11 +2975,11 @@ func _show_wrapup_report(report: Array) -> void:
 
 func _wrapup_continue_button() -> void:
 	if str(Game.state.game_over) != "":
-		btn("Bekijk het einde →", show_gameover)
+		btn(T("Bekijk het einde →"), show_gameover)
 	elif int(Game.state.season) > Game.MAX_SEASONS:
-		btn("Bekijk het einde →", show_win)
+		btn(T("Bekijk het einde →"), show_win)
 	else:
-		btn("🪙 Naar de shop →", _enter_shop)
+		btn(T("🪙 Naar de shop →"), _enter_shop)
 
 
 func show_departures_news(departures: Array, report: Array) -> void:
@@ -2988,7 +2993,7 @@ func show_departures_news(departures: Array, report: Array) -> void:
 	refresh_header()
 	clear()
 	var n := departures.size()
-	var title := lbl("💥 JE RAAKT %s KWIJT" % ("EEN CLIËNT" if n == 1 else "%d CLIËNTEN" % n), 38)
+	var title := lbl(T("💥 JE RAAKT %s KWIJT") % ("EEN CLIËNT" if n == 1 else "%d CLIËNTEN" % n), 38)
 	title.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
 	for entry in departures:
 		sep()
@@ -3011,9 +3016,9 @@ func show_departures_news(departures: Array, report: Array) -> void:
 				str(p.pos), int(p.age), trust, eur(Game.value(p)),
 			], false, false, -1, true))
 	sep()
-	lbl("Vertrouwen is je enige verdediging: onder de 60 loopt het vertrekrisico elk punt verder op. Een cliënt die zich gezien voelt, blijft — en luistert niet naar een rivaal.", 19)
+	lbl(T("Vertrouwen is je enige verdediging: onder de 60 loopt het vertrekrisico elk punt verder op. Een cliënt die zich gezien voelt, blijft — en luistert niet naar een rivaal."), 19)
 	sep()
-	btn("Verder →", func(): _after_departures_news(report))
+	btn(T("Verder →"), func(): _after_departures_news(report))
 
 
 # ---------------------------------------------------------------- de shop
@@ -3057,9 +3062,9 @@ func _reroll_shop() -> void:
 		# Sluit de huidige set uit, zodat een reroll echt iets anders geeft
 		# (tenzij er te weinig andere upgrades over zijn).
 		shop_offers = Game.shop_offer(Game.rng, 3, shop_offers)
-		flash = "Nieuwe upgrades ingeladen."
+		flash = T("Nieuwe upgrades ingeladen.")
 	else:
-		flash = "Te weinig geld om te rerollen."
+		flash = T("Te weinig geld om te rerollen.")
 	show_shop()
 
 
@@ -3070,53 +3075,53 @@ func show_gameover() -> void:
 	var earned := _finish_run_meta(false)
 	clear()
 	var reason := str(Game.state.game_over)
-	lbl("GAME OVER", 40)
+	lbl(T("GAME OVER"), 40)
 	match reason:
 		"failliet":
-			lbl("Failliet. De deurwaarder neemt zelfs je gesigneerde shirtjes mee.", 26)
+			lbl(T("Failliet. De deurwaarder neemt zelfs je gesigneerde shirtjes mee."), 26)
 		"licentie":
-			lbl("Je licentie is ingetrokken. De bond stuurt een koele brief; de pers een fotograaf.", 26)
+			lbl(T("Je licentie is ingetrokken. De bond stuurt een koele brief; de pers een fotograaf."), 26)
 		"leeg":
-			lbl("Je laatste cliënt is vertrokken. Een makelaar zonder spelers is gewoon een man met een telefoon.", 26)
+			lbl(T("Je laatste cliënt is vertrokken. Een makelaar zonder spelers is gewoon een man met een telefoon."), 26)
 		_:
-			lbl("De run is voorbij.", 26)
+			lbl(T("De run is voorbij."), 26)
 	sep()
-	lbl("Seizoenen overleefd: %d" % (int(Game.state.season)), 24)
-	lbl("Totaal aan fees verdiend: %s" % eur(Game.state.total_fees), 24)
+	lbl(T("Seizoenen overleefd: %d") % (int(Game.state.season)), 24)
+	lbl(T("Totaal aan fees verdiend: %s") % eur(Game.state.total_fees), 24)
 	sep()
 	if earned > 0:
-		lbl("+%s legacy points verdiend  →  totaal %s" % [_pts(earned), _pts(Meta.state.legacy_points)], 24)
+		lbl(T("+%s legacy points verdiend  →  totaal %s") % [_pts(earned), _pts(Meta.state.legacy_points)], 24)
 	else:
-		lbl("Legacy points: %s" % _pts(Meta.state.legacy_points), 24)
-	btn("Perks bekijken →", show_perks)
-	btn("Nieuwe run", _on_restart)
+		lbl(T("Legacy points: %s") % _pts(Meta.state.legacy_points), 24)
+	btn(T("Perks bekijken →"), show_perks)
+	btn(T("Nieuwe run"), _on_restart)
 
 
 func show_win() -> void:
 	refresh_header()
 	var earned := _finish_run_meta(true)
 	clear()
-	lbl("JE HEBT HET GEHAALD", 38)
-	lbl("Je overleefde alle %d seizoenen. Van snackbar-kantoor naar gevestigde naam." % Game.MAX_SEASONS, 26)
+	lbl(T("JE HEBT HET GEHAALD"), 38)
+	lbl(T("Je overleefde alle %d seizoenen. Van snackbar-kantoor naar gevestigde naam.") % Game.MAX_SEASONS, 26)
 	sep()
-	lbl("EINDSCORE (totaal aan fees): %s" % eur(Game.state.total_fees), 30)
+	lbl(T("EINDSCORE (totaal aan fees): %s") % eur(Game.state.total_fees), 30)
 	var fees := int(Game.state.total_fees)
 	if fees >= 750000:
-		lbl("Rang: SUPERAGENT. Jouw naam gonst door elke bestuurskamer.", 24)
+		lbl(T("Rang: SUPERAGENT. Jouw naam gonst door elke bestuurskamer."), 24)
 	elif fees >= 400000:
-		lbl("Rang: Gevestigde makelaar. Netjes — maar de top lonkt.", 24)
+		lbl(T("Rang: Gevestigde makelaar. Netjes — maar de top lonkt."), 24)
 	else:
-		lbl("Rang: Overlever. Je bestaat nog. Dat is niet hetzelfde als winnen.", 24)
+		lbl(T("Rang: Overlever. Je bestaat nog. Dat is niet hetzelfde als winnen."), 24)
 	sep()
 	if earned > 0:
-		lbl("+%s legacy points verdiend  →  totaal %s" % [_pts(earned), _pts(Meta.state.legacy_points)], 24)
+		lbl(T("+%s legacy points verdiend  →  totaal %s") % [_pts(earned), _pts(Meta.state.legacy_points)], 24)
 		if Meta.last_champion_bonus > 0:
-			var bonus_lbl := lbl("Waarvan %s KAMPIOENSBONUS — 12%% van je hele carrière-saldo, in één klap." % _pts(Meta.last_champion_bonus), 22)
+			var bonus_lbl := lbl(T("Waarvan %s KAMPIOENSBONUS — 12%% van je hele carrière-saldo, in één klap.") % _pts(Meta.last_champion_bonus), 22)
 			bonus_lbl.add_theme_color_override("font_color", Color(1.0, 0.85, 0.2))
 	else:
-		lbl("Legacy points: %s" % _pts(Meta.state.legacy_points), 24)
-	btn("Perks bekijken →", show_perks)
-	btn("Nieuwe run", _on_restart)
+		lbl(T("Legacy points: %s") % _pts(Meta.state.legacy_points), 24)
+	btn(T("Perks bekijken →"), show_perks)
+	btn(T("Nieuwe run"), _on_restart)
 
 
 func _on_restart() -> void:
