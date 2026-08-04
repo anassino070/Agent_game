@@ -281,12 +281,17 @@ func lbl(text: String, size := 28) -> Label:
 	return l
 
 
-func btn(text: String, cb: Callable, enabled := true) -> Button:
+func btn(text: String, cb: Callable, enabled := true, font_size := 0) -> Button:
+	# font_size 0 = themastandaard. Alleen opgeven waar de knop in een smalle
+	# kolom staat (de tactieken in de onderhandeling), want daar wrapt de
+	# standaardgrootte over drie regels.
 	var b := Button.new()
 	b.text = text
 	b.disabled = not enabled
 	b.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
-	b.custom_minimum_size = Vector2(0, 72)
+	if font_size > 0:
+		b.add_theme_font_size_override("font_size", font_size)
+	b.custom_minimum_size = Vector2(0, 72 if font_size == 0 else 60)
 	b.pressed.connect(cb)
 	content.add_child(b)
 	return b
@@ -1414,7 +1419,7 @@ func _sort_button(label: String, key: String) -> Button:
 	var arrow := ""
 	if scout_sort == key:
 		arrow = "  ↓" if scout_sort_desc else "  ↑"
-	b.text = label + arrow
+	b.text = T(label) + arrow
 	b.add_theme_font_size_override("font_size", 20)
 	b.custom_minimum_size = Vector2(0, 48)
 	b.pressed.connect(func(): _toggle_sort(key))
@@ -1472,7 +1477,7 @@ func _set_turn_bar(label: String, current: int, max_turns: int) -> void:
 	turn_bar.visible = true
 	if label != "":
 		var l := Label.new()
-		l.text = label
+		l.text = T(label)
 		l.add_theme_font_size_override("font_size", 20)
 		turn_bar.add_child(l)
 	var blocks := HBoxContainer.new()
@@ -1684,6 +1689,7 @@ const EFFECT_GOOD_HIGH := {
 }
 
 
+const NEGO_BTN_FONT := 19   # tactiekknoppen staan in een smalle kolom, dus kleiner dan standaard
 const EMPHASIS_MIN_RATIO := 2.0   # pas 4 tekens als de waarde ÉCHT ≥2× de kleinste is
 
 # Absolute drempel voor GELD (seizoen-1-bedrag, schaalt mee met de economie).
@@ -2660,7 +2666,7 @@ func show_nego() -> void:
 		var coach_bonus := 15 if Game.has_shop("onderhandelcoach") else 0
 		for t in nego.tactics(int(Game.state.rep) + Meta.perk_bonus("onderhandelen") * 5 + coach_bonus):
 			if str(t.id) == "aftasten":
-				btn(T("%s  [kost %d %s]") % [T(str(t.label)), nego.aftast_cost, _rounds_word(nego.aftast_cost)], func(): _play_tactic(t))
+				btn(T("%s  [kost %d %s]") % [T(str(t.label)), nego.aftast_cost, _rounds_word(nego.aftast_cost)], func(): _play_tactic(t), true, NEGO_BTN_FONT)
 			else:
 				# Zowel de slagingskans als het weerstandseffect blijven verborgen
 				# tot je de TD kent (aftasten of een type-combo) — anders zou je
@@ -2668,9 +2674,9 @@ func show_nego() -> void:
 				var chance_txt := ("%d%%" % int(round(float(t.chance) * 100))) if nego.pers_known else T("kans ?")
 				var drop_txt := (T("weerstand -%d") % int(t.drop)) if nego.pers_known else T("weerstand ?")
 				var blocked := nego.is_blocked(str(t.id))
-				var suffix := "  (net mislukt — probeer iets anders)" if blocked else ""
-				btn(T("%s  [%s, %s]%s") % [T(str(t.label)), chance_txt, drop_txt, suffix], func(): _play_tactic(t), not blocked)
-		btn(T("Percentage verhogen (+%d%%, raakt weerstand/flow niet)") % int(round(Negotiation.RAISE_FEE_STEP * 100)), _raise_fee, nego.cut < Negotiation.MAX_CUT)
+				var suffix := T("  (net mislukt — probeer iets anders)") if blocked else ""
+				btn(T("%s  [%s, %s]%s") % [T(str(t.label)), chance_txt, drop_txt, suffix], func(): _play_tactic(t), not blocked, NEGO_BTN_FONT)
+		btn(T("Percentage verhogen (+%d%%, raakt weerstand/flow niet)") % int(round(Negotiation.RAISE_FEE_STEP * 100)), _raise_fee, nego.cut < Negotiation.MAX_CUT, NEGO_BTN_FONT)
 
 		var favor_btn := Button.new()
 		favor_btn.text = T("🪙 Gunst inzetten: deal direct rond")
