@@ -109,19 +109,19 @@ func find_club(cid: String) -> Dictionary:
 
 
 func profile_label(c: Dictionary) -> String:
-	return str(PROFILES[str(c.profile)].label)
+	return I18n.T(str(PROFILES[str(c.profile)].label))
 
 
 func terms_label(t: int) -> String:
 	if t >= 80:
-		return "uitstekend (basisplek, vrije afkoop)"
+		return I18n.T("uitstekend (basisplek, vrije afkoop)")
 	if t >= 60:
-		return "goed (serieuze rol)"
+		return I18n.T("goed (serieuze rol)")
 	if t >= 40:
-		return "redelijk"
+		return I18n.T("redelijk")
 	if t >= 20:
-		return "mager (bankzitter, strakke clausules)"
-	return "slecht (hij wordt geparkeerd)"
+		return I18n.T("mager (bankzitter, strakke clausules)")
+	return I18n.T("slecht (hij wordt geparkeerd)")
 
 
 func top_by_price() -> Dictionary:

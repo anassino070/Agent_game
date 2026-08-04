@@ -808,7 +808,7 @@ func show_perks() -> void:
 	lbl(T("Permanente upgrades voor elke volgende run. Je verdient legacy points door te spelen — hoe verder je komt, hoe exponentieel meer (een gewonnen run = 1%% van de boom). Elke rij biedt 3 opties; koop %d niveaus in een rij om de rij eronder te ontgrendelen (of alles wat die rij te bieden heeft, als dat er minder zijn).") % Meta.TIER_REQ, 22)
 	for branch in Meta.TREE:
 		sep()
-		lbl(T("◆ TAK: %s") % str(branch.name), 30)
+		lbl(T("◆ TAK: %s") % T(str(branch.name)), 30)
 		for tier_idx in range(branch.tiers.size()):
 			var unlocked: bool = Meta.tier_unlocked(branch, tier_idx)
 			if unlocked:
@@ -818,7 +818,7 @@ func show_perks() -> void:
 			else:
 				var names: Array = []
 				for id in branch.tiers[tier_idx]:
-					names.append(str(Meta.PERKS[id].name))
+					names.append(Meta.perk_name(id))
 				# De échte eis opvragen i.p.v. de kale TIER_REQ: in een rij met
 				# minder dan 5 koopbare niveaus is de eis lager (zie
 				# Meta.tier_req_for()), en dan moet de melding dat ook zeggen.
