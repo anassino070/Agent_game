@@ -322,13 +322,13 @@ func _player_tooltip(pid: String) -> String:
 	# meer, gewoon de exacte waarde. Voor de rest blijft het een geschatte band.
 	var pot_str := ""
 	if pid in Game.state.clients:
-		pot_str = "potentieel %d" % int(p.pot)
+		pot_str = T("potentieel %d") % int(p.pot)
 	else:
 		var lo := maxi(Game.estimate(pid) - int(p.unc), int(p.rating))
 		var hi := mini(Game.estimate(pid) + int(p.unc), 95)
-		pot_str = "potentieel ca. %d–%d" % [lo, hi]
+		pot_str = T("potentieel ca. %d–%d") % [lo, hi]
 	# Clubs staan voorlopig buiten beeld (cosmetisch) — geen waarde momenteel.
-	return "%s — %s, %d jr\nRating %d (%s)\nVertrouwen %d\nWaarde %s" % [
+	return T("%s — %s, %d jr\nRating %d (%s)\nVertrouwen %d\nWaarde %s") % [
 		str(p.name), str(p.pos), int(p.age), int(p.rating), pot_str,
 		int(p.trust), eur(Game.value(p)),
 	]
@@ -1035,7 +1035,7 @@ func show_prep() -> void:
 	bank_deposit_slider.value_changed.connect(_on_bank_slider_changed)
 	content.add_child(bank_deposit_slider)
 	var deposit_btn := Button.new()
-	deposit_btn.text = "Storten"
+	deposit_btn.text = T("Storten")
 	deposit_btn.custom_minimum_size = Vector2(0, 48)
 	deposit_btn.disabled = max_deposit <= 0
 	deposit_btn.pressed.connect(_do_bank_deposit)
@@ -1190,7 +1190,7 @@ func _candidate_card(pid: String) -> Control:
 
 	if not is_client and not approached.has(pid):
 		var chance := Label.new()
-		chance.text = "tekenkans %d%%" % int(round(Game.sign_chance(pid) * 100))
+		chance.text = T("tekenkans %d%%") % int(round(Game.sign_chance(pid) * 100))
 		chance.add_theme_font_size_override("font_size", 18)
 		chance.add_theme_color_override("font_color", Color(0.7, 0.82, 0.95))
 		info.add_child(chance)
@@ -1592,7 +1592,7 @@ func show_event(ev: Dictionary) -> void:
 		if opt.has("chance"):
 			# Geluksvogel-perk telt mee in de getoonde én de echte kans.
 			var shown := clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98)
-			label += "  [%d%% kans]" % int(round(shown * 100))
+			label += T("  [%d%% kans]") % int(round(shown * 100))
 			btn(label + suffix, func(): _resolve(ev, opt), enabled)
 			var succ_eff := Game.scale_money_effects(opt.get("success", {}))
 			var fail_eff := Game.scale_money_effects(opt.get("fail", {}))
@@ -1723,7 +1723,7 @@ func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: b
 		if effects.has(key) and int(effects[key]) != 0:
 			var v := int(effects[key])
 			var good: bool = (v > 0) == bool(EFFECT_GOOD_HIGH[key])
-			var label := str(EFFECT_LABELS[key])
+			var label := T(str(EFFECT_LABELS[key]))
 			var text: String
 			if show_numbers:
 				var amount := eur(v) if key == "money" else _fmt_delta(v)
@@ -1733,12 +1733,12 @@ func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: b
 			rows.append({"text": text, "good": good, "key": key})
 	if effects.has("trust") and int(effects.trust) != 0:
 		var v := int(effects.trust)
-		var who := client_name if client_name != "" else "cliënt"
-		var text := ("Vertrouwen (%s): %s" % [who, _fmt_delta(v)]) if show_numbers else ("%s Vertrouwen (%s)" % [_emphasis_symbol("trust", emphasize, v), who])
+		var who := client_name if client_name != "" else T("cliënt")
+		var text := (T("Vertrouwen (%s): %s") % [who, _fmt_delta(v)]) if show_numbers else (T("%s Vertrouwen (%s)") % [_emphasis_symbol("trust", emphasize, v), who])
 		rows.append({"text": text, "good": v > 0})
 	if effects.has("all_trust") and int(effects.all_trust) != 0:
 		var v := int(effects.all_trust)
-		var text := ("Vertrouwen (hele stal): %s" % _fmt_delta(v)) if show_numbers else ("%s Vertrouwen (hele stal)" % _emphasis_symbol("all_trust", emphasize, v))
+		var text := (T("Vertrouwen (hele stal): %s") % _fmt_delta(v)) if show_numbers else (T("%s Vertrouwen (hele stal)") % _emphasis_symbol("all_trust", emphasize, v))
 		rows.append({"text": text, "good": v > 0})
 	# new_client/new_top_client zijn geen getal maar wél de belangrijkste
 	# uitkomst van een optie — anders lees je alleen "Reputatie -5" en mis
@@ -1746,7 +1746,7 @@ func _effect_rows(effects: Dictionary, client_name: String = "", show_numbers: b
 	if bool(effects.get("new_client", false)):
 		rows.append({"text": "★ Kans op een NIEUWE CLIËNT", "good": true})
 	if bool(effects.get("new_top_client", false)):
-		rows.append({"text": "★ Kans op een NIEUWE TOPSPELER als cliënt", "good": true})
+		rows.append({"text": T("★ Kans op een NIEUWE TOPSPELER als cliënt"), "good": true})
 	return rows
 
 
@@ -2665,15 +2665,15 @@ func show_nego() -> void:
 				# Zowel de slagingskans als het weerstandseffect blijven verborgen
 				# tot je de TD kent (aftasten of een type-combo) — anders zou je
 				# via het effect alsnog kunnen afleiden welk type hij is.
-				var chance_txt := ("%d%%" % int(round(float(t.chance) * 100))) if nego.pers_known else "kans ?"
-				var drop_txt := ("weerstand -%d" % int(t.drop)) if nego.pers_known else "weerstand ?"
+				var chance_txt := ("%d%%" % int(round(float(t.chance) * 100))) if nego.pers_known else T("kans ?")
+				var drop_txt := (T("weerstand -%d") % int(t.drop)) if nego.pers_known else T("weerstand ?")
 				var blocked := nego.is_blocked(str(t.id))
 				var suffix := "  (net mislukt — probeer iets anders)" if blocked else ""
 				btn(T("%s  [%s, %s]%s") % [T(str(t.label)), chance_txt, drop_txt, suffix], func(): _play_tactic(t), not blocked)
 		btn(T("Percentage verhogen (+%d%%, raakt weerstand/flow niet)") % int(round(Negotiation.RAISE_FEE_STEP * 100)), _raise_fee, nego.cut < Negotiation.MAX_CUT)
 
 		var favor_btn := Button.new()
-		favor_btn.text = "🪙 Gunst inzetten: deal direct rond"
+		favor_btn.text = T("🪙 Gunst inzetten: deal direct rond")
 		favor_btn.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
 		favor_btn.custom_minimum_size = Vector2(0, 56)
 		favor_btn.disabled = int(Game.state.favors) <= 0
@@ -2702,10 +2702,10 @@ func show_nego() -> void:
 			var reached: int = combo.pattern.size() if done else progress
 			var req := ""
 			if combo.has("req_pers"):
-				req = "  [alleen tegen een %s TD]" % str(combo.req_pers)
+				req = T("  [alleen tegen een %s TD]") % T(str(combo.req_pers))
 			var mark := "✔" if done else ("▸" if progress > 0 else "·")
 			var header_color := Color(0.35, 0.9, 0.4) if done else (Color(1.0, 0.78, 0.15) if progress > 0 else Color(0.75, 0.75, 0.75))
-			var header := lbl(T("%s %s (+%d)%s") % [mark, str(combo.name), int(combo.bonus), req], 19)
+			var header := lbl(T("%s %s (+%d)%s") % [mark, T(str(combo.name)), int(combo.bonus), req], 19)
 			header.add_theme_color_override("font_color", header_color)
 			_show_combo_pattern_row(combo.pattern, reached)
 
@@ -2997,14 +2997,14 @@ func show_departures_news(departures: Array, report: Array) -> void:
 	title.add_theme_color_override("font_color", Color(1.0, 0.35, 0.3))
 	for entry in departures:
 		sep()
-		var nm := str(entry.get("name", "Een cliënt"))
+		var nm := str(entry.get("name", T("Een cliënt")))
 		var reason := str(entry.get("reason", "left"))
 		var trust := int(entry.get("trust", 0))
 		var line := ""
 		if reason == "poached":
 			line = "%s wordt weggekaapt door %s. 'Zij beloven me meer.'" % [nm, str(entry.get("rival", "een rivaal"))]
 		else:
-			line = "%s stapt zelf op. Het vertrouwen was op (%d)." % [nm, trust]
+			line = T("%s stapt zelf op. Het vertrouwen was op (%d).") % [nm, trust]
 		var l := lbl(line, 26)
 		l.add_theme_color_override("font_color", Color(1.0, 0.5, 0.45))
 		var pid := str(entry.get("pid", ""))
@@ -3012,7 +3012,7 @@ func show_departures_news(departures: Array, report: Array) -> void:
 			var p: Dictionary = Game.state.players[pid]
 			# known_pot: hij wás je cliënt, dus je kende zijn exacte potentieel —
 			# dat verdwijnt niet op het moment dat hij vertrekt.
-			content.add_child(_player_card(pid, "%s, %d jr · vertrouwen was %d · waarde %s" % [
+			content.add_child(_player_card(pid, T("%s, %d jr · vertrouwen was %d · waarde %s") % [
 				str(p.pos), int(p.age), trust, eur(Game.value(p)),
 			], false, false, -1, true))
 	sep()

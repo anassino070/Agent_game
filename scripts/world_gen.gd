@@ -33,7 +33,7 @@ static func generate(rng: RandomNumberGenerator) -> Dictionary:
 		var cid := "c%d" % i
 		clubs[cid] = {
 			"id": cid,
-			"name": CLUB_NAMES[i],
+			"name": I18n.club_names(CLUB_NAMES)[i],
 			"ambition": amb,
 			"budget": amb * rng.randi_range(300, 1200) * 1000,
 			"td": _rand_name(rng),

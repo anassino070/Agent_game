@@ -52,6 +52,34 @@ func lang_name(l: String) -> String:
 	return str(LANGS.get(l, l))
 
 
+# Woordenlijst voor de anagram-minigame en de clubnamen: GEEN vertaling maar een
+# eigen lijst per taal. Een gehusseld Nederlands woord is onontcijferbaar in een
+# Engels spel, en Nederlandse clubnamen passen niet in een Engelse wereld. Dit is
+# dus spelinhoud, niet tekst. Beide vallen terug op de meegegeven NL-lijst.
+const WORD_BANK_EN := [
+	"CONTRACT", "CLAUSE", "BUDGET", "TRANSFER", "SPONSOR", "RESERVE", "SCOUTING", "SEASON",
+	"TALENT", "PERFORMANCE", "SELECTION", "FORMATION", "TACTICS", "QUOTATION", "PREMIUM", "SALARY",
+	"ATTACK", "MIDFIELD", "KEEPER", "STRIKER", "COACH", "ASSISTANT", "NETWORK", "REPUTATION",
+	"SCANDAL", "FAVOUR", "OFFICE", "RIVAL", "OFFER", "BIDDING", "VALUE", "MARKET",
+	"STADIUM", "SUPPORTER", "DOSSIER", "SETTLEMENT", "PENALTY", "SANCTION", "LICENCE", "CLAUSES",
+	"AGENT", "PROVISION", "IMAGE", "BONUS",
+]
+
+const CLUB_NAMES_EN := [
+	"Lakeport FC", "Dunmore Athletic", "Redwhite Rovers", "Eastgate FC",
+	"Silverton Town", "Canalside AFC", "Northlight FC",
+	"Borderguard SC", "Bronzeton FC", "West Coast United",
+]
+
+
+func word_bank(nl_bank: Array) -> Array:
+	return WORD_BANK_EN if _lang == "en" else nl_bank
+
+
+func club_names(nl_names: Array) -> Array:
+	return CLUB_NAMES_EN if _lang == "en" else nl_names
+
+
 # De vertaalfunctie. Kort van naam omdat hij honderden keren voorkomt.
 func T(nl: String) -> String:
 	if _lang == DEFAULT_LANG:
@@ -1179,4 +1207,18 @@ func _table_en() -> Dictionary:
 	d["%s zit financieel krap en moet verkopen."] = "%s is financially stretched and has to sell."
 	d["Rustige zomer op de transfermarkt. Iedereen wacht op de eerste dominosteen."] = "A quiet summer on the transfer market. Everyone is waiting for the first domino."
 	d["Een groot eindtoernooi komt eraan; spelers willen zich in de kijker spelen."] = "A major tournament is coming up; players want to put themselves in the shop window."
+	# ---- effect-labels, tooltip en negotiation-UI (opgebouwde strings) ----
+	d["%s — %s, %d jr\nRating %d (%s)\nVertrouwen %d\nWaarde %s"] = "%s — %s, %d yrs\nRating %d (%s)\nTrust %d\nValue %s"
+	d["potentieel %d"] = "potential %d"
+	d["potentieel ca. %d–%d"] = "potential approx. %d–%d"
+	d["cliënt"] = "client"
+	d["★ Kans op een NIEUWE TOPSPELER als cliënt"] = "★ Chance of a NEW TOP PLAYER as a client"
+	d["%s stapt zelf op. Het vertrouwen was op (%d)."] = "%s walks out on his own. Trust had run out (%d)."
+	d["%s, %d jr · vertrouwen was %d · waarde %s"] = "%s, %d yrs · trust was %d · value %s"
+	d["Een cliënt"] = "A client"
+	# ---- TD-persoonlijkheidssleutels (in de combo-hint) ----
+	d["rekenmeester"] = "number-cruncher"
+	d["nerveus"] = "nervous"
+	d["ijdel"] = "vain"
+	d["koppig"] = "stubborn"
 	return d
