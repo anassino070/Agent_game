@@ -373,11 +373,28 @@ func _fmt_thousands(n: int) -> String:
 	return ("-" + out) if n < 0 else out
 
 
+func perk_name(id: String) -> String:
+	# Gelokaliseerde perknaam. De NL-naam in PERKS is de vertaalsleutel, dus
+	# alle leessites in de UI gaan hierlangs i.p.v. rechtstreeks PERKS[id].name.
+	return I18n.T(str(PERKS[id].name))
+
+
+func legacy_perk_name(id: String) -> String:
+	return I18n.T(str(LEGACY_PERKS[id].name))
+
+
+func legacy_perk_desc(id: String) -> String:
+	return I18n.T(str(LEGACY_PERKS[id].desc))
+
+
 func perk_desc(id: String, levels: int) -> String:
-	# Beschrijving voor `levels` niveaus, met de juiste eenheid.
+	# Beschrijving voor `levels` niveaus, met de juiste eenheid. Vertalen gebeurt
+	# op de NL-brontekst en VOOR het interpoleren van de waarde, zodat de %s in
+	# de vertaling gewoon meekomt.
 	var p: Dictionary = PERKS[id]
-	if str(p.desc).find("%s") == -1:
-		return str(p.desc)   # vaste tekst (de OP-perks)
+	var desc := I18n.T(str(p.desc))
+	if desc.find("%s") == -1:
+		return desc   # vaste tekst (de OP-perks)
 	var amount: int = int(p.value) * levels
 	var txt := str(amount)
 	match str(p.get("fmt", "int")):
@@ -385,7 +402,7 @@ func perk_desc(id: String, levels: int) -> String:
 			txt = "€%s" % _fmt_thousands(amount)
 		"pct10":
 			txt = ("%.1f%%" % (float(amount) / 10.0)).replace(".", ",")
-	return str(p.desc) % txt
+	return desc % txt
 
 
 func tier_levels(branch: Dictionary, tier_idx: int) -> int:

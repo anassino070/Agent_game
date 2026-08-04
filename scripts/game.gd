@@ -364,6 +364,16 @@ func has_shop(id: String) -> bool:
 const SHOP_PRICE_MULT := 0.9
 
 
+func shop_name(id: String) -> String:
+	# Gelokaliseerde shop-teksten. De NL-string in SHOP_UPGRADES is de
+	# vertaalsleutel, dus de UI leest hierlangs i.p.v. rechtstreeks .name/.desc.
+	return I18n.T(str(SHOP_UPGRADES[id].name))
+
+
+func shop_desc(id: String) -> String:
+	return I18n.T(str(SHOP_UPGRADES[id].desc))
+
+
 func shop_price(id: String) -> int:
 	return int(round(float(SHOP_UPGRADES[id].price) * SHOP_PRICE_MULT * shop_money_scale()))
 
@@ -824,7 +834,9 @@ func office_band() -> Dictionary:
 
 
 func office_name() -> String:
-	return str(office_band().name)
+	# Gelokaliseerd: de kantoornamen zijn sfeernamen ("Boven de Snackbar") en
+	# staan dus ook in de vertaaltabel.
+	return I18n.T(str(office_band().name))
 
 
 const OFFICE_UPGRADE_PCT_OF_VALUE := 0.4   # upgrade-kosten = 40% van de gem. spelerswaarde op het doelniveau
@@ -1136,7 +1148,7 @@ func end_of_season() -> Array:
 		costs = int(costs * (1.0 - float(discount) / 100.0))
 	costs = maxi(costs - Meta.perk_bonus("schuldpapier"), 0)
 	state.money = int(state.money) - costs
-	lines.append("Kantoorkosten: -€%s" % fmt_thousands(costs))
+	lines.append(I18n.T("Kantoorkosten: -€%s") % fmt_thousands(costs))
 
 	# Clubbudgetten groeien elk seizoen mee (tv-gelden, sponsoring) — anders
 	# blijven ze voor altijd vastzitten op hun startwaarde uit seizoen 1,
@@ -1157,7 +1169,7 @@ func end_of_season() -> Array:
 			var bank_mult := BANK_MULTIPLIER + (0.3 if has_shop("investeringsfonds") else 0.0)
 			var payout := int(round(float(d.amount) * bank_mult))
 			state.money = int(state.money) + payout
-			lines.append("De bank keert uit: je storting van €%s wordt €%s." % [fmt_thousands(int(d.amount)), fmt_thousands(payout)])
+			lines.append(I18n.T("De bank keert uit: je storting van €%s wordt €%s.") % [fmt_thousands(int(d.amount)), fmt_thousands(payout)])
 		else:
 			still_pending.append({"amount": int(d.amount), "seasons_left": seasons_left})
 	state.bank_deposits = still_pending
@@ -1178,10 +1190,10 @@ func end_of_season() -> Array:
 			pp["club"] = MYSTERY_CLUB_ID
 			pp["contract"] = 3
 			pp["trust"] = clampi(int(pp.trust) + int(ceil(6.0 * trust_gain_mult())), 0, 100)
-			lines.append("Voorbereide transfer: %s naar een mysterieuze buitenlandse club — jouw fee €%s." % [pp.name, fmt_thousands(income)])
+			lines.append(I18n.T("Voorbereide transfer: %s naar een mysterieuze buitenlandse club — jouw fee €%s.") % [pp.name, fmt_thousands(income)])
 			prepared_results.append({"name": str(pp.name), "success": true, "transfer_sum": transfer_sum, "income": income})
 		else:
-			lines.append("Voorbereide transfer van %s ging niet door — de prognose bleek onjuist." % pp.name)
+			lines.append(I18n.T("Voorbereide transfer van %s ging niet door — de prognose bleek onjuist.") % pp.name)
 			prepared_results.append({"name": str(pp.name), "success": false})
 	state.prepared_transfers = []
 	state["last_prepared_results"] = prepared_results
@@ -1248,7 +1260,7 @@ func end_of_season() -> Array:
 				var tg := int(value(p) * 0.01 * tekengeld_mult())
 				state.money = int(state.money) + tg
 				state.total_fees = int(state.total_fees) + tg
-				lines.append("%s verlengt bij zijn club; tekengeld €%s voor jou." % [p.name, fmt_thousands(tg)])
+				lines.append(I18n.T("%s verlengt bij zijn club; tekengeld €%s voor jou.") % [p.name, fmt_thousands(tg)])
 		if Meta.perk_level("ijzeren_stal") == 0 and rng.randf() < leave_chance(p):
 			# Ook dit vertrek gaat NAAR HET NIEUWSSCHERM en niet meer als losse
 			# tekstregel het rapport in: uit zichzelf weglopen door laag
@@ -1287,27 +1299,27 @@ func end_of_season() -> Array:
 		var rente := int(float(state.money) * float(rente_pct) / 100.0)
 		if rente > 0:
 			state.money = int(state.money) + rente
-			lines.append("Rente op je vermogen: +€%s." % fmt_thousands(rente))
+			lines.append(I18n.T("Rente op je vermogen: +€%s.") % fmt_thousands(rente))
 
 	# Gunstenfabriek-perk: elk 3e seizoen extra gunsten.
 	var gf := Meta.perk_bonus("gunstenfabriek")
 	if gf > 0 and int(state.season) % 3 == 0:
 		state.favors = int(state.favors) + gf
-		lines.append("Je gunstenfabriek draait: +%d gunst(en)." % gf)
+		lines.append(I18n.T("Je gunstenfabriek draait: +%d gunst(en).") % gf)
 
 	# Netwerkdiner-upgrade (shop): elk seizoen een gratis gunst.
 	if has_shop("netwerkdiner"):
 		state.favors = int(state.favors) + 1
-		lines.append("Je netwerkdiner levert weer een gunst op.")
+		lines.append(I18n.T("Je netwerkdiner levert weer een gunst op."))
 
 	state.news = _gen_news()
 
 	# Laatste redmiddel-perk / Noodfonds-upgrade: één keer per run wordt een
 	# tekort gedekt (los van elkaar bruikbaar als je beide hebt).
 	if int(state.money) < 0 and try_bailout():
-		lines.append("!! Een oude vriend dekt je tekort. 'Eén keer. Daarna sta je er alleen voor.'")
+		lines.append(I18n.T("!! Een oude vriend dekt je tekort. 'Eén keer. Daarna sta je er alleen voor.'"))
 	if int(state.money) < 0 and try_shop_bailout():
-		lines.append("!! Je noodfonds springt bij en zet je saldo op €0. Dat was 'm dan.")
+		lines.append(I18n.T("!! Je noodfonds springt bij en zet je saldo op €0. Dat was 'm dan."))
 
 	# Fail states — in volgorde van drama.
 	if int(state.money) < 0:

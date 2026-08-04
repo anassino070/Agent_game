@@ -849,13 +849,14 @@ func show_perks() -> void:
 func _legacy_perk_node(id: String) -> void:
 	var perk: Dictionary = Meta.LEGACY_PERKS[id]
 	var owned := Meta.has_legacy_perk(id)
-	lbl("  %s  (%d ster%s)%s" % [
-		str(perk.name), int(perk.stars), "" if int(perk.stars) == 1 else "ren",
-		"  ✔ ACTIEF" if owned else "",
+	var stars := int(perk.stars)
+	lbl(T("  %s  (%d %s)%s") % [
+		Meta.legacy_perk_name(id), stars, _stars_word(stars),
+		T("  ✔ ACTIEF") if owned else "",
 	], 24)
-	lbl("       " + str(perk.desc), 20)
+	lbl("       " + Meta.legacy_perk_desc(id), 20)
 	if not owned:
-		btn("Koop %s  (%d ster%s)" % [str(perk.name), int(perk.stars), "" if int(perk.stars) == 1 else "ren"],
+		btn(T("Koop %s  (%d %s)") % [Meta.legacy_perk_name(id), stars, _stars_word(stars)],
 			func(): _buy_legacy_perk(id), Meta.can_buy_legacy_perk(id))
 
 
@@ -885,14 +886,14 @@ func _perk_node(id: String) -> void:
 	var lvl := Meta.perk_level(id)
 	var maxlvl := int(perk.max_level)
 	var bar := "●".repeat(lvl) + "○".repeat(maxlvl - lvl)
-	lbl("  %s  %s" % [str(perk.name), bar], 25)
+	lbl("  %s  %s" % [Meta.perk_name(id), bar], 25)
 	if lvl > 0:
-		lbl("       nu: " + Meta.perk_desc(id, lvl), 21)
+		lbl("       " + T("nu: ") + Meta.perk_desc(id, lvl), 21)
 	if lvl < maxlvl:
-		lbl("       volgend niveau: " + Meta.perk_desc(id, 1), 21)
-		btn("Koop %s niveau %d  (%s punten)" % [str(perk.name), lvl + 1, _pts(Meta.perk_cost(id))], func(): _buy_perk(id), Meta.can_buy(id))
+		lbl("       " + T("volgend niveau: ") + Meta.perk_desc(id, 1), 21)
+		btn(T("Koop %s niveau %d  (%s punten)") % [Meta.perk_name(id), lvl + 1, _pts(Meta.perk_cost(id))], func(): _buy_perk(id), Meta.can_buy(id))
 	else:
-		lbl("       MAX bereikt.", 20)
+		lbl("       " + T("MAX bereikt."), 20)
 
 
 func _buy_perk(id: String) -> void:
@@ -3025,30 +3026,29 @@ func _enter_shop() -> void:
 func show_shop() -> void:
 	refresh_header()
 	clear()
-	lbl("🪙 DE SHOP", 34)
-	lbl("Elke seizoenswissel liggen hier 3 willekeurige upgrades voor de rest van deze run. Koop wat je wilt, reroll voor een andere set, of loop gewoon door — niets verplicht.", 22)
+	lbl(T("🪙 DE SHOP"), 34)
+	lbl(T("Elke seizoenswissel liggen hier 3 willekeurige upgrades voor de rest van deze run. Koop wat je wilt, reroll voor een andere set, of loop gewoon door — niets verplicht."), 22)
 	show_flash()
 	sep()
 	if shop_offers.is_empty():
-		lbl("Niets (meer) te koop deze keer.", 24)
+		lbl(T("Niets (meer) te koop deze keer."), 24)
 	for id in shop_offers:
-		var up: Dictionary = Game.SHOP_UPGRADES[id]
-		var title := lbl(str(up.name), 26)
+		var title := lbl(Game.shop_name(id), 26)
 		title.add_theme_color_override("font_color", Color(0.95, 0.85, 0.4))
-		lbl(str(up.desc), 21)
+		lbl(Game.shop_desc(id), 21)
 		if Game.has_shop(id):
-			lbl("✔ Gekocht", 20)
+			lbl(T("✔ Gekocht"), 20)
 		else:
-			btn("Kopen (%s)" % eur(Game.shop_price(id)), func(): _buy_shop(id), Game.can_buy_shop(id))
+			btn(T("Kopen (%s)") % eur(Game.shop_price(id)), func(): _buy_shop(id), Game.can_buy_shop(id))
 		sep()
-	btn("🎲 Reroll — andere upgrades (%s)" % eur(Game.shop_reroll_cost()), _reroll_shop, Game.can_reroll_shop())
+	btn(T("🎲 Reroll — andere upgrades (%s)") % eur(Game.shop_reroll_cost()), _reroll_shop, Game.can_reroll_shop())
 	sep()
-	btn("Doorgaan naar volgend seizoen →", show_prep)
+	btn(T("Doorgaan naar volgend seizoen →"), show_prep)
 
 
 func _buy_shop(id: String) -> void:
 	if Game.buy_shop_upgrade(id):
-		flash = "%s gekocht!" % str(Game.SHOP_UPGRADES[id].name)
+		flash = T("%s gekocht!") % Game.shop_name(id)
 	show_shop()
 
 
