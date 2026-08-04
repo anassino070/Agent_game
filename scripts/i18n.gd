@@ -1221,4 +1221,8 @@ func _table_en() -> Dictionary:
 	d["nerveus"] = "nervous"
 	d["ijdel"] = "vain"
 	d["koppig"] = "stubborn"
+	# ---- directe .text-toewijzingen (omzeilen lbl()/btn(), zie regel 4 in 4.7) ----
+	d["   [CLIËNT]"] = "   [CLIENT]"
+	d["Ga naar event"] = "Go to event"
+	d["∞ ×%s\n+1%%\nkoop: %d pt"] = "∞ ×%s\n+1%%\nbuy: %d pt"
 	return d

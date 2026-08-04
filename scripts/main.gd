@@ -119,7 +119,7 @@ func _process(delta: float) -> void:
 		anagram_time_left = 0.0
 		_anagram_timeout()
 	elif anagram_timer_label != null and is_instance_valid(anagram_timer_label):
-		anagram_timer_label.text = "Tijd: %ds" % int(ceil(anagram_time_left))
+		anagram_timer_label.text = T("Tijd: %ds") % int(ceil(anagram_time_left))
 
 
 func _ready() -> void:
@@ -728,7 +728,7 @@ func _dev_test_banner() -> void:
 	dev_jump_input.custom_minimum_size = Vector2(70, 40)
 	row.add_child(dev_jump_input)
 	var jump_btn := Button.new()
-	jump_btn.text = "Ga naar event"
+	jump_btn.text = T("Ga naar event")
 	jump_btn.pressed.connect(_dev_jump_to_event)
 	row.add_child(jump_btn)
 
@@ -907,7 +907,7 @@ func _buy_perk(id: String) -> void:
 
 
 func _refresh_inf_btn() -> void:
-	inf_btn.text = "∞ ×%s\n+1%%\nkoop: %d pt" % [
+	inf_btn.text = T("∞ ×%s\n+1%%\nkoop: %d pt") % [
 		("%.3f" % Meta.inf_multiplier()).replace(".", ","), Meta.INF_COST,
 	]
 	inf_btn.disabled = int(Meta.state.legacy_points) < Meta.INF_COST
@@ -1056,7 +1056,7 @@ func _upgrade_office() -> void:
 
 func _on_bank_slider_changed(value: float) -> void:
 	if bank_deposit_label != null:
-		bank_deposit_label.text = "Storten: %s" % eur(int(value))
+		bank_deposit_label.text = T("Storten: %s") % eur(int(value))
 
 
 func _do_bank_deposit() -> void:
@@ -1167,7 +1167,7 @@ func show_scouting() -> void:
 	sort_row.add_theme_constant_override("separation", 8)
 	content.add_child(sort_row)
 	var sl := Label.new()
-	sl.text = "Sorteer:"
+	sl.text = T("Sorteer:")
 	sl.add_theme_font_size_override("font_size", 20)
 	sort_row.add_child(sl)
 	sort_row.add_child(_sort_button("Rating", "rating"))
@@ -1202,7 +1202,7 @@ func _candidate_card(pid: String) -> Control:
 	# (afgewezen): dan valt er niets meer te doen tot volgend seizoen.
 	if not is_client and approached.has(pid):
 		var al := Label.new()
-		al.text = "al benaderd dit seizoen"
+		al.text = T("al benaderd dit seizoen")
 		al.add_theme_font_size_override("font_size", 18)
 		al.add_theme_color_override("font_color", Color(0.7, 0.7, 0.7))
 		btn_row.add_child(al)
@@ -1247,7 +1247,7 @@ func _player_card(pid: String, sub_text := "", highlighted := false, client_tag 
 	var name_lbl := Label.new()
 	# De [CLIËNT]-tag alleen waar hij informatie toevoegt (scoutinglijst) — in
 	# je eigen stal is het overbodige ruis.
-	name_lbl.text = "%s%s" % [str(p.name), "   [CLIËNT]" if (client_tag and pid in Game.state.clients) else ""]
+	name_lbl.text = "%s%s" % [str(p.name), T("   [CLIËNT]") if (client_tag and pid in Game.state.clients) else ""]
 	name_lbl.add_theme_font_size_override("font_size", 22)
 	# Wrappen is nodig sinds de kaarten in een halve kolom staan: een lange naam
 	# of subregel past daar niet meer op één regel.

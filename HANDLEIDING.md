@@ -355,14 +355,18 @@ Dit is de belangrijkste valkuil: de tweede vorm crasht niet, hij blijft gewoon s
 
 * **ternaries** — `btn(T("Naar scouting →") if x else "Naar stalbeheer →")`: alleen de eerste tak was gewrapt;
 * **opgebouwde strings** — `var sub := "%s, %d jr" % [...]` gevolgd door `sub += " · waarde %s" % ...`: dat zijn geen `lbl()`/`btn()`-aanroepen, dus de regex zag ze niet;
-* **strings uit een ander bestand** — de nieuwsregels komen uit `game.gd`'s `_gen_news()`.
+* **strings uit een ander bestand** — de nieuwsregels komen uit `game.gd`'s `_gen_news()`;
+* **directe `.text =`-toewijzingen** — een node die buiten `lbl()`/`btn()` om zijn tekst krijgt. Dit is de gemeenste: een label kan bij opbouw correct via `lbl(T(...))` gaan en daarna door een callback met een KALE literal worden overschreven. Zo bleef de bank-slider "Storten: €9.000" tonen terwijl het label eronder wél Engels begon — `_on_bank_slider_changed()` zette hem elke beweging terug naar Nederlands.
 
 Zoek ze met:
 
 ```bash
 grep -n 'T("[^"]*") if .* else "' scripts/main.gd     # halve ternary
 grep -n 'var sub := "\|sub += "' scripts/main.gd      # opgebouwde string
+grep -n '\.text = "' scripts/main.gd                  # directe toewijzing
 ```
+
+Symbolen (`"🏠"`, `"→"`) hoeven niet gewrapt; de rest wel.
 
 **Noot over het nieuws.** `_gen_news()` interpoleert de clubnaam en bewaart het resultaat in `state.news` (dus in de save). Vertalen gebeurt daarom bij GENERATIE, niet bij weergave. Gevolg: schakel je midden in een run van taal, dan blijft die ene nieuwsregel in de oude taal staan tot het volgende seizoen. Bewust geaccepteerd — het alternatief is een sleutel + argumenten in de save opslaan, wat het saveformaat verandert voor één regel tekst.
 
