@@ -139,6 +139,7 @@ voetbalmakelaar/
 └── scripts/
     ├── game.gd            # AUTOLOAD "Game": alle staat + spellogica van één run
     ├── meta.gd            # AUTOLOAD "Meta": meta-progressie (legacy points, perks), overleeft runs
+    ├── i18n.gd            # AUTOLOAD "I18n": vertaallaag NL/EN (zie §4.7)
     ├── world_gen.gd       # procedurele generatie (spelers, clubs, namen)
     ├── events_db.gd       # alle 70 events als pure data
     ├── negotiation.gd     # het onderhandelings-minigame (transferwindow)
@@ -295,7 +296,7 @@ Daarnaast zijn er **vier ★ OVERPOWERED extra's** buiten de boom (tellen niet m
 
 De perks grijpen op vrijwel elk systeem in: startgeld/rep/gunsten/startvertrouwen (`new_run()`, `_make_client()`), kantoorkosten, rente, gunstenfabriek en schandaalverval (`end_of_season()`), tekenkans (`sign_chance()`), kaapkans (`poach_chance()`), scoutdiepte en kandidatenlijst (`scout()`, `gen_candidates()`), scouting-plafond (`candidate_ceiling()`), fee en tekengeld (`fee_cut()`, `tekengeld_mult()`), stal-cap (`client_cap()`), een eenmalige bailout (`try_bailout()`) en het hele onderhandelspel (extra ronde, flow-multiplier, wegloopdemping, clausulekosten, aftastkosten — gezet in `_start_nego()` in `main.gd`). Nieuwe perks toevoegen = een entry aan `Meta.PERKS` toevoegen, in een rij van `Meta.TREE` hangen en de bonus ergens toepassen (gebruik `fmt` voor de weergave: `int`, `money` of `pct10`).
 
-### 4.4 Richting het volledige GDD
+### 4.5 Richting het volledige GDD
 
 Logische volgorde, oplopend in werk:
 
@@ -307,13 +308,13 @@ Logische volgorde, oplopend in werk:
 
 De enige vraag die deze MVP moet beantwoorden: **wil je na een game-over meteen opnieuw beginnen?** Zo nee, eerst events en balans verbeteren; geen enkel meta-systeem repareert een saaie kernloop.
 
-### 4.5 Instellingen (⚙)
+### 4.6 Instellingen (⚙)
 
 Bereikbaar via het startscherm (`show_settings()` in `main.gd`). Alle instellingen leven in `Meta.state.settings` (dus in `meta.json`, runs-overstijgend) met defaults in `Meta.SETTING_DEFAULTS`; lezen via `Meta.setting(key)`, wisselen via `Meta.toggle_setting(key)`. Bewust géén nep-schakelaars: elke toggle grijpt echt ergens in — de enige uitzondering is de taalkeuze, die als placeholder in de UI staat gemarkeerd.
 
 | Instelling | Key | Wat het doet |
 |---|---|---|
-| Taal | `lang` | **Placeholder** — alleen Nederlands werkt; de Engelse knop staat uitgeschakeld. |
+| Taal | `lang` | Nederlands of English, live omschakelbaar. Zie §4.7 voor de vertaallaag. |
 | Confetti & animaties | `confetti` | Gate in `_confetti()` én `_small_negative_puff()`, dus zowel de combo-uitbarsting en tekening-confetti als het rode puffje bij een afwijzing. |
 | Kantoor-achtergrond | `office_bg` | Gate in `_update_office_background()`: uit = effen donkere achtergrond i.p.v. beeld/sfeerkleur per niveau (rustiger te lezen). Wordt direct toegepast door `_bg_level` te invalideren. |
 | Spelerkaart onderaan | `player_panel` | Gate in `_show_player_info()`: uit = het onderste paneel blijft verborgen, wat ~156px schermruimte teruggeeft bij events/minigames. |
@@ -326,6 +327,45 @@ Daarnaast staan hier de **destructieve acties**, allemaal met tweestaps-bevestig
 - **Alles wissen** — `Meta.wipe_everything()` + `Game.delete_save()`. Wist punten, perks, Erfenis-perks, sterren, ∞-upgrade, carrièrestats, Hall of Fame én de niveau-6-ontgrendeling. **Instellingen blijven expres staan** — die zijn geen progressie, en het is irritant als je taal-/animatiekeuzes verdwijnen omdat je opnieuw wilt beginnen.
 
 **Prestige** is bewust NIET verhuisd: dat is een progressie-keuze (boom opofferen voor een ster), geen instelling, en hoort dus op het perkscherm.
+
+### 4.7 Meertaligheid (Nederlands / English)
+
+`scripts/i18n.gd` (autoload `I18n`) bevat de vertaallaag. **De NEDERLANDSE string is zelf de sleutel**: in de code staat `T("Naar events →")` en de tabel mapt die naar het Engels. Waarom zo, en niet met abstracte sleutels als `EVENTS_NEXT`:
+
+* de broncode blijft leesbaar — je ziet meteen wat er op het scherm komt;
+* een ontbrekende vertaling valt automatisch terug op het Nederlands, i.p.v. een lege string of een sleutelnaam te tonen;
+* er is geen aparte sleutel-administratie die uit de pas kan lopen.
+
+`I18n` staat in `project.godot` **ná** `Meta` geregistreerd, zodat de opgeslagen taalkeuze bij `_ready()` al beschikbaar is. In `main.gd` staat een korte alias `T()`; andere scripts roepen `I18n.T()` aan.
+
+**Regel 1: vertaal ALTIJD vóór het interpoleren.**
+
+```gdscript
+lbl(T("Seizoen %d/%d") % [a, b])     # goed
+lbl(T("Seizoen %d/%d" % [a, b]))     # FOUT — zoekt een al ingevulde string op en mist dus altijd
+```
+
+Dit is de belangrijkste valkuil: de tweede vorm crasht niet, hij blijft gewoon stil Nederlands. De placeholders (`%s`, `%d`) moeten in de vertaling in dezelfde ORDE staan, want GDScript's `%`-operator kent geen genummerde argumenten.
+
+**Regel 2: pluraliseer met HELE woorden, niet met een achtervoegsel.** `"%d ster%s"` met `"" if n == 1 else "ren"` werkt alleen in het Nederlands — in het Engels wordt dat `"starren"`. Gebruik daarom `_stars_word(n)` / `_rounds_word(n)`, die `T("ster")` of `T("sterren")` teruggeven. Dit patroon zat op drie plekken en is nu overal weg; als je een nieuwe teller toevoegt, doe het meteen goed.
+
+**Regel 3: data-dicts lokaliseren op de LEESSITE, niet in de dict.** `SHOP_UPGRADES`, `PERKS`, `OFFICE_LEVELS` en `LEGACY_PERKS` zijn `const` — die kunnen op parse-time geen `T()` aanroepen. Daarom zijn er accessors: `Game.shop_name()/shop_desc()`, `Game.office_name()`, `Meta.perk_name()/perk_desc()/legacy_perk_name()/legacy_perk_desc()`. De UI leest hierlangs. Dat is ook waarom ~150 strings maar 9 code-edits kostten.
+
+**`events_db.gd` blijft volledig onaangeroerd.** `get_events()` is een `static func`, en autoload-toegang vanuit een static context is in GDScript riskant. In plaats daarvan vertaalt `main.gd` op de **zes weergavesites**: `ev.title`, `ev.text`, `opt.label` en de drie uitkomst-fallbacks (`txt` / `success_txt` / `fail_txt`). Zes edits dekken zo alle 424 event-strings. Let op dat `{client}` en `{amount}` in elke vertaling bewaard blijven — die worden ná het vertalen vervangen.
+
+**Niet elke taalverschil is een vertaling.** `anagram_hunt.gd`'s `WORD_BANK` bevat woorden die gehusseld worden; een gehusseld Nederlands woord is onontcijferbaar in een Engels spel. Daarom geeft `I18n.word_bank()` per taal een eigen lijst met dezelfde thematiek en vergelijkbare woordlengtes — spelinhoud, niet tekst.
+
+**Een taal toevoegen.** Schrijf een `_table_xx()` naar het model van `_table_en()`, voeg de taalcode toe aan `I18n.LANGS`, en registreer de tabel in `_ready()`. Er is geen code-wijziging nodig buiten `i18n.gd`. **Arabisch staat bewust NIET in `LANGS`**: dat vraagt naast vertaling ook een gespiegelde RTL-layout (badges rechts, `→`-pijlen, `HBoxContainer`-ordening) en is dus een aparte klus, geen vertaalronde.
+
+**Controleren of je niets mist**, na het toevoegen van strings:
+
+```bash
+grep -oh 'T("[^"]*")' scripts/*.gd | sed 's/^T("//;s/")$//' | sort -u > /tmp/used.txt
+grep -o '	d\[".*"\] =' scripts/i18n.gd | sed 's/^\td\["//;s/"\] =$//' | sort -u > /tmp/have.txt
+comm -23 /tmp/used.txt /tmp/have.txt | grep '[a-zA-Z]'
+```
+
+Wat overblijft zijn puur structurele sleutels (`"%s"`, `"%s%s"`, witruimte) — die vallen correct identiek terug. Let op: een sleutel met een `]` erin (zoals de header met `[color=…]`) geeft een vals-negatief in die tweede grep.
 
 ---
 
