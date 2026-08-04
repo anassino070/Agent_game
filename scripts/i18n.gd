@@ -116,7 +116,6 @@ func _table_en() -> Dictionary:
 	d["NIEUWE RUN"] = "NEW RUN"
 	d["Doorgaan met vorige run"] = "Continue previous run"
 	d["🏆 HALL OF FAME"] = "🏆 HALL OF FAME"
-	d["  %s — %s (seizoen %d)"] = "  %s — %s (season %d)"
 	d["Naamloze topper"] = "Nameless star"
 	d["⚙ Instellingen →"] = "⚙ Settings →"
 

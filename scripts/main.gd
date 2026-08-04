@@ -502,8 +502,10 @@ func show_start() -> void:
 		lbl(T("🏆 HALL OF FAME"), 26)
 		for entry in Meta.state.hall_of_fame:
 			var cname: String = str(entry.client_name)
-			lbl(T("  %s — %s (seizoen %d)") % [
-				cname if cname != "" else T("Naamloze topper"), eur(int(entry.total_fees)), int(entry.seasons),
+			# Geen seizoen erbij: je komt hier alleen in met een gewonnen run, en
+			# winnen kan pas ná MAX_SEASONS — dat cijfer is dus altijd 15.
+			lbl(T("  %s — %s") % [
+				cname if cname != "" else T("Naamloze topper"), eur(int(entry.total_fees)),
 			], 20)
 	sep()
 	btn(T("⚙ Instellingen →"), show_settings)
@@ -931,7 +933,10 @@ func _finish_run_meta(won: bool) -> int:
 	if bool(Game.state.get("meta_awarded", false)):
 		return 0
 	var seasons := mini(int(Game.state.season), Game.MAX_SEASONS)
-	var earned := Meta.award_run(int(Game.state.total_fees)/10, seasons, won)
+	# Rauwe total_fees, NIET gedeeld: award_run() rekent er geen punten mee (die
+	# komen uit tree_total_cost()) en zet het bedrag alleen in best_fees en
+	# total_career_fees, en die worden als euro's getoond.
+	var earned := Meta.award_run(int(Game.state.total_fees), seasons, won)
 	if won:
 		Meta.record_win(_best_client_name(), int(Game.state.total_fees), seasons)
 	Game.state.meta_awarded = true

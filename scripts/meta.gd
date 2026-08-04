@@ -284,6 +284,7 @@ func load_meta() -> void:
 			"best_fees": 0,
 			"best_season": 0,
 			"total_career_fees": 0,
+			"fees_scale_fixed": true,
 			"perks": {},
 		}
 	if not state.has("perks"):
@@ -307,6 +308,15 @@ func load_meta() -> void:
 	for k in SETTING_DEFAULTS:
 		if not state.settings.has(k):
 			state.settings[k] = SETTING_DEFAULTS[k]
+	# Migratie: best_fees en total_career_fees kwamen binnen als total_fees/10
+	# (zie main.gd _finish_run_meta), maar worden als euro's getoond — ze stonden
+	# dus een factor 10 te laag, terwijl de Hall of Fame het echte bedrag bewaart.
+	# Eenmalig terugschalen zodat oude en nieuwe runs op dezelfde schaal staan.
+	if not state.has("fees_scale_fixed"):
+		state.best_fees = int(state.best_fees) * 10
+		state.total_career_fees = int(state.total_career_fees) * 10
+		state.fees_scale_fixed = true
+		save_meta()   # meteen vastleggen, anders loopt de migratie elke start opnieuw
 
 
 # ---- Instellingen (persistent in meta.json, dus runs-overstijgend) ----
@@ -625,6 +635,7 @@ func wipe_everything() -> void:
 		"best_fees": 0,
 		"best_season": 0,
 		"total_career_fees": 0,
+		"fees_scale_fixed": true,
 		"perks": {},
 		"prestige_stars": 0,
 		"legacy_perks": {},
