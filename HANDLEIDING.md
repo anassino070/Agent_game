@@ -139,7 +139,7 @@ voetbalmakelaar/
 └── scripts/
     ├── game.gd            # AUTOLOAD "Game": alle staat + spellogica van één run
     ├── meta.gd            # AUTOLOAD "Meta": meta-progressie (legacy points, perks), overleeft runs
-    ├── i18n.gd            # AUTOLOAD "I18n": vertaallaag NL/EN/FR (zie §4.7)
+    ├── i18n.gd            # AUTOLOAD "I18n": vertaallaag NL/EN/FR/ES/DE (zie §4.7)
     ├── world_gen.gd       # procedurele generatie (spelers, clubs, namen)
     ├── events_db.gd       # alle 70 events als pure data
     ├── negotiation.gd     # het onderhandelings-minigame (transferwindow)
@@ -316,7 +316,7 @@ Bereikbaar via het startscherm (`show_settings()` in `main.gd`). Alle instelling
 
 | Instelling | Key | Wat het doet |
 |---|---|---|
-| Taal | `lang` | Nederlands, English of Français, live omschakelbaar. Zie §4.7 voor de vertaallaag. |
+| Taal | `lang` | Nederlands, English, Français, Español of Deutsch, live omschakelbaar. Zie §4.7 voor de vertaallaag. |
 | Confetti & animaties | `confetti` | Gate in `_confetti()` én `_small_negative_puff()`, dus zowel de combo-uitbarsting en tekening-confetti als het rode puffje bij een afwijzing. |
 | Kantoor-achtergrond | `office_bg` | Gate in `_update_office_background()`: uit = effen donkere achtergrond i.p.v. beeld/sfeerkleur per niveau (rustiger te lezen). Wordt direct toegepast door `_bg_level` te invalideren. |
 | Spelerkaart onderaan | `player_panel` | Gate in `_show_player_info()`: uit = het onderste paneel blijft verborgen, wat ~156px schermruimte teruggeeft bij events/minigames. |
@@ -330,9 +330,9 @@ Daarnaast staan hier de **destructieve acties**, allemaal met tweestaps-bevestig
 
 **Prestige** is bewust NIET verhuisd: dat is een progressie-keuze (boom opofferen voor een ster), geen instelling, en hoort dus op het perkscherm.
 
-### 4.7 Meertaligheid (Nederlands / English / Français)
+### 4.7 Meertaligheid (Nederlands / English / Français / Español / Deutsch)
 
-`scripts/i18n.gd` (autoload `I18n`) bevat de vertaallaag. **De NEDERLANDSE string is zelf de sleutel**: in de code staat `T("Naar events →")` en de tabel mapt die naar het Engels of Frans. Waarom zo, en niet met abstracte sleutels als `EVENTS_NEXT`:
+`scripts/i18n.gd` (autoload `I18n`) bevat de vertaallaag. **De NEDERLANDSE string is zelf de sleutel**: in de code staat `T("Naar events →")` en de tabel mapt die naar de doeltaal. Waarom zo, en niet met abstracte sleutels als `EVENTS_NEXT`:
 
 * de broncode blijft leesbaar — je ziet meteen wat er op het scherm komt;
 * een ontbrekende vertaling valt automatisch terug op het Nederlands, i.p.v. een lege string of een sleutelnaam te tonen;
@@ -374,7 +374,7 @@ Symbolen (`"🏠"`, `"→"`) hoeven niet gewrapt; de rest wel.
 
 **`events_db.gd` blijft volledig onaangeroerd.** `get_events()` is een `static func`, en autoload-toegang vanuit een static context is in GDScript riskant. In plaats daarvan vertaalt `main.gd` op de **zes weergavesites**: `ev.title`, `ev.text`, `opt.label` en de drie uitkomst-fallbacks (`txt` / `success_txt` / `fail_txt`). Zes edits dekken zo alle 424 event-strings. Let op dat `{client}` en `{amount}` in elke vertaling bewaard blijven — die worden ná het vertalen vervangen.
 
-**Niet elke taalverschil is een vertaling.** `anagram_hunt.gd`'s `WORD_BANK` bevat woorden die gehusseld worden; een gehusseld Nederlands woord is onontcijferbaar in een Engels spel. Daarom geeft `I18n.word_bank()` per taal een eigen lijst met dezelfde thematiek en vergelijkbare woordlengtes — spelinhoud, niet tekst. Hetzelfde geldt voor `club_names()`. De Franse woordenlijst is bewust **accentloos** (`RESERVE`, `ENTRAINEUR`): de anagramjacht husselt losse letters, en een `É` als apart tegeltje is zowel lastig te typen als verwarrend.
+**Niet elke taalverschil is een vertaling.** `anagram_hunt.gd`'s `WORD_BANK` bevat woorden die gehusseld worden; een gehusseld Nederlands woord is onontcijferbaar in een Engels spel. Daarom geeft `I18n.word_bank()` per taal een eigen lijst met dezelfde thematiek en vergelijkbare woordlengtes — spelinhoud, niet tekst. Hetzelfde geldt voor `club_names()`. Alle niet-Nederlandse woordenlijsten zijn bewust **accentloos** (`RESERVE`, `ENTRAINEUR`, `PENALITE`, `PRAEMIE`): de anagramjacht husselt losse letters, en een `É`, `Ñ` of `ß` als apart tegeltje is zowel lastig te typen als verwarrend. Bij Duits betekent dat woorden kiezen die zonder umlaut kunnen, of de `AE`/`OE`/`UE`-schrijfwijze.
 
 **Een taal toevoegen.** Schrijf een `_table_xx()` naar het model van `_table_en()`, voeg de taalcode toe aan `I18n.LANGS`, registreer de tabel in `_ready()`, en breid `word_bank()`/`club_names()` uit. Er is geen code-wijziging nodig buiten `i18n.gd`; het taalmenu in `show_settings()` loopt over `I18n.LANGS` en pikt de nieuwe taal automatisch op. **Arabisch staat bewust NIET in `LANGS`**: dat vraagt naast vertaling ook een gespiegelde RTL-layout (badges rechts, `→`-pijlen, `HBoxContainer`-ordening) en is dus een aparte klus, geen vertaalronde.
 
@@ -382,7 +382,9 @@ Bij een nieuwe tabel zijn drie mechanische checks de moeite waard, want geen erv
 
 1. **sleutelset identiek** aan `_table_en()` — anders val je stil terug op Nederlands;
 2. **placeholders in dezelfde soort én ORDE** (`%s`, `%d`, `{client}`, `{amount}`, `\n`), want GDScript's `%`-operator kent geen genummerde argumenten: een omgewisselde `%s`/`%d` is een harde crash, geen schoonheidsfoutje;
-3. **stringsyntaxis**: exact vier niet-ge-escapete `"` per regel. Een losse `"` in een vertaling breekt het hele bestand bij het parsen. Handige vergelijking: het escape-profiel van de nieuwe tabel moet gelijk zijn aan dat van `_table_en()` (nu 12× `\n`, 48× `\"`).
+3. **stringsyntaxis**: exact vier niet-ge-escapete `"` per regel. Een losse `"` in een vertaling breekt het hele bestand bij het parsen. Handige vergelijking: het escape-profiel van de nieuwe tabel moet gelijk zijn aan dat van `_table_en()` (nu 12× `\n`, 48× `\"`) — alle vier de huidige tabellen komen daar precies op uit.
+
+**Naamvallen in het Duits.** Een paar waarden worden in een frame geïnterpoleerd dat de naamval bepaalt, dus staan ze niet in de nominatief: `d["een rivaal"] = "einem Rivalen"` (datief, want `von %s abgeworben`) en `d["EEN CLIËNT"] = "EINEN KLIENTEN"` (accusatief, want `DU VERLIERST %s`). Wie zulke sleutels later hergebruikt in een ánder frame krijgt een grammaticale fout die geen enkele check opmerkt — de tabel is per definitie contextloos.
 
 **Controleren of je niets mist**, na het toevoegen van strings:
 
