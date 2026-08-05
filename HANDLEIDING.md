@@ -139,7 +139,7 @@ voetbalmakelaar/
 └── scripts/
     ├── game.gd            # AUTOLOAD "Game": alle staat + spellogica van één run
     ├── meta.gd            # AUTOLOAD "Meta": meta-progressie (legacy points, perks), overleeft runs
-    ├── i18n.gd            # AUTOLOAD "I18n": vertaallaag NL/EN/FR/ES/DE (zie §4.7)
+    ├── i18n.gd            # AUTOLOAD "I18n": vertaallaag NL/EN/FR/ES/DE/AR + RTL (zie §4.7)
     ├── world_gen.gd       # procedurele generatie (spelers, clubs, namen)
     ├── events_db.gd       # alle 70 events als pure data
     ├── negotiation.gd     # het onderhandelings-minigame (transferwindow)
@@ -316,7 +316,7 @@ Bereikbaar via het startscherm (`show_settings()` in `main.gd`). Alle instelling
 
 | Instelling | Key | Wat het doet |
 |---|---|---|
-| Taal | `lang` | Nederlands, English, Français, Español of Deutsch, live omschakelbaar. Zie §4.7 voor de vertaallaag. |
+| Taal | `lang` | Nederlands, English, Français, Español, Deutsch of العربية, live omschakelbaar (ook de RTL-layout). Zie §4.7. |
 | Confetti & animaties | `confetti` | Gate in `_confetti()` én `_small_negative_puff()`, dus zowel de combo-uitbarsting en tekening-confetti als het rode puffje bij een afwijzing. |
 | Kantoor-achtergrond | `office_bg` | Gate in `_update_office_background()`: uit = effen donkere achtergrond i.p.v. beeld/sfeerkleur per niveau (rustiger te lezen). Wordt direct toegepast door `_bg_level` te invalideren. |
 | Spelerkaart onderaan | `player_panel` | Gate in `_show_player_info()`: uit = het onderste paneel blijft verborgen, wat ~156px schermruimte teruggeeft bij events/minigames. |
@@ -330,7 +330,7 @@ Daarnaast staan hier de **destructieve acties**, allemaal met tweestaps-bevestig
 
 **Prestige** is bewust NIET verhuisd: dat is een progressie-keuze (boom opofferen voor een ster), geen instelling, en hoort dus op het perkscherm.
 
-### 4.7 Meertaligheid (Nederlands / English / Français / Español / Deutsch)
+### 4.7 Meertaligheid (NL / EN / FR / ES / DE / AR)
 
 `scripts/i18n.gd` (autoload `I18n`) bevat de vertaallaag. **De NEDERLANDSE string is zelf de sleutel**: in de code staat `T("Naar events →")` en de tabel mapt die naar de doeltaal. Waarom zo, en niet met abstracte sleutels als `EVENTS_NEXT`:
 
@@ -376,7 +376,17 @@ Symbolen (`"🏠"`, `"→"`) hoeven niet gewrapt; de rest wel.
 
 **Niet elke taalverschil is een vertaling.** `anagram_hunt.gd`'s `WORD_BANK` bevat woorden die gehusseld worden; een gehusseld Nederlands woord is onontcijferbaar in een Engels spel. Daarom geeft `I18n.word_bank()` per taal een eigen lijst met dezelfde thematiek en vergelijkbare woordlengtes — spelinhoud, niet tekst. Hetzelfde geldt voor `club_names()`. Alle niet-Nederlandse woordenlijsten zijn bewust **accentloos** (`RESERVE`, `ENTRAINEUR`, `PENALITE`, `PRAEMIE`): de anagramjacht husselt losse letters, en een `É`, `Ñ` of `ß` als apart tegeltje is zowel lastig te typen als verwarrend. Bij Duits betekent dat woorden kiezen die zonder umlaut kunnen, of de `AE`/`OE`/`UE`-schrijfwijze.
 
-**Een taal toevoegen.** Schrijf een `_table_xx()` naar het model van `_table_en()`, voeg de taalcode toe aan `I18n.LANGS`, registreer de tabel in `_ready()`, en breid `word_bank()`/`club_names()` uit. Er is geen code-wijziging nodig buiten `i18n.gd`; het taalmenu in `show_settings()` loopt over `I18n.LANGS` en pikt de nieuwe taal automatisch op. **Arabisch staat bewust NIET in `LANGS`**: dat vraagt naast vertaling ook een gespiegelde RTL-layout (badges rechts, `→`-pijlen, `HBoxContainer`-ordening) en is dus een aparte klus, geen vertaalronde.
+**Een taal toevoegen.** Schrijf een `_table_xx()` naar het model van `_table_en()`, voeg de taalcode toe aan `I18n.LANGS`, registreer de tabel in `_ready()`, en breid `word_bank()`/`club_names()` uit. Er is geen code-wijziging nodig buiten `i18n.gd`; het taalmenu in `show_settings()` loopt over `I18n.LANGS` en pikt de nieuwe taal automatisch op.
+
+**RTL (Arabisch).** `I18n.RTL_LANGS` markeert talen die van rechts naar links lopen; `I18n.is_rtl()` vraagt het op. Het echte werk gebeurt in één functie: `_apply_layout_direction()` in `main.gd`, aangeroepen vanuit `_ready()` en `_set_lang()`. Die zet `layout_direction` op de **root** `Control`, en omdat elke Control dat standaard erft, spiegelt Godot vanzelf de ordening in `HBoxContainer`/`GridContainer` en de tekstuitlijning van Labels en Buttons. Drie dingen doet Godot NIET:
+
+* **ankers spiegelen** — die zijn absoluut. De twee zwevende knoppen (🏠 en de ∞-knop) worden daarom met de hand omgeklapt van `PRESET_*_RIGHT` naar `PRESET_*_LEFT` met omgekeerde offsets. Hun geometrie staat alléén in `_apply_layout_direction()`, niet ook in `_ready()` — anders drift het uit elkaar.
+* **pijltekens spiegelen** — `→` blijft `→` in een RTL-regel. De pijlen zitten in de vertaaltabel, dus de Arabische waarden gebruiken `←` (en `← Terug` wordt `→ رجوع`). Controleerbaar: elke sleutel met een pijl moet in `_table_ar()` de tegenovergestelde pijl hebben.
+* **het anagram-toetsenbord vullen** — dat was hardgecodeerd `range(65, 91)`, oftewel A–Z. Nu komt het alfabet uit `I18n.keyboard_letters()`.
+
+De `horizontal_alignment`-instellingen in `main.gd` zijn allemaal `CENTER` en hoeven dus niets: gecentreerd blijft gecentreerd.
+
+**Het anagram-toetsenbord moet elk antwoord kunnen typen.** Dat is de reden dat de Latijnse woordenlijsten accentloos zijn, en bij Arabisch kostte het een extra ronde: de eerste versie van `KEYBOARD_AR` had de 28 basisletters, maar 18 van de 44 woorden eindigen op `ة` (taa marbuta) en één bevat `ء` (hamza). Die twee staan nu op het toetsenbord (30 letters, bij 5 kolommen precies 6 rijen). De alif-varianten `أ إ آ` en de `ى` blijven er buiten, en de woordenlijst vermijdt ze daarom ook. Te controleren met een verzamelingsverschil: elke letter die in `WORD_BANK_xx` voorkomt moet in het bijbehorende `KEYBOARD_*` zitten.
 
 Bij een nieuwe tabel zijn drie mechanische checks de moeite waard, want geen ervan valt op tijdens spelen:
 

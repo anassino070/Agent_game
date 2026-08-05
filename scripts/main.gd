@@ -187,11 +187,7 @@ func _ready() -> void:
 	home_btn = Button.new()
 	home_btn.text = "🏠"
 	home_btn.add_theme_font_size_override("font_size", 36)
-	home_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
-	home_btn.offset_left = -104
-	home_btn.offset_top = -104
-	home_btn.offset_right = -24
-	home_btn.offset_bottom = -24
+	# Anker en offsets: zie _apply_layout_direction() — die klapt ze om bij RTL.
 	home_btn.pressed.connect(_go_home)
 	add_child(home_btn)
 
@@ -227,16 +223,46 @@ func _ready() -> void:
 	# perkscherm. Vaste prijs, oneindig te kopen, +0,1% punten per niveau.
 	inf_btn = Button.new()
 	inf_btn.add_theme_font_size_override("font_size", 18)
-	inf_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
-	inf_btn.offset_left = -160
-	inf_btn.offset_top = 24
-	inf_btn.offset_right = -24
-	inf_btn.offset_bottom = 160
+	# Anker en offsets: zie _apply_layout_direction().
 	inf_btn.pressed.connect(_buy_inf)
 	inf_btn.visible = false
 	add_child(inf_btn)
 
+	_apply_layout_direction()
 	show_start()
+
+
+# RTL-talen (nu alleen Arabisch). We zetten layout_direction op de ROOT: elke
+# Control erft dat standaard, dus Godot spiegelt zelf de ordening in HBox- en
+# GridContainers en de tekstuitlijning van Labels/Buttons. Wat het NIET doet is
+# ankers spiegelen — die zijn absoluut. Daarom worden de twee zwevende knoppen
+# hieronder met de hand omgeklapt. De → -pijlen zitten in de vertaaltabel (het
+# Arabisch gebruikt ←), dus die hoeven hier niet.
+func _apply_layout_direction() -> void:
+	var rtl := I18n.is_rtl()
+	layout_direction = Control.LAYOUT_DIRECTION_RTL if rtl else Control.LAYOUT_DIRECTION_LTR
+	# Home-knop: 80×80, 24 px uit de hoek, onderaan.
+	if rtl:
+		home_btn.set_anchors_preset(Control.PRESET_BOTTOM_LEFT)
+		home_btn.offset_left = 24
+		home_btn.offset_right = 104
+	else:
+		home_btn.set_anchors_preset(Control.PRESET_BOTTOM_RIGHT)
+		home_btn.offset_left = -104
+		home_btn.offset_right = -24
+	home_btn.offset_top = -104
+	home_btn.offset_bottom = -24
+	# ∞-knop: 136×136, 24 px uit de hoek, bovenaan.
+	if rtl:
+		inf_btn.set_anchors_preset(Control.PRESET_TOP_LEFT)
+		inf_btn.offset_left = 24
+		inf_btn.offset_right = 160
+	else:
+		inf_btn.set_anchors_preset(Control.PRESET_TOP_RIGHT)
+		inf_btn.offset_left = -160
+		inf_btn.offset_right = -24
+	inf_btn.offset_top = 24
+	inf_btn.offset_bottom = 160
 
 
 func _go_home() -> void:
@@ -620,6 +646,7 @@ func _rounds_word(n: int) -> String:
 func _set_lang(code: String) -> void:
 	Meta.set_setting("lang", code)
 	I18n.set_lang(code)
+	_apply_layout_direction()
 	show_settings()
 
 
@@ -2347,8 +2374,11 @@ func show_anagram() -> void:
 		kb.add_theme_constant_override("v_separation", 6)
 		kb.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 		content.add_child(kb)
-		for code in range(65, 91):
-			var ch := char(code)
+		# Het alfabet komt uit I18n: niet elke taal is Latijns (zie
+		# I18n.keyboard_letters()). 5 kolommen geeft 6 rijen bij zowel de 26
+		# Latijnse als de 30 Arabische letters.
+		for letter in I18n.keyboard_letters():
+			var ch := str(letter)
 			var kbtn := Button.new()
 			kbtn.text = ch
 			kbtn.add_theme_font_size_override("font_size", 32)
