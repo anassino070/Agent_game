@@ -542,11 +542,6 @@ static func get_events() -> Array:
 			],
 		},
 		{
-			"id": "overboden", "title": "Verkeerd begrepen bod", "needs_client": true,
-			"minigame": "biedingsoorlog",
-			"text": "Door een miscommunicatie denken meteen drie clubs dat er een concurrerend bod ligt op {client}. Niemand wil de eerste zijn die afhaakt — en jij kunt die chaos naar je hand zetten.",
-		},
-		{
 			"id": "podcastuitnodiging", "title": "De podcast",
 			"text": "Een populaire voetbalpodcast wil je uitnodigen voor een lang, ongefilterd gesprek. Kansen en risico's in gelijke mate.",
 			"options": [

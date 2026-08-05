@@ -6,10 +6,10 @@ extends Control
 var header: RichTextLabel   # BBCode aan, zodat "Gunsten" er goudkleurig uit kan springen
 var content: VBoxContainer
 
-# Achtergrond die per kantoorniveau wisselt. De art maak je zelf: leg
-# office_1.png t/m office_5.png in res://art/ en ze worden automatisch geladen.
-# Zolang die er niet zijn, valt hij terug op een effen sfeerkleur per niveau.
-# Een halfdoorzichtige scrim eroverheen houdt de tekst altijd leesbaar.
+# Achtergrond die per kantoorniveau wisselt. Standaard een procedureel
+# sfeerverloop (OFFICE_BG_GRADIENTS) — geen assets nodig. Wil je echte art: leg
+# office_1.png t/m office_6.png in res://art/ en die gaat automatisch vóór het
+# verloop. Een halfdoorzichtige scrim eroverheen houdt de tekst altijd leesbaar.
 var office_bg: TextureRect
 var office_bg_fallback: ColorRect
 var office_scrim: ColorRect
@@ -21,6 +21,21 @@ const OFFICE_BG_COLORS := [
 	Color(0.07, 0.10, 0.16),   # 4 De Glazen Toren — koel glasblauw
 	Color(0.06, 0.13, 0.15),   # 5 Monaco — turquoise Middellandse Zee
 	Color(0.16, 0.12, 0.03),   # 6 De Kampioenssuite — donker champagnegoud
+]
+
+# Sfeerverloop per kantoorniveau: [boven, horizon-accent, onder]. Een effen
+# kleur alleen maakte niveau 1 en 6 in de praktijk bijna niet te onderscheiden;
+# een verticaal verloop met een lichtere band op ~55% leest als "een ruimte met
+# een raam" en geeft elk niveau een eigen gezicht — zónder art-assets.
+# Bewust allemaal DONKER: er ligt een scrim van 45% zwart over en de tekst moet
+# leesbaar blijven. Zodra res://art/office_<n>.png bestaat gaat die hier vóór.
+const OFFICE_BG_GRADIENTS := [
+	[Color(0.10, 0.06, 0.05), Color(0.28, 0.13, 0.06), Color(0.08, 0.05, 0.04)],  # 1 patatneon
+	[Color(0.09, 0.11, 0.10), Color(0.16, 0.20, 0.18), Color(0.07, 0.09, 0.08)],  # 2 tl-licht
+	[Color(0.07, 0.11, 0.09), Color(0.13, 0.19, 0.15), Color(0.09, 0.08, 0.06)],  # 3 gracht + hout
+	[Color(0.05, 0.08, 0.14), Color(0.10, 0.16, 0.26), Color(0.06, 0.07, 0.11)],  # 4 stad onder glas
+	[Color(0.05, 0.11, 0.14), Color(0.09, 0.24, 0.26), Color(0.14, 0.12, 0.09)],  # 5 zee + kust
+	[Color(0.10, 0.08, 0.03), Color(0.30, 0.22, 0.06), Color(0.08, 0.06, 0.02)],  # 6 champagnegoud
 ]
 
 var event_queue: Array = []
@@ -41,7 +56,6 @@ var nego_club := ""
 
 # Event-minigames: precies één van deze is actief tijdens een minigame-event.
 var mg_ev: Dictionary = {}          # het originerende event (voor client_id, terugkeer)
-var bidding: BiddingWar = null
 var press: PressConference = null
 var tax: TaxSettlement = null
 var poker: PokerBluff = null
@@ -477,11 +491,33 @@ func _update_office_background() -> void:
 	office_bg_fallback.color = OFFICE_BG_COLORS[clampi(lvl - 1, 0, OFFICE_BG_COLORS.size() - 1)]
 	var path := "res://art/office_%d.png" % lvl
 	if ResourceLoader.exists(path):
+		# Echte art: aspect bewaren en de randen laten afsnijden.
 		office_bg.texture = load(path)
+		office_bg.stretch_mode = TextureRect.STRETCH_KEEP_ASPECT_COVERED
 		office_bg.visible = true
 	else:
-		office_bg.texture = null
-		office_bg.visible = false
+		# Geen art: procedureel verloop. Dat mag juist wél uitgerekt worden —
+		# een verticaal verloop heeft geen aspect om te bewaren.
+		office_bg.texture = _office_gradient(lvl)
+		office_bg.stretch_mode = TextureRect.STRETCH_SCALE
+		office_bg.visible = true
+
+
+func _office_gradient(lvl: int) -> GradientTexture2D:
+	var stops: Array = OFFICE_BG_GRADIENTS[clampi(lvl - 1, 0, OFFICE_BG_GRADIENTS.size() - 1)]
+	var g := Gradient.new()
+	g.offsets = PackedFloat32Array([0.0, 0.55, 1.0])
+	g.colors = PackedColorArray([stops[0], stops[1], stops[2]])
+	var t := GradientTexture2D.new()
+	t.gradient = g
+	t.fill = GradientTexture2D.FILL_LINEAR
+	t.fill_from = Vector2(0.0, 0.0)   # van boven…
+	t.fill_to = Vector2(0.0, 1.0)     # …naar onder
+	# 4 px breed volstaat: er zit geen horizontale variatie in en de TextureRect
+	# rekt hem toch op. Hoog genoeg voor een vloeiend verloop zonder banding.
+	t.width = 4
+	t.height = 512
+	return t
 
 
 func show_flash() -> void:
@@ -801,7 +837,6 @@ func _dev_jump_to_event() -> void:
 func _dev_cleanup_minigames() -> void:
 	# Sluit een eventueel actieve minigame af zonder de effecten toe te
 	# passen — puur navigatie tijdens het testen, geen echte uitkomst.
-	bidding = null
 	press = null
 	tax = null
 	poker = null
@@ -1901,24 +1936,6 @@ func _show_effect_lines(effects: Dictionary, client_name: String = "") -> void:
 func _start_minigame(ev: Dictionary) -> void:
 	mg_ev = ev
 	match str(ev.minigame):
-		"biedingsoorlog":
-			var cid := str(ev.client_id)
-			var value := Game.value(Game.state.players[cid])
-			# Budget is geen harde bottleneck: elke andere club kan meebieden
-			# (financiering is hún probleem, niet een reden om jouw speler
-			# onverkoopbaar te maken).
-			var pool: Array = []
-			for club_id in Game.state.clubs:
-				if club_id != str(Game.state.players[cid].club):
-					pool.append(club_id)
-			var picked: Array = []
-			while picked.size() < 3 and not pool.is_empty():
-				var i := Game.rng.randi_range(0, pool.size() - 1)
-				picked.append(pool[i])
-				pool.remove_at(i)
-			bidding = BiddingWar.new()
-			bidding.setup(cid, picked, value, Game.state.clubs, Game.rng)
-			show_bidding()
 		"persconferentie":
 			press = PressConference.new()
 			press.setup(Game.rng)
@@ -1950,106 +1967,6 @@ func _start_minigame(ev: Dictionary) -> void:
 			simon = SimonMedia.new()
 			simon.setup(Game.rng, int(Game.state.season))
 			show_simon()
-
-
-# -- Biedingsoorlog --
-
-func show_bidding() -> void:
-	refresh_header()
-	clear()
-	_dev_test_banner()
-	lbl(T("BIEDINGSOORLOG"), 32)
-	_name_row("Cliënt: ", bidding.client_id, "", 24)
-	_set_turn_bar("Rondes:", bidding.rounds_left, BiddingWar.ROUNDS)
-	lbl(T("Prijs bepaalt JOUW fee, voorwaarden bepalen zijn vertrouwen. Duw je de een op, dan zakt de ander."), 19)
-	sep()
-	for c in bidding.clubs:
-		if not c.active:
-			var dead := lbl(T("%s — afgehaakt") % str(c.name), 22)
-			dead.add_theme_color_override("font_color", Color(0.55, 0.55, 0.58))
-			continue
-		lbl(T("%s") % str(c.name), 24)
-		var money_lbl := lbl(T("   Prijs: %s   (jouw fee ~%s)") % [
-			eur(int(c.price)), eur(int(float(int(c.price)) * Game.fee_cut())),
-		], 20)
-		money_lbl.add_theme_color_override("font_color", Color(0.45, 0.9, 0.5))
-		var terms_lbl := lbl(T("   Voorwaarden: %d/100 — %s") % [int(c.terms), bidding.terms_label(int(c.terms))], 20)
-		terms_lbl.add_theme_color_override("font_color", _terms_color(int(c.terms)))
-		lbl(T("   Geduld: %s") % ("●".repeat(int(c.patience)) + "○".repeat(maxi(3 - int(c.patience), 0))), 19)
-		lbl(T("   %s") % bidding.profile_label(c), 18)
-	if not bidding.log.is_empty():
-		sep()
-		for line in bidding.log:
-			lbl(T("· ") + str(line), 20)
-	sep()
-	if bidding.finished:
-		lbl(bidding.outcome_text(), 26)
-		if bidding.deal:
-			lbl(T("%s — %s, voorwaarden %s.") % [
-				str(bidding.find_club(bidding.winner_id).name), eur(bidding.final_price),
-				bidding.terms_label(bidding.final_terms),
-			], 22)
-			var income := int(float(bidding.final_price) * Game.fee_cut())
-			if Meta.perk_level("superprovisie") > 0:
-				income *= 2
-			# Beide assen als effectregels, zodat de ruil die je net maakte
-			# zwart-op-wit staat: fee uit de prijs, vertrouwen uit de voorwaarden.
-			var eff := {"money": income}
-			var td := bidding.trust_delta()
-			if td != 0:
-				eff["trust"] = td
-			_show_effect_lines(eff, str(Game.state.players[str(bidding.client_id)].name))
-		else:
-			_show_effect_lines({"rep": BIDDING_FAIL_REP})
-		btn(T("Verder →"), _finish_bidding)
-	else:
-		for c in bidding.active_clubs():
-			var target_id := str(c.id)
-			var prof: Dictionary = BiddingWar.PROFILES[str(c.profile)]
-			btn(T("%s: prijs omhoog  (+%s, voorwaarden -%d)") % [
-				str(c.name), eur(int(float(bidding.base_value) * float(prof.price_give))), int(prof.terms_cost),
-			], func(): _play_bidding("prijs", target_id))
-			btn(T("%s: voorwaarden omhoog  (+%d, prijs -%s)") % [
-				str(c.name), int(prof.terms_give), eur(int(float(bidding.base_value) * float(prof.price_cost))),
-			], func(): _play_bidding("voorwaarden", target_id))
-			btn(T("%s: hier tekenen") % str(c.name), func(): _play_bidding("tekenen", target_id))
-			sep()
-		if bidding.active_clubs().size() >= 2:
-			btn(T("Clubs tegen elkaar uitspelen — de achterblijvers trekken bij (kost hen geduld)"), func(): _play_bidding("uitspelen", ""))
-
-
-func _terms_color(t: int) -> Color:
-	if t >= 60:
-		return Color(0.4, 0.9, 0.5)
-	if t >= 40:
-		return Color(0.9, 0.85, 0.45)
-	return Color(1.0, 0.5, 0.4)
-
-
-func _play_bidding(action: String, target_id: String) -> void:
-	match action:
-		"prijs": bidding.push_price(target_id)
-		"voorwaarden": bidding.push_terms(target_id)
-		"uitspelen": bidding.play_off(Game.rng)
-		"tekenen": bidding.accept(target_id)
-	show_bidding()
-
-
-const BIDDING_FAIL_REP := -3
-
-func _finish_bidding() -> void:
-	if bidding.deal:
-		var income := Game.complete_transfer(bidding.client_id, bidding.winner_id, bidding.final_price, Game.fee_cut())
-		# Voorwaarden -> vertrouwen: apart toepassen, want complete_transfer()
-		# kent alleen de prijs. Dit is de helft van de ruil die de speler maakte.
-		var td := bidding.trust_delta()
-		if td != 0:
-			Game.apply_effects({"trust": td}, str(bidding.client_id))
-		flash = T("Transfer uit de biedingsoorlog! Jij incasseert %s.") % eur(income)
-	else:
-		Game.apply_effects({"rep": BIDDING_FAIL_REP}, "")
-	bidding = null
-	_next_event()
 
 
 # -- Persconferentie --
