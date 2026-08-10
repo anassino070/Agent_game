@@ -440,7 +440,7 @@ func _outcome_column(rows: Array, align: int) -> VBoxContainer:
 # vooraf en geeft het resultaat door aan _resolve(); die rolt dan niet opnieuw.
 const CHANCE_SHAKE_STEPS := 6
 const CHANCE_SHAKE_TIME := 0.18
-const CHANCE_SHAKE_AMP := 0.06
+const CHANCE_SHAKE_AMP := 0.12
 const CHANCE_SETTLE_TIME := 1.52
 
 var chance_anim_busy := false
