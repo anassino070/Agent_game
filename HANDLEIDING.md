@@ -200,6 +200,17 @@ Het getoonde percentage is de kans **inclusief** de Geluksvogel-perk (`Game.luck
 
 Opties **zonder** `chance` houden de gewone gestapelde weergave via `_show_effect_rows()` — daar is maar één uitkomst, dus valt er niets naast elkaar te zetten.
 
+**Uitkomst-animatie op de knop.** Na het kiezen trilt de grens tussen groen en rood eerst kort na (uitdempend, `CHANCE_SHAKE_*`) en schuift dan volledig naar de kant die het geworden is: heel groen bij succes, heel rood bij mislukking (`_animate_chance_outcome()`). Je ziet de uitslag dus op de knop die je net indrukte, vóór het uitkomstscherm.
+
+Dat vraagt één structurele aanpassing: **de worp gebeurt vóór de animatie**, want anders weet die niet welke kant op te schuiven. `_start_chance_option()` rolt en geeft het resultaat door via de nieuwe parameter `_resolve(ev, opt, rolled)` — `-1` = zelf rollen (alle bestaande aanroepers), `1`/`0` = uitslag al bekend. Zo wordt er nooit twee keer gerold. Er wordt gerold met exact de kans die op de balk staat (inclusief Geluksvogel), dus wat je ziet is waarmee gerold wordt.
+
+Verder:
+
+* `_chance_bar_gradient()` zet **één** stijl-instantie op alle vijf de states en geeft de `Gradient` terug; de tween muteert per frame alleen `offsets`, en `GradientTexture2D` regenereert zichzelf daarop. Eén instantie voor alle states is nodig omdat de knop tijdens de animatie op `disabled` gaat — met aparte styles zou de balk dan naar de gedimde variant springen.
+* Tijdens de animatie worden **alle** buttons in `content` uitgeschakeld (plus een `chance_anim_busy`-vlag), anders kies je een tweede optie terwijl de eerste nog uitrolt.
+* Staat **Confetti & animaties** uit in Instellingen, dan wordt de tween overgeslagen en gaat `_resolve()` meteen door. Zelfde knop als de confetti.
+* Bij een kans van 0% of 98% dempt de trilling automatisch weg: `clampf` drukt de uitslag tegen de rand plat.
+
 Beschikbare effect-keys: `money`, `rep`, `scandal`, `favors`, `trust` (de gekoppelde cliënt), `all_trust`, `scout_points`, `new_client`/`new_top_client` (voegt een vrij talent toe aan je stal en meldt wie). Poortwachters: `req_money` en `req_favors` schakelen de knop uit als de speler het niet heeft.
 
 **Faillissement-vangnet (generiek, geen `req_money` nodig).** `_option_certain_bankrupt()` in `main.gd` schakelt élke optie uit die je saldo gegarandeerd onder €0 zou zetten — ook zonder expliciete `req_money`. Dat was een echt gat: events als `clubarts_geheim` ("Alvast een transfer voorbereiden", `money: -2000`) hadden geen poortwachter, dus je kon jezelf failliet klikken. En dat is direct fataal: `_next_event()` doet een tussentijdse fail-check en zet `game_over = "failliet"` zodra je saldo onder €0 komt, dus het was een instant self-destruct. Bij een **gok** geldt de blokkade alleen als BEIDE uitkomsten je eronder brengen — een gok die je pas bij mislukking kopt blijft beschikbaar, want dat is een geïnformeerd risico (de preview toont dat bedrag). Zijn hierdoor álle opties geblokkeerd, dan verschijnt een **"Laten lopen →"**-knop zodat je niet vastzit op het eventscherm.

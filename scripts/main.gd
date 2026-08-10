@@ -407,22 +407,16 @@ func _outcome_columns(succ_rows: Array, fail_rows: Array) -> void:
 	# de uitlijning mee te spiegelen blijft elke kolom tegen de buitenrand staan.
 	var lead := HORIZONTAL_ALIGNMENT_RIGHT if I18n.is_rtl() else HORIZONTAL_ALIGNMENT_LEFT
 	var trail := HORIZONTAL_ALIGNMENT_LEFT if I18n.is_rtl() else HORIZONTAL_ALIGNMENT_RIGHT
-	row.add_child(_outcome_column(T("Bij succes:"), succ_rows, lead))
-	row.add_child(_outcome_column(T("Bij mislukking:"), fail_rows, trail))
+	row.add_child(_outcome_column(succ_rows, lead))
+	row.add_child(_outcome_column(fail_rows, trail))
 
 
-func _outcome_column(header: String, rows: Array, align: int) -> VBoxContainer:
+func _outcome_column(rows: Array, align: int) -> VBoxContainer:
 	var col := VBoxContainer.new()
 	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
 	col.add_theme_constant_override("separation", 2)
 	if rows.is_empty():
 		return col
-	var h := Label.new()
-	h.text = header
-	h.add_theme_font_size_override("font_size", 18)
-	h.horizontal_alignment = align
-	h.size_flags_horizontal = Control.SIZE_EXPAND_FILL
-	col.add_child(h)
 	for r in rows:
 		var l := Label.new()
 		l.text = str(r.text)
@@ -433,6 +427,75 @@ func _outcome_column(header: String, rows: Array, align: int) -> VBoxContainer:
 		l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(r.good) else Color(1.0, 0.35, 0.35))
 		col.add_child(l)
 	return col
+
+
+# --- Uitkomst-animatie op een kansknop ------------------------------------
+# Na het kiezen trilt de grens tussen groen en rood eerst kort na (uitdempend)
+# en schuift dan volledig naar de kant die het geworden is: heel groen bij
+# succes, heel rood bij mislukking. Zo zie je de uitslag op de knop die je net
+# indrukte, in plaats van pas op het volgende scherm.
+#
+# BELANGRIJK: de uitslag moet AL bekend zijn voordat de animatie start, anders
+# weet hij niet welke kant op te schuiven. Daarom rolt _start_chance_option()
+# vooraf en geeft het resultaat door aan _resolve(); die rolt dan niet opnieuw.
+const CHANCE_SHAKE_STEPS := 6
+const CHANCE_SHAKE_TIME := 0.045
+const CHANCE_SHAKE_AMP := 0.06
+const CHANCE_SETTLE_TIME := 0.38
+
+var chance_anim_busy := false
+
+
+func _chance_bar_gradient(b: Button, ratio: float) -> Gradient:
+	# Eén stijl-instantie voor ALLE states, zodat de balk blijft animeren ook als
+	# de knop tijdens de animatie op disabled gaat. Geeft de Gradient terug, die
+	# we per frame muteren — GradientTexture2D regenereert zichzelf daarop.
+	var sb := _chance_style(ratio)
+	for st in ["normal", "hover", "pressed", "focus", "disabled"]:
+		b.add_theme_stylebox_override(st, sb)
+	return (sb.texture as GradientTexture2D).gradient
+
+
+func _animate_chance_outcome(b: Button, base: float, success: bool, done: Callable) -> void:
+	var g := _chance_bar_gradient(b, base)
+	var set_ratio := func(r: float) -> void:
+		var p := clampf(r, 0.0, 1.0)
+		g.offsets = PackedFloat32Array([0.0, maxf(p - 0.001, 0.0), minf(p + 0.001, 1.0), 1.0])
+	var tw := create_tween()
+	var prev := base
+	for i in range(CHANCE_SHAKE_STEPS):
+		# Uitdempend: elke uitslag is kleiner dan de vorige, en om en om de andere
+		# kant op. Bij een kans van 0% of 100% valt de trilling automatisch weg
+		# omdat clampf de uitslag tegen de rand aan platdrukt.
+		var amp := CHANCE_SHAKE_AMP * (1.0 - float(i) / float(CHANCE_SHAKE_STEPS))
+		var target := clampf(base + (amp if i % 2 == 0 else -amp), 0.0, 1.0)
+		tw.tween_method(set_ratio, prev, target, CHANCE_SHAKE_TIME)
+		prev = target
+	tw.tween_method(set_ratio, prev, 1.0 if success else 0.0, CHANCE_SETTLE_TIME) \
+		.set_trans(Tween.TRANS_CUBIC).set_ease(Tween.EASE_OUT)
+	tw.tween_callback(done)
+
+
+func _start_chance_option(ev: Dictionary, opt: Dictionary, b: Button, shown: float) -> void:
+	if chance_anim_busy:
+		return
+	# Rol hier, niet in _resolve(): de animatie moet de kant al weten. `shown` is
+	# exact de kans die op de balk staat (incl. Geluksvogel), dus wat je ziet is
+	# waarmee gerold wordt.
+	var ok := Game.rng.randf() < shown
+	# Animaties uit via Instellingen? Dan meteen doorgaan, zonder tween.
+	if not bool(Meta.setting("confetti")):
+		_resolve(ev, opt, 1 if ok else 0)
+		return
+	chance_anim_busy = true
+	# Alles blokkeren tijdens de animatie, anders kun je een tweede optie kiezen
+	# terwijl de eerste nog uitrolt.
+	for c in content.get_children():
+		if c is Button:
+			(c as Button).disabled = true
+	_animate_chance_outcome(b, shown, ok, func() -> void:
+		chance_anim_busy = false
+		_resolve(ev, opt, 1 if ok else 0))
 
 
 func sep() -> void:
@@ -1763,7 +1826,11 @@ func show_event(ev: Dictionary) -> void:
 			# Geluksvogel-perk telt mee in de getoonde én de echte kans.
 			var shown := clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98)
 			# Geen "[65% kans]" meer in de tekst: de knop wordt zelf de balk.
-			_style_chance_button(btn(label + suffix, func(): _resolve(ev, opt), enabled), shown)
+			var cbtn := btn(label + suffix, func(): pass, enabled)
+			_style_chance_button(cbtn, shown)
+			# Eigen handler i.p.v. direct _resolve: eerst de uitkomst-animatie op
+			# de knop, daarna pas afhandelen (zie _start_chance_option).
+			cbtn.pressed.connect(func(): _start_chance_option(ev, opt, cbtn, shown))
 			var succ_eff := Game.scale_money_effects(opt.get("success", {}))
 			var fail_eff := Game.scale_money_effects(opt.get("fail", {}))
 			var succ_rows := _effect_rows(succ_eff, "", false, _emphasis_for(succ_eff, em_ctx.max_abs, em_ctx.distinct_counts, em_ctx.min_abs))
@@ -1782,12 +1849,16 @@ func show_event(ev: Dictionary) -> void:
 		btn(T("Laten lopen →"), _next_event)
 
 
-func _resolve(ev: Dictionary, opt: Dictionary) -> void:
+func _resolve(ev: Dictionary, opt: Dictionary, rolled := -1) -> void:
 	var txt := ""
 	var notes: Array = []
 	var used: Dictionary = {}
 	if opt.has("chance"):
-		if Game.rng.randf() < clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98):
+		# `rolled`: -1 = hier rollen, 1 = geslaagd, 0 = mislukt. De kansknop-
+		# animatie moet de uitslag al kennen om de juiste kant op te schuiven en
+		# rolt daarom vooraf; dan mag hier NIET opnieuw gerold worden.
+		var ok := (Game.rng.randf() < clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98)) if rolled < 0 else rolled == 1
+		if ok:
 			used = Game.scale_money_effects(opt.get("success", {}))
 			notes = Game.apply_effects(used, str(ev.client_id))
 			txt = T(str(opt.get("success_txt", "Het pakt goed uit.")))
