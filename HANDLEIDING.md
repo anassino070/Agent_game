@@ -188,6 +188,14 @@ Kansgebaseerde optie:
  "fail":    {"scandal": 12}, "fail_txt": "Oei."}
 ```
 
+**De kans staat NIET als tekst op de knop.** De knop is zelf de meter: groen vanaf de leidende rand tot de slaagkans, rood daarna (`_chance_style()` / `_style_chance_button()` in `main.gd`). Zo zie je het risico in één blik zonder te rekenen. Drie dingen om te weten als je hieraan sleutelt:
+
+* het is een `StyleBoxTexture` met een `GradientTexture2D` erin, en die kent **geen `corner_radius`** — kansknoppen hebben dus rechte hoeken waar gewone knoppen die van het thema volgen;
+* de harde grens komt van twee gradient-stops op `p ± 0,001` in plaats van twee stops op exact dezelfde offset, zodat het niet afhangt van hoe `Gradient` met dubbele offsets omgaat;
+* **alle** button-states krijgen een eigen stijl (`normal`/`hover`/`pressed`/`focus`/`disabled`). Vergeet je er één, dan pakt Godot daar weer de themastijl en knippert de balk weg bij aanraken. In RTL vult de balk vanaf rechts (`I18n.is_rtl()`).
+
+Het getoonde percentage is de kans **inclusief** de Geluksvogel-perk (`Game.luck_bonus()`), dus wat je ziet is wat er echt gerold wordt.
+
 Beschikbare effect-keys: `money`, `rep`, `scandal`, `favors`, `trust` (de gekoppelde cliënt), `all_trust`, `scout_points`, `new_client`/`new_top_client` (voegt een vrij talent toe aan je stal en meldt wie). Poortwachters: `req_money` en `req_favors` schakelen de knop uit als de speler het niet heeft.
 
 **Faillissement-vangnet (generiek, geen `req_money` nodig).** `_option_certain_bankrupt()` in `main.gd` schakelt élke optie uit die je saldo gegarandeerd onder €0 zou zetten — ook zonder expliciete `req_money`. Dat was een echt gat: events als `clubarts_geheim` ("Alvast een transfer voorbereiden", `money: -2000`) hadden geen poortwachter, dus je kon jezelf failliet klikken. En dat is direct fataal: `_next_event()` doet een tussentijdse fail-check en zet `game_over = "failliet"` zodra je saldo onder €0 komt, dus het was een instant self-destruct. Bij een **gok** geldt de blokkade alleen als BEIDE uitkomsten je eronder brengen — een gok die je pas bij mislukking kopt blijft beschikbaar, want dat is een geïnformeerd risico (de preview toont dat bedrag). Zijn hierdoor álle opties geblokkeerd, dan verschijnt een **"Laten lopen →"**-knop zodat je niet vastzit op het eventscherm.

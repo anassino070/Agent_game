@@ -337,6 +337,58 @@ func btn(text: String, cb: Callable, enabled := true, font_size := 0) -> Button:
 	return b
 
 
+# Kansbalk op een keuzeknop: de knop ZELF is de meter. Groen vanaf de leidende
+# rand tot de slaagkans, rood daarna. Vervangt de oude "[65% kans]"-tekst — een
+# balk laat je in één blik zien hoe groot het risico is, zonder te rekenen.
+const CHANCE_GREEN := Color(0.16, 0.42, 0.21)
+const CHANCE_RED := Color(0.46, 0.15, 0.15)
+
+
+func _chance_style(ratio: float, tint := 0.0) -> StyleBoxTexture:
+	var p := clampf(ratio, 0.0, 1.0)
+	var green := CHANCE_GREEN
+	var red := CHANCE_RED
+	if tint > 0.0:
+		green = green.lightened(tint)
+		red = red.lightened(tint)
+	elif tint < 0.0:
+		green = green.darkened(-tint)
+		red = red.darkened(-tint)
+	var g := Gradient.new()
+	# Twee stops vlak naast elkaar i.p.v. exact op dezelfde offset: dat geeft een
+	# harde grens zonder te leunen op hoe Gradient met dubbele offsets omgaat. De
+	# overgang is 0,002 breed — op 256 px is dat een halve pixel.
+	g.offsets = PackedFloat32Array([0.0, maxf(p - 0.001, 0.0), minf(p + 0.001, 1.0), 1.0])
+	g.colors = PackedColorArray([green, green, red, red])
+	var t := GradientTexture2D.new()
+	t.gradient = g
+	t.fill = GradientTexture2D.FILL_LINEAR
+	# In een RTL-taal vult de balk vanaf RECHTS, zodat hij dezelfde leesrichting
+	# volgt als de tekst erop.
+	if I18n.is_rtl():
+		t.fill_from = Vector2(1.0, 0.0)
+		t.fill_to = Vector2(0.0, 0.0)
+	else:
+		t.fill_from = Vector2(0.0, 0.0)
+		t.fill_to = Vector2(1.0, 0.0)
+	t.width = 256
+	t.height = 8
+	var sb := StyleBoxTexture.new()
+	sb.texture = t
+	sb.set_content_margin_all(10)
+	return sb
+
+
+func _style_chance_button(b: Button, ratio: float) -> void:
+	# Alle states zetten, anders valt de balk weg zodra je de knop aanraakt of
+	# hij uitgeschakeld is (dan pakt Godot weer de themastijl).
+	b.add_theme_stylebox_override("normal", _chance_style(ratio))
+	b.add_theme_stylebox_override("hover", _chance_style(ratio, 0.15))
+	b.add_theme_stylebox_override("pressed", _chance_style(ratio, -0.15))
+	b.add_theme_stylebox_override("focus", _chance_style(ratio, 0.08))
+	b.add_theme_stylebox_override("disabled", _chance_style(ratio, -0.5))
+
+
 func sep() -> void:
 	content.add_child(HSeparator.new())
 
@@ -1664,8 +1716,8 @@ func show_event(ev: Dictionary) -> void:
 		if opt.has("chance"):
 			# Geluksvogel-perk telt mee in de getoonde én de echte kans.
 			var shown := clampf(float(opt.chance) + Game.luck_bonus(), 0.0, 0.98)
-			label += T("  [%d%% kans]") % int(round(shown * 100))
-			btn(label + suffix, func(): _resolve(ev, opt), enabled)
+			# Geen "[65% kans]" meer in de tekst: de knop wordt zelf de balk.
+			_style_chance_button(btn(label + suffix, func(): _resolve(ev, opt), enabled), shown)
 			var succ_eff := Game.scale_money_effects(opt.get("success", {}))
 			var fail_eff := Game.scale_money_effects(opt.get("fail", {}))
 			var succ_rows := _effect_rows(succ_eff, "", false, _emphasis_for(succ_eff, em_ctx.max_abs, em_ctx.distinct_counts, em_ctx.min_abs))
