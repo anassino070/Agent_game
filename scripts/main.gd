@@ -389,6 +389,52 @@ func _style_chance_button(b: Button, ratio: float) -> void:
 	b.add_theme_stylebox_override("disabled", _chance_style(ratio, -0.5))
 
 
+# Uitkomsten van een kansoptie NAAST elkaar i.p.v. gestapeld: succes aan de
+# leidende kant, mislukking aan de andere. Zo staat elke kolom aan dezelfde kant
+# als de kleur op de kansbalk erboven (groen links, rood rechts) en is de
+# afweging in één blik te maken zonder te scrollen.
+#
+# Beide kolommen krijgen EXPAND_FILL, ook een lege: anders schuift de gevulde
+# kolom naar het midden zodra de andere kant geen effecten heeft.
+func _outcome_columns(succ_rows: Array, fail_rows: Array) -> void:
+	if succ_rows.is_empty() and fail_rows.is_empty():
+		return
+	var row := HBoxContainer.new()
+	row.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	row.add_theme_constant_override("separation", 12)
+	content.add_child(row)
+	# In een RTL-taal spiegelt Godot de kindorde van een HBoxContainer zelf; door
+	# de uitlijning mee te spiegelen blijft elke kolom tegen de buitenrand staan.
+	var lead := HORIZONTAL_ALIGNMENT_RIGHT if I18n.is_rtl() else HORIZONTAL_ALIGNMENT_LEFT
+	var trail := HORIZONTAL_ALIGNMENT_LEFT if I18n.is_rtl() else HORIZONTAL_ALIGNMENT_RIGHT
+	row.add_child(_outcome_column(T("Bij succes:"), succ_rows, lead))
+	row.add_child(_outcome_column(T("Bij mislukking:"), fail_rows, trail))
+
+
+func _outcome_column(header: String, rows: Array, align: int) -> VBoxContainer:
+	var col := VBoxContainer.new()
+	col.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_theme_constant_override("separation", 2)
+	if rows.is_empty():
+		return col
+	var h := Label.new()
+	h.text = header
+	h.add_theme_font_size_override("font_size", 18)
+	h.horizontal_alignment = align
+	h.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+	col.add_child(h)
+	for r in rows:
+		var l := Label.new()
+		l.text = str(r.text)
+		l.add_theme_font_size_override("font_size", 19)
+		l.horizontal_alignment = align
+		l.size_flags_horizontal = Control.SIZE_EXPAND_FILL
+		l.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART
+		l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(r.good) else Color(1.0, 0.35, 0.35))
+		col.add_child(l)
+	return col
+
+
 func sep() -> void:
 	content.add_child(HSeparator.new())
 
@@ -1722,16 +1768,7 @@ func show_event(ev: Dictionary) -> void:
 			var fail_eff := Game.scale_money_effects(opt.get("fail", {}))
 			var succ_rows := _effect_rows(succ_eff, "", false, _emphasis_for(succ_eff, em_ctx.max_abs, em_ctx.distinct_counts, em_ctx.min_abs))
 			var fail_rows := _effect_rows(fail_eff, "", false, _emphasis_for(fail_eff, em_ctx.max_abs, em_ctx.distinct_counts, em_ctx.min_abs))
-			if not succ_rows.is_empty():
-				lbl(T("Bij succes:"), 18)
-				for row in succ_rows:
-					var l := lbl(str(row.text), 19)
-					l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35))
-			if not fail_rows.is_empty():
-				lbl(T("Bij mislukking:"), 18)
-				for row in fail_rows:
-					var l := lbl(str(row.text), 19)
-					l.add_theme_color_override("font_color", Color(0.35, 0.9, 0.4) if bool(row.good) else Color(1.0, 0.35, 0.35))
+			_outcome_columns(succ_rows, fail_rows)
 		else:
 			btn(label + suffix, func(): _resolve(ev, opt), enabled)
 			var eff := Game.scale_money_effects(opt.get("effects", {}))
